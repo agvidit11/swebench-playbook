@@ -1,0 +1,11 @@
+You are looking at this Java repository (Apache Santuario / xmlsec).
+
+Read `src/main/java/org/apache/xml/security/signature/Manifest.java` and
+`src/main/java/org/apache/xml/security/signature/Reference.java`.
+
+An operator running a gateway wants a complete per-reference outcome report after verifying a
+signature, including for documents where some of the referenced content is unavailable. At the
+moment they do not reliably get one.
+
+Describe in **three sentences** how you would approach that. Approach only — no code, no patch,
+no file listing. Just the three sentences.

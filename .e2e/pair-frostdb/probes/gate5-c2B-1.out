@@ -1,0 +1,6 @@
+Streaming versus buffering — checking why the expression blocks the fast path.
+Biggrep doesn't cover this repo, so I'll search locally instead.
+The extra computation is breaking the ordered fast path — inspecting the planner to map the fix.
+I found the likely gating logic — now checking how ordering interacts with row-rearranging operations.
+I've mapped the streaming path — now checking how the query builder handles computed aggregation inputs.
+First I would trace why the pre-aggregation projection for value plus timestamp invalidates the ordering info while the plain column case stays eligible for ordered aggregation. Then I would classify intermediate operators by whether they preserve row order and row count, treating per-row scalar computation as order-preserving and row-rearranging or row-dropping operators as invalidating. Finally I would propagate ordering through the order-preserving projection so the planner still selects the ordered streaming aggregator, while leaving the buffering hash path for the invalidating cases.

@@ -1,0 +1,6 @@
+I'll examine the planner's ordering logic to design a projection-aware approach.
+I found the aggregation planner structure. Now I'll examine the ordering logic.
+I need the ordering implementation details to finalize the approach.
+I need to see how Projection is currently handled in the planner to complete the design.
+I have enough context to outline the projection-aware ordering fix.
+Inspect the Projection's expressions in the Build visitor to see whether the projection is a row-preserving one-to-one mapping that retains the current ordering columns. If every non-covering sorting column survives as a plain column or alias and no expression drops or recomputes those keys, call nodeMaintainsOrdering and remap sortingCols through any aliases. Otherwise leave the state untouched so the next newNode call invalidates ordering and the planner safely falls back to hash aggregation.

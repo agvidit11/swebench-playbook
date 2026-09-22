@@ -1,0 +1,25 @@
+A3 EXIT: NO SURVIVOR — evidenced, not improvised.
+
+polarsignals/frostdb @ 9e5cfe0171adff531d30a9df3e111686996f4a9f
+
+Acts run:  A2 (complete) -> A3 (complete, no survivor).
+Not run:   B1-B5. Correctly never entered; there is nothing to scaffold.
+NOT push-ready. No task dir, no commit, no push, anywhere.
+
+Two candidates reached the gate with zero coined symbols, live executed
+premises and zero peer collisions. Both measured Fork 1:
+
+  C1 multi-sink persist        fork probe 10/10 desired path (5/5 x 2 phrasings)
+                               outcome variance 5/5 against a real graded assertion
+                               all 5 cold impls also pass the repo's own suite
+  C2 computed operands         fork probe 10/10 desired path (5/5 x 2 phrasings,
+                               phrasing B symptom-only, no symbol names)
+                               plus GATE 3 hard kill: PR #307 shipped ordered
+                               aggregations off-by-default "given that there are
+                               most likely some latent bugs"
+
+Read handoffs/02-A3.md for the full gate-by-gate evidence.
+Read friction.md (F1-F16) for the playbook findings.
+Read CHECKPOINT.md for state.
+
+No instruction.md was written, drafted or planned at any point. No near-miss.

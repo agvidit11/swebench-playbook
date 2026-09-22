@@ -1,0 +1,247 @@
+# SURFACE SURVEY — polarsignals/frostdb @ 9e5cfe0171adff531d30a9df3e111686996f4a9f
+
+You are surveying an already-screened repository for candidate SWE-bench
+multi-turn task surfaces. Your output is a SURFACE LIST, not tasks.
+
+## CONTAINMENT — read this first
+
+- The clone at your working directory is READ-ONLY to you. Do not edit, create,
+  delete, `git add`, `git commit`, `git checkout`, or run any build/test that
+  writes into the tree. Read and grep only.
+- Do not write any file except the single answer you print to stdout.
+- Do not write prose that is intended to become a task specification. Your
+  deliverable is surfaces + observable contracts + symbol tables. No
+  instruction-style prose.
+- Print your whole answer to stdout in Markdown. Do not stop early.
+
+## THE REPO (measured, do not re-measure)
+
+Go, Apache-2.0, embedded columnar OLAP database. 45,247 non-test Go LOC.
+HEAD = `9e5cfe0171adff531d30a9df3e111686996f4a9f`, dormant since 2026-01-21.
+
+Non-test LOC by subsystem:
+`query/` 9,166 · `pqarrow/` 5,175 · repo-root (`table.go`, `db.go`,
+`snapshot.go`, `store.go`) 4,527 · `dynparquet/` 2,724 · `index/` 1,133 ·
+`internal/` 1,086 · `wal/` 694 · `parts/` 459 · `samples/` 383 ·
+`logictest/` 465 · `dst/` 412 · `storage/`, `sqlparse/`.
+
+Test harness: `go build ./...` 28 s cold; `go test ./index/...` 0.063 s;
+`go test ./query/...` 17 s. `Test_Sampler_Randomness`
+(`query/physicalplan/sampler_test.go:152`) FAILS at HEAD — it is flaky, ignore it.
+
+## HOW MANY SURFACES
+
+**14 to 16.** Derived: the 15k–60k LOC band asks 10–12; the cross-check of
+2–3 per major subsystem over 8 real subsystems asks 16–24; I took the overlap.
+
+A *surface* is: an invariant or behaviour area; the files it lives in; its
+candidate fork (the two ways a competent engineer could implement it); rough
+net-line size; and whether asserting it needs real network, wall-clock, or
+concurrency. A surface is NOT a task. They are cheap to produce and cheap to
+discard. **Do not filter out weak forks — label them `FORK: weak` and keep
+them.** A weak fork often merges usefully into a cascade later.
+
+## THE LENS — this is the composed ask
+
+### Primary search axis — AXIS 19: closed extension points at a protocol/plan boundary
+
+A dispatch site that *can* be extended but has no reachable public path: the
+machinery exists and is unreachable, or a capability is refused by an explicit
+guard while the code behind the guard is already written.
+
+Greps: an enum used as a dispatch code point; a function returning
+`does not support` / `not yet supported` / `unsupported`; a registry map with
+no public writer; a commented-out registration API; a planner that avoids a
+physical operator because that operator refuses a case.
+
+### Secondary search axis — AXIS 10: observer non-interference
+
+Inspection, preview or explanation added to a stateful object WITHOUT consuming
+input, doing work twice, or changing later results. Grep iterators, cursors,
+callbacks, lazy loaders with `Next` / `Scan` / `Iterate` / `Callback` but no
+`Peek` / `Inspect` / `Explain` / snapshot-neutral status.
+
+This repo has many existing callback-shaped entry points; they are the reason
+this axis is here. Verified by hand:
+`index.LSM.Scan(ctx, _ string, _ *dynparquet.Schema, filter logicalplan.Expr, tx uint64, callback func(context.Context, any) error) error`
+at `index/lsm.go:401`.
+
+### Tertiary search axis — AXIS 13: constraint-preserving canonical order
+
+Canonicalise output while preserving original order wherever the domain imposes
+no ordering relation. The wrong path is a total sort; the right one preserves
+stability among incomparable elements.
+
+### Fork shape — P6 revert-and-redo
+
+Step 1 builds approach A. Step 2 states a NEW, REALISTIC constraint that makes A
+untenable, so the solver must **remove or rework what it just built** and reach
+B. Step 3 (optional) builds C on B.
+
+Two operational tests every P6 surface must pass, and you must answer both:
+1. **HEAD counterfactual** — delete step 1 entirely. Could step 2's grader still
+   pass? If yes, there is no cascade. Say so.
+2. **Parallel-API test** — can step 2 be satisfied by ADDING a second API
+   alongside A, leaving A intact? If yes, P6 never engages; it is build-then-use
+   wearing a P6 label. Say so.
+
+**P6 precondition, measured:** it works ONLY when the default implementation is
+eager / unconditional / materialise-everything / copy-everything. It FAILS when
+the clever design is the idiomatic answer in the language, because the model
+emits B immediately and step 1 becomes a strawman.
+
+**MEASURED GO PRIORS — a step 1 built on any of these is a strawman and the
+surface is dead. Do not propose them as the thing step 2 tears out:** shared
+state behind pointers; generation / epoch counters; append-only version chains;
+reschedule-from-the-loop; persistent / path-copying trees; copy-on-write
+handoff. Go models write all of these unprompted.
+
+## HARD EXCLUSIONS — surfaces landing here are worthless, do not propose them
+
+These are not style preferences. Each is a measured kill.
+
+1. **WAL, crash recovery, replay, snapshot/restore, torn-tail, fsync ordering.**
+   `wal/`, `recovery/`, `snapshot.go`. 323 peer tasks on crash recovery, 160 on
+   write-ahead logging. Also publicly documented in this repo at
+   `design/wal.md` and `design/snapshots.md`.
+2. **MVCC / snapshot isolation / transaction-watermark visibility.** 126 and 111
+   peer tasks. `DB.HighWatermark`, `DB.Wait`, `Table.View` are in scope only as
+   *plumbing you use*, never as the observable being graded.
+3. **LSM level promotion, compaction picking, compaction scheduling, level
+   sizing.** Documented at `design/lsm.md` and `design/index_files.md`, and
+   heavily mined (badger compaction-picker ×2, slatedb compaction-retention,
+   pebble). **`index/` is NOT excluded** — only the compaction/level-accounting
+   *framing* of it is. `LSM.Scan` as an iteration/callback entry point is live.
+4. **Byte-for-byte output identity** as the graded observable (1,868 peers).
+5. **Execution budgets / resource budgets / query cost ceilings** of any kind.
+   Burned twice in our own corpus.
+6. **Caching, memoization, eviction policy, LRU** in any form.
+7. Anything named in this repo's 8 open issues, which are public disclosure:
+   #916 move block admin events out of the WAL · #886 dst enhancements ·
+   #879 data race when opening database · #872 transaction rearchitecture ·
+   #769 aggregation function with `GOMAXPROCS(1)` · #548 logictest build arrow
+   records directly · #433 L1 arrow compaction · #207 add final stage to the
+   logic of physical plan planning.
+8. Anything whose hard part you can name in three words or fewer (LRU eviction,
+   bloom filter, circuit breaker, k-way merge). If you can name it in three
+   words the model recalls it from training data.
+9. **A newly coined record / schema / ledger / census / manifest / audit-trail
+   whose invented field names become the task.** Measured 0 for 10. An
+   observable *effect* through an entry point that already exists is fine; a
+   single counter or flag the library ALREADY defines is fine; a coined schema
+   is not.
+
+## THE REPO'S OWN ADMISSIONS — I grepped these, you must re-verify each against HEAD
+
+An in-code admission is the strongest premise receipt there is. Quote it
+verbatim in any surface that rests on it, and state whether it is still true at
+HEAD — comments get fixed and the code moves on.
+
+- `query/physicalplan/aggregate.go:54-58` — `OrderedAggregate does not support
+  multiple aggregations, found %d`, returned as an error, immediately above
+  `// TODO(asubiotto): Multiple aggregation functions are not yet supported. The
+  planning code should already have planned a hash aggregation in this case.`
+  **This is a live refusal guard in front of already-written machinery.** Read
+  `NewOrderedAggregate` and the planner that chooses `ordered`.
+- `query/physicalplan/aggregate.go:33-36` — `// TODO(brancz): This is not
+  correct, it doesn't handle aggregations correctly of previously projected
+  columns like sum(value + timestamp).`
+- `pqarrow/arrowutils/merge.go:22` — `// WARNING: Only ascending ordering is
+  currently supported.` **Check this one especially carefully**: `cursorHeap.Less`
+  at `merge.go:82` DOES consult `Direction.comparison()`, so the warning may be
+  stale, may be partially true, or may be true only for the null-ordering half
+  (`NullsFirst` at `merge.go:88-95` does not appear to consult direction). State
+  which.
+- `query/physicalplan/binaryscalarexpr.go:113` — `panic("TODO: list comparisons
+  unimplemented")`.
+- `query/physicalplan/sampler.go:262` — `// TODO handle disparate schemas`.
+- `dynparquet/schema.go:1552` — `// This only works because we currently only
+  support flat schemas.`
+- `internal/records/record_builder.go:37` and `table.go:171` — `Nested Columns
+  are not supported`.
+- `store.go:37` — `multiple sinks not supported`.
+- `index/lsm.go:470` — `// TODO: this should be changed to just retain the
+  sentinel nodes in the lsm struct to do an O(1) lookup.`
+- `query/logicalplan/optimize.go:181`, `query/physicalplan/planordering.go:66`,
+  `pqarrow/arrow.go:723` — planner/pushdown TODOs, read them.
+
+## MANDATORY PER-SURFACE FORMAT
+
+For EVERY surface, answer all of these. A missing field makes the surface
+unusable.
+
+1. **Name** and the **subsystem / files**.
+2. **Axis** — which of AXIS 19 / AXIS 10 / AXIS 13 it instantiates, or
+   `UNLENSED` (see the control ask below).
+3. **HEAD TODAY, with a citation.** Verbatim:
+   > State what HEAD does TODAY for this behaviour, with a `file.go:line`
+   > citation. Then state whether the behaviour I am describing is already fully
+   > implemented there. If it is, say so and keep the surface in the list anyway.
+   Do not answer this with a yes/no — give me the line.
+4. **Nearest presence** — quote verbatim the closest thing that already exists
+   to the absence you are claiming, and name the case it fails to cover. You
+   cannot cite an absence; you can only cite its neighbour.
+5. **The fork** — the two implementations a competent Go engineer could
+   genuinely write here, and which one you predict a model writes cold.
+   Label `FORK: strong` / `FORK: weak`. Keep the weak ones.
+6. **Observable** — what a test asserts, through which existing entry point, to
+   tell the two implementations apart. If the only difference is speed, say so
+   and mark the surface `UNGRADEABLE` (we cannot grade a stopwatch).
+7. **Existing-vocabulary check** — list every noun in the observable contract
+   and mark each `IN-BASE` (already a symbol in this repo at HEAD, with its
+   file:line) or `COINED` (you invented it). Give the ratio.
+8. **P6 answers** — the HEAD counterfactual and the parallel-API test, above.
+9. **Determinism seam** — if the surface involves time, concurrency, ordering or
+   retries, name the injection point (a clock, a barrier, an explicit
+   `tx uint64`, a single-goroutine mode). If there is no seam, say `NO SEAM` —
+   that is a kill, not a caveat.
+10. **Size** — files touched, net lines. Target is 80–150 net lines across 2–4
+    files. Report honestly if it is 400.
+11. **Motivating caller** — who needs this and why now. A concrete caller, a
+    scale requirement, a compatibility obligation, or an operational constraint.
+    "It would be a nice API" is not one; say `NO CALLER` if you cannot name one.
+
+## SHAPE DIVERSITY — enforced
+
+Left alone, surveys return ~85% "find an existing bug" surfaces. That is the
+weakest category we have. Required mix across your 14–16:
+
+- **At least one third must be net-new capability**, not a defect fix.
+- **At least two must be genuine P6 revert-and-redo shapes** that pass both
+  operational tests in field 8.
+- **At least three must be UNLENSED CONTROLS** — surfaces you found by reading
+  the repo with no axis in mind at all. Mark them `UNLENSED`. This exists so a
+  bad lens choice on my part does not silently cost the repo; if the unlensed
+  ones are the best, say that plainly.
+- At most one third may be "HEAD has a bug here".
+
+## MERGE PASS — do this after the surface list, in the same answer
+
+Most good 2–3 step cascades are two or three RELATED surfaces combined, not one
+idea with a second step bolted on. Three merge shapes that work:
+build-then-use, narrow-then-widen, observe-then-enforce.
+
+Produce a merge table: every surface mapped to a merged candidate, or marked
+`dropped` / `parked-single-turn`, **with the reason**. Then for each merged
+candidate give:
+
+- the step 1 / step 2 requirement, one compositional invariant per step, and
+  **the tension** — the two things that conflict — in one sentence;
+- an **Interface Contract** table of every symbol the graded tests would touch
+  that is not already in the base repo:
+  `Symbol | Kind | Shape | Reachability (STATED or IN-BASE) | Alternatives (PINNED or accepted synonyms)`;
+- the **named wrong shape** a capable model would produce, plus one sentence on
+  **why** it would — which shipped primitive, which adjacent Go idiom, which
+  reading of the requirement leads there. If you cannot write that sentence, it
+  is a strawman and it will not discriminate;
+- **inter-step file overlap** — which files each step touches, and whether step
+  2 is incremental on step 1 or cumulative from base;
+- what step 2 **cannot compute** without step 1's artifact, in one sentence. No
+  answer means the cascade is fake — drop it.
+
+## HONESTY CLAUSE
+
+Zero merged candidates is a valid and expected outcome, and a survey that
+discards every premise with quoted evidence is a SUCCESSFUL survey. Do not pad.
+Do not invent a surface to reach 14. If the repo yields 6 real surfaces and 0
+merged candidates, report 6 and 0 and tell me why.

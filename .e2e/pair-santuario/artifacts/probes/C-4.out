@@ -1,0 +1,12 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/987245/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Checking the resolver chain to shape a three-sentence approach.
+I’ve mapped the resolver entry point — now I’ll examine a couple of provider implementations to complete the picture.
+I’ve mapped the resolver chain layout — now I’ll look at specific implementations to shape the approach.
+I would separate the “not mine” decision from the “mine but broken” outcome by treating decline as a silent pass and recognized-but-failed as a cause-preserving signal. I would keep the existing chain order and registration behavior unchanged while adding opt-in per-resolver diagnostics that record which resolver claimed the element and why it failed. I would limit those diagnostics to non-sensitive metadata such as resolver identity and element type, so operators can distinguish misconfiguration from unsupported key types without leaking key material.

@@ -1,0 +1,449 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/97575/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Surveying Santuario for 18 task surfaces — starting with your threat model and admissions.
+Threat model absorbed — now verifying your admissions and screening hypotheses against HEAD.
+Screening hypotheses check out so far — now sweeping each subsystem for the rest.
+Evidence gathering is nearly complete — pulling the last citations.
+# Survey: apache/santuario-xml-security-java @ 497d3fb4 — candidate surfaces for a multi-turn SWE-bench-Pro task
+
+HEAD verified as run directory clone. All line citations below were read or grepped at HEAD during this survey unless explicitly marked "prompt-supplied, NOT re-found" (one case: Surface 17, which is itself a finding).
+Preliminaries read first: `AGENTS.md` (37 lines, security-researcher routing guide, no completed-work log — nothing in it pre-claims any surface below) and `THREAT_MODEL.md` (321 lines, DRAFT, ~26 documented / 0 maintainer / 22 inferred). Threat-model contact is noted per surface. `SECURITY.md`/advisories were not mined for issues per containment (no JIRA/PR/CVE-sourced proposals; no surface below is one).
+
+**Count reported: 18 surfaces** (5 lens-1, 7 lens-2, 6 control). No padding was needed; two subsystems (`jcp/xml/dsig`, `parser/`) yielded only one surface each, and the `jcp` admission turned out to be gone (Surface 17 — a demolition, kept as instructed).
+
+---
+
+## Subsystem: signature/ (Reference, Manifest, SignedInfo, VerifiedReference, XMLSignature)
+
+### S1. Per-reference tri-state verification reporting (UNRESOLVABLE vs INVALID vs VALID)
+
+1. **NAME and SUBSYSTEM:** Tri-state per-reference verification report — signature/
+2. **LENS:** lens-1 (indeterminate policy propagation: boolean accumulation + in-loop throw that escapes the loop)
+3. **WHAT HEAD DOES TODAY:** `Manifest.verifyReferences(boolean)` accumulates a single `boolean verify` (`src/main/java/org/apache/xml/security/signature/Manifest.java:328`), sets it false on digest mismatch (`Manifest.java:339-341`), but a reference that cannot be *resolved at all* throws `ReferenceNotInitializedException` out of the loop body and is converted to a whole-operation `MissingResourceFailureException` (`Manifest.java:403-409`), so no per-reference entry is ever recorded for it. Additionally the nested-Manifest guard `if (verify && followManifests && currentRef.typeIsReferenceToManifest())` (`Manifest.java:347`) means that once *any earlier* reference fails, *later* Manifest-typed references are recorded with `manifestReferences = emptyList()` and never followed — a downstream consumer cannot tell "nested manifest valid" from "nested manifest never examined." The `VerifiedReference` value object itself only carries `(boolean valid, String uri, List<VerifiedReference> manifestReferences)` (`signature/VerifiedReference.java:27-47`) — there is no third state.
+   "State what HEAD does TODAY for this behaviour, with a file:line citation. Then state whether the behaviour I am describing is already fully implemented there. If it is, say so and keep the surface in the list anyway."
+   The tri-state (valid/invalid/unresolvable) reporting I am describing is **not** implemented: `VerifiedReference` has only a boolean, and the unresolvable path throws instead of recording. Kept in list as NET-NEW.
+4. **NEAREST PRESENCE:** `Manifest.getVerificationResults()` (`Manifest.java:449`) returns `List<VerifiedReference>` — verbatim the closest thing to the absence claimed. It fails to cover: (a) references that threw during resolve (they abort the loop at `Manifest.java:403-409` and never appear in the list), and (b) nested manifests skipped by the `verify &&` short-circuit at `Manifest.java:347` (recorded with an empty child list indistinguishable from "no nested manifest").
+5. **ENTRY POINT:** Existing public methods: `org.apache.xml.security.signature.XMLSignature.checkSignatureValue(java.security.Key)` (`XMLSignature.java:936`) and `org.apache.xml.security.signature.SignedInfo.verify(boolean)` (`SignedInfo.java:284`), plus `Manifest.getVerificationResults()` for observation. A test can reach all of it with no new public API for the *reproduction*; asserting the new tri-state needs a new accessor or extended `VerifiedReference` (COINED, see 6).
+6. **EXISTING VOCABULARY AUDIT:** `VerifiedReference` ALREADY-IN-LIBRARY; `Manifest` ALREADY-IN-LIBRARY; `Reference` ALREADY-IN-LIBRARY; `ReferenceNotInitializedException` ALREADY-IN-LIBRARY; `MissingResourceFailureException` ALREADY-IN-LIBRARY; `ReferenceType`/manifest-type URI (`Reference.MANIFEST_URI`) ALREADY-IN-LIBRARY; tri-state enum value e.g. `UNRESOLVABLE` COINED-BY-ME; any per-reference exception carrier field COINED-BY-ME. Audit is mostly ALREADY-IN-LIBRARY.
+7. **SPEC-RECALL:** LOCAL-POLICY. **SPEC-RECALL EVIDENCE:** XML Signature Syntax and Processing (xmldsig-core) § "Core Validation" defines only the overall boolean outcome (valid/invalid) of reference validation and signature validation; it says nothing about what a library reports *per reference*, and the concepts "unresolvable," `VerifiedReference`, and `getVerificationResults()` are Java-API surface the spec never mentions. No reference implementation (C xmlsec, .NET, JDK JSR-105) determines this library's reporting API.
+8. **CASCADE SKETCH:** Step 1 builds the eager tri-state collector on the DOM stack (record every reference's outcome, never throw out of the loop). Step 2's new constraint is **the StAX stack as constraint**: the streaming implementation sees each reference once, in document order, with no re-read — the DOM-natural "collect full `List<VerifiedReference>` then return" representation cannot survive one-pass delivery, so step 2 must REWORK step 1's approach into an incremental/visitor form, touching step 1's files. Step 2 cannot compute its streaming delivery order and single-pass memory bound without step 1's artifact (the complete per-reference outcome set whose emission order and retention it must then constrain). **REVERT-AND-REDO.**
+9. **DETERMINISM:** Fully deterministic. No network (same-document/synthetic URI), no clock, no threads, no randomness. Injection point for unresolvable case: a `Reference` with a bogus same-document fragment URI.
+10. **SIZE:** 2–4 files (`Manifest.java`, `VerifiedReference.java`, maybe `SignedInfo.java` + StAX counterpart), ~80–150 net lines. In band.
+
+### S2. Reference/transform budget accounting: which limit trips first, and nested-Manifest budget separation
+
+1. **NAME and SUBSYSTEM:** Budget-trip ordering and nested-budget separation — signature/
+2. **LENS:** lens-2 (which limit trips first when two policies both apply; what exception the caller sees)
+3. **WHAT HEAD DOES TODAY:** Two independent caps enforced at different program points: `Manifest` constructor throws `XMLSecurityException("signature.tooManyReferences")` when `le > referenceCount` (`Manifest.java:139-143`), where `referenceCount` is a **mutable static** read once from system property `org.apache.xml.security.maxReferences` (`Manifest.java:62-65`); the same check repeats in `verifyReferences` (`Manifest.java:321-325`); and `Reference` constructor throws `XMLSecurityException("signature.tooManyTransforms")` when transforms exceed `MAXIMUM_TRANSFORM_COUNT` (`Reference.java:253-257`). A nested Manifest is constructed fresh inside `verifyReferences` (`Manifest.java:362-365`), so its budget is separate: 30+30 references across parent+child pass while 31 in one Manifest fails. Which exception trips first for a document violating both (outer Manifest construction order vs per-Reference transform check during the verify loop) is a construction/verification interleaving artifact.
+   "State what HEAD does TODAY …" The per-Manifest enforcement exists; a unified, specified trip-order and a stated nested-budget policy do **not** exist — the separation is an emergent property of `new Manifest(...)` per nested element, not a specified rule. Not fully implemented; kept as NET-NEW (accounting/query API + specified ordering).
+4. **NEAREST PRESENCE:** `public static final int MAXIMUM_REFERENCE_COUNT = 30;` (`Manifest.java:58`) plus the two `signature.tooManyReferences` throw sites — the closest thing to a budget policy. They fail to cover: trip-order between the reference cap and the transform cap, and whether nested Manifests share or split the budget (code splits it silently).
+5. **ENTRY POINT:** `new org.apache.xml.security.signature.XMLSignature(Element, String, boolean)` (`XMLSignature.java:532`) for construction-time trips; `checkSignatureValue(Key)` (`XMLSignature.java:936`) for verify-time trips. Observable with no new API (exception message keys differ); asserting a *specified* order needs only existing API.
+6. **EXISTING VOCABULARY AUDIT:** `secureValidation` ALREADY-IN-LIBRARY; `MAXIMUM_REFERENCE_COUNT` ALREADY-IN-LIBRARY; `MAXIMUM_TRANSFORM_COUNT` ALREADY-IN-LIBRARY; `signature.tooManyReferences` / `signature.tooManyTransforms` message keys ALREADY-IN-LIBRARY; `followManifests` ALREADY-IN-LIBRARY; any "budget consumed" counter or trip-order specification COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **SPEC-RECALL EVIDENCE:** xmldsig-core defines no limit on reference/transform counts; caps exist only as DoS hardening invented by implementations (the JDK provider, C xmlsec, and .NET each pick different or no numbers). The spec therefore cannot determine trip order or nesting semantics — this is pure local policy, which is exactly why THREAT_MODEL.md §8.4 lists "expansion bounding" as an *inferred* (Q7) property and §14-Q7 asks maintainers to confirm the exact caps.
+8. **CASCADE SKETCH:** Step 1 builds an eager budget accountant (per-Manifest counters + a specified trip-order, throwing the same exception classes). Step 2's constraint (StAX one-pass: no lookahead to count references before verifying) forces rework of step 1's count-then-verify approach into count-as-you-go with deferred trips, modifying step 1's files. Step 2 cannot compute where its deferred trip must fire without step 1's artifact (the specified trip-order table it must preserve under streaming). **REVERT-AND-REDO** (second of the required two).
+9. **DETERMINISM:** Deterministic. Injection point: system property `org.apache.xml.security.maxReferences` (but note it is read once into a static — tests must set it before class load; name that in any task).
+10. **SIZE:** 2–3 files, ~80–130 net lines. In band.
+
+### S3. Deferred unknown-digest-algorithm failure (Reference constructor TODO)
+
+1. **NAME and SUBSYSTEM:** Unknown digest algorithm accepted at build, detonates at verify — signature/
+2. **LENS:** control (found by reading the admission; no lens needed)
+3. **WHAT HEAD DOES TODAY:** The `Reference` creation constructor carries `TODO should we throw XMLSignatureException if MessageDigestAlgoURI is wrong?` (`Reference.java:165`); the constructor stores the algorithm URI unchecked (`Reference.java:192-207`) and failure surfaces only later — `getMessageDigestAlgorithm()` returns null for empty URI or throws for MD5-under-secure-validation (`Reference.java:285-303`), and `calculateDigest` dereferences the algorithm (`Reference.java:705-706`). A caller that *signs* with a bad URI gets an object that looks fine until `generateDigestValue`/`verify`.
+   "State what HEAD does TODAY …" Fail-late is today's behaviour, cited above; fail-fast validation is **not** implemented. Kept as subtly-wrong-behaviour surface.
+4. **NEAREST PRESENCE:** `getMessageDigestAlgorithm()` (`Reference.java:285-303`) — the closest existing validation, covering only the MD5-under-secureValidation case and only at use time. It fails to cover misspelled/unknown URIs at construction time.
+5. **ENTRY POINT:** `org.apache.xml.security.signature.XMLSignature.addDocument(String baseURI, String referenceURI, Transforms, String digestURI, ...)` (via `Manifest.addDocument`, `Manifest.java:173`) — public signing path; observable with no new API (exception timing/type changes).
+6. **EXISTING VOCABULARY AUDIT:** `MessageDigestAlgorithm` ALREADY-IN-LIBRARY; `XMLSignatureException` ALREADY-IN-LIBRARY; `secureValidation` ALREADY-IN-LIBRARY; any new fail-fast checked exception or algorithm-allowlist query COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **SPEC-RECALL EVIDENCE:** xmldsig-core § "DigestMethod" mandates the element and that verifiers reject unsupported algorithms *during validation*, but says nothing about when a *signing-side Java builder API* must reject a bad URI — constructor strictness is a Java API-surface decision no spec or reference implementation determines.
+8. **CASCADE SKETCH:** NO CASCADE — single-step fail-fast change; no step-1 artifact a constrained step 2 would need.
+9. **DETERMINISM:** Deterministic, no injection issues.
+10. **SIZE:** 1–2 files, ~30–60 net lines. Below band (honest: small).
+
+---
+
+## Subsystem: c14n/ (Canonicalizer, NameSpaceSymbTable, XmlAttrStack)
+
+### S4. Relative-URI dot-segment edge cases in XmlAttrStack (double FIXME)
+
+1. **NAME and SUBSYSTEM:** Dot-segment removal completeness in c14n URI resolution — c14n/
+2. **LENS:** control
+3. **WHAT HEAD DOES TODAY:** `XmlAttrStack` implements RFC 3986 §5.2.4 `remove_dot_segments` inline with two `// FIXME: what is complete path segment?` admissions at the `"/."`-equals-input (`XmlAttrStack.java:288-290`) and `"/.."`-equals-input (`XmlAttrStack.java:321-323`) branches, using `replaceFirst("/.", "/")` / `replaceFirst("/..", "/")` — regex-based, first-match replacements whose correctness on inputs like `"/.../"`, `"/...."`, or encoded variants is exactly what the FIXME doubts.
+   "State what HEAD does TODAY …" The branches exist and function for common inputs; *proven* complete-path-segment handling is **not** implemented (the FIXME says so). Kept as subtly-wrong surface.
+4. **NEAREST PRESENCE:** The surrounding `remove_dot_segments` implementation itself (`XmlAttrStack.java:270-329`) — the closest thing to a correct implementation. It fails to cover the exact-match `"/."` / `"/.."` terminal cases with a definition of "complete path segment" (RFC 3986 §5.2.4 terms E/D).
+5. **ENTRY POINT:** No direct public entry — reachable via `org.apache.xml.security.c14n.Canonicalizer.canonicalizeSubtree(Node)` over documents with relative base URIs / XPointer-ish resolution paths that flow through `XmlAttrStack`. Test-reachable without new API, though awkward (needs URI-resolution-triggering input).
+6. **EXISTING VOCABULARY AUDIT:** `Canonicalizer` ALREADY-IN-LIBRARY; `XMLSignatureInput` ALREADY-IN-LIBRARY; RFC 3986 terminology (`remove_dot_segments`, `complete path segment`) COINED-BY-ME-as-assertions (spec vocabulary, not library vocabulary).
+7. **SPEC-RECALL:** RECALLABLE — **dead for task purposes, reported as instructed.** **SPEC-RECALL EVIDENCE:** RFC 3986 §5.2.4 fully determines `remove_dot_segments` including the complete-path-segment conditions, and Canonical XML 1.0 §2.4 / C14N 1.1 defer URI resolution to RFC 3986. A model that has read the RFC can recall the correct branch behaviour; the JDK and .NET stacks implement the same algorithm. Do not build on this.
+8. **CASCADE SKETCH:** NO CASCADE.
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 1 file, ~20–40 lines. Below band. (Also screened starting-point B: subset-boundary namespace rendering across c14n 1.0/1.1/exclusive is **entirely RECALLABLE** — C14N 1.0 §2.2, C14N 1.1 §2.2, Exclusive C14N §2 — and is therefore reported here as considered-and-dropped, not as a surface.)
+
+### S5. StAX exclusive-c14n rejects InclusiveNamespaces PrefixList (DOM/StAX divergence)
+
+1. **NAME and SUBSYSTEM:** StAX exc-c14n InclusiveNamespace support gap — c14n/ + stax/
+2. **LENS:** lens-2 (closed extension point / policy at a boundary: what the caller sees when two stacks disagree)
+3. **WHAT HEAD DOES TODAY:** The StAX canonicalizer base throws `UnsupportedOperationException("InclusiveNamespace-PrefixList not supported")` (grep-observed `stax/impl/transformer/canonicalizer/CanonicalizerBase.java:96`), while the DOM stack honors `InclusiveNamespaces` in exclusive c14n (cf. `Reference.getHTMLRepresentation` handling of `InclusiveNamespaces`, `Reference.java:542-559`). Same input verifies on DOM, throws on StAX.
+   "State what HEAD does TODAY …" The throw is today's behaviour; StAX support for the PrefixList is **not** implemented. Kept as NET-NEW.
+4. **NEAREST PRESENCE:** The `UnsupportedOperationException` at `CanonicalizerBase.java:96` — the closest existing thing to the missing support. It fails to cover any actual inclusive-prefix rendering on the streaming path.
+5. **ENTRY POINT:** StAX entry `org.apache.xml.security.stax.ext.InboundXMLSec` processing pipeline with an exc-c14n transform carrying `ec:InclusiveNamespaces`; DOM counterpart `Canonicalizer.canonicalizeSubtree`. Both existing public API.
+6. **EXISTING VOCABULARY AUDIT:** `InclusiveNamespaces` ALREADY-IN-LIBRARY; `Transform` URI constants ALREADY-IN-LIBRARY; `InboundXMLSec` ALREADY-IN-LIBRARY; streaming inclusive-prefix rendering COINED-BY-ME (implementation, not vocabulary).
+7. **SPEC-RECALL:** LOCAL-POLICY (with a RECALLABLE core — stated honestly). **SPEC-RECALL EVIDENCE:** Exclusive XML Canonicalization REC §2 *does* determine the expected output bytes for a given PrefixList (that part is RECALLABLE and the task must not ask for it); what is LOCAL-POLICY is the library's behaviour when unimplemented — which exception class surfaces, and DOM/StAX parity, which no spec or reference implementation determines. THREAT_MODEL.md §12 explicitly anticipates this class: "The StAX stack diverging from the DOM stack on any §8 property" triggers a model revision.
+8. **CASCADE SKETCH:** NO CASCADE — port-and-parity work; step 2 needs nothing step 1 uniquely computes beyond the DOM oracle output (usable as a test oracle, not a task artifact).
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 2–3 files, ~80–150 net lines (streaming namespace-prefix tracking). In band, upper end.
+
+---
+
+## Subsystem: encryption/ (XMLCipher and friends)
+
+### S6. Relative-URI CipherReference resolution (XMLCipher TODO)
+
+1. **NAME and SUBSYSTEM:** Base-URI-aware EncryptedData/CipherReference loading — encryption/
+2. **LENS:** lens-1 (un-evaluable collapsed to failure: no base context ⇒ resolution impossible ⇒ whole load fails)
+3. **WHAT HEAD DOES TODAY:** `XMLCipher`'s factory path carries `// TODO: Work out how to handle relative URI` (`XMLCipher.java:2362-2363`) when rebuilding `EncryptedData` from an element; the surrounding code copies id/type/mime/encoding/KeyInfo/EncryptionProperties (`XMLCipher.java:2342-2383`) but does nothing to resolve a relative `CipherReference` URI against a base.
+   "State what HEAD does TODAY …" Relative URIs are unhandled (admission says so); base-aware resolution is **not** implemented. Kept as NET-NEW.
+4. **NEAREST PRESENCE:** The `newEncryptedData(Element)` factory (`XMLCipher.java:2342-2383`) — closest existing loader. It fails to cover relative `URI` attributes on `CipherReference` (absolute URIs / embedded `CipherValue` work; relative ones have no base to resolve against).
+5. **ENTRY POINT:** `org.apache.xml.security.encryption.XMLCipher.loadEncryptedData(Document, Element)`-family factory path (existing); a test reaches it with an `EncryptedData` DOM containing a relative-URI `CipherReference`. No new public API needed for reproduction; a base-URI-carrying overload would be COINED.
+6. **EXISTING VOCABULARY AUDIT:** `EncryptedData`, `CipherReference`, `CipherValue`, `KeyInfo`, `EncryptionProperties` ALL ALREADY-IN-LIBRARY; base-URI parameter/field COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **SPEC-RECALL EVIDENCE:** XML Encryption § "CipherReference" defines the `URI` attribute and dereferencing only as "the decrypted octet stream," leaving base-URI processing and same-document vs external fetching to the application/JAVA layer; reference implementations differ (C xmlsec resolves against document base; JDK provider behaviour is configuration-dependent). The spec does not determine this library's loader API.
+8. **CASCADE SKETCH:** Step 1 builds eager base-aware resolution on the DOM path (whole document + base in memory). Step 2's constraint is streaming decrypt (StAX sees the `CipherReference` before/without random access to the referenced bytes), forcing removal/rework of step 1's re-read approach — modifying step 1's files. Step 2 cannot compute its single-pass fetch schedule without step 1's artifact (the resolved base-URI mapping for each reference). **REVERT-AND-REDO.**
+9. **DETERMINISM:** Deterministic if tests use in-memory/synthetic resolvers; real-external-URI tests would need network — the task should pin to same-document URIs.
+10. **SIZE:** 2–4 files, ~80–140 net lines. In band.
+
+### S7. ReferenceInformation / ReferenceList round-trip fidelity (marshalling TODO)
+
+1. **NAME and SUBSYSTEM:** Lossless EncryptedKey ReferenceInformation marshalling — encryption/
+2. **LENS:** control (admission-driven)
+3. **WHAT HEAD DOES TODAY:** `ReferenceImpl.toElement()` drops extensibility content: `// TODO: Need to martial referenceInformation ... <any namespace="##other" .../>` (`XMLCipher.java:3645-3647`) — parse keeps what the schema allows, but re-serialization silently loses `##other` children.
+   "State what HEAD does TODAY …" Lossy `toElement` is today's behaviour; faithful round-trip is **not** implemented. Kept as NET-NEW (fidelity capability).
+4. **NEAREST PRESENCE:** `DataReference`/`KeyReference` subclasses (`XMLCipher.java:3653-3669`) — closest existing typed references. They fail to cover `##other` payload preservation through `toElement()`.
+5. **ENTRY POINT:** `org.apache.xml.security.encryption.EncryptedKey` / `ReferenceList` `toElement()` paths (existing public API via `XMLCipher.newReferenceList`/`toElement`). No new API needed to observe the loss; preservation accessors would be COINED.
+6. **EXISTING VOCABULARY AUDIT:** `DataReference`, `KeyReference`, `ReferenceList`, `EncryptedKey` ALREADY-IN-LIBRARY; `referenceInformation` carrier ALREADY-IN-LIBRARY (as schema); any preservation accessor COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **SPEC-RECALL EVIDENCE:** XML Encryption's schema *permits* `##other` content (it says nothing about round-trip fidelity through a Java object model) — the "MAY carry" shape leaves Java marshalling behaviour entirely to the library; no spec or port determines it.
+8. **CASCADE SKETCH:** NO CASCADE.
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 1–2 files, ~50–90 net lines. Lower edge of band (honest).
+
+### S8. EncryptionProperty/EncryptionMethod extensibility silently dropped (double TODO)
+
+1. **NAME and SUBSYSTEM:** Extension-preserving EncryptionProperty parsing — encryption/
+2. **LENS:** lens-2 (closed extension point: `##other` content admitted by schema, discarded by code; no error, no preservation)
+3. **WHAT HEAD DOES TODAY:** `newEncryptionMethod` ignores `<any namespace='##other'/>` (`XMLCipher.java:2517-2518`); `newEncryptionProperty` ignores both `xml:*` attributes and `##other` children (`XMLCipher.java:2556-2560`). All three are `TODO: Make this ... work` admissions. Parsed objects silently lack content the schema allows.
+   "State what HEAD does TODAY …" Silent-drop is today's behaviour; preservation-or-reject is **not** implemented. Kept as NET-NEW.
+4. **NEAREST PRESENCE:** `newEncryptionProperty(Element)` (`XMLCipher.java:2551-2563`) — closest parser. It fails to cover `Target`/`Id`-adjacent extension attributes and `##other` child elements (reads only `Target` and `Id`).
+5. **ENTRY POINT:** `XMLCipher.loadEncryptedData`-adjacent factory path + `org.apache.xml.security.encryption.EncryptionProperty` getters (existing). Observable without new API; extension accessors COINED.
+6. **EXISTING VOCABULARY AUDIT:** `EncryptionProperty`, `EncryptionProperties`, `EncryptionMethod` ALREADY-IN-LIBRARY; `Target`, `Id` ALREADY-IN-LIBRARY; extension accessors COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **SPEC-RECALL EVIDENCE:** XML Encryption § "EncryptionProperty" explicitly opens `anyAttribute`/`any` for application use ("MAY") — the spec deliberately leaves handling to implementations, so silent-drop vs preserve vs reject is local policy no reference implementation determines.
+8. **CASCADE SKETCH:** NO CASCADE.
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 2 files, ~60–100 net lines. In band (lower half).
+
+---
+
+## Subsystem: transforms/ (11 transforms incl. XPath2Filter, XSLT, Base64, Enveloped)
+
+### S9. Pre-flight transform-chain policy validation (XSLT trip timing)
+
+1. **NAME and SUBSYSTEM:** Pre-execution forbidden-transform validation — transforms/
+2. **LENS:** lens-2 (which policy trips first: per-item runtime check vs whole-chain preflight)
+3. **WHAT HEAD DOES TODAY:** XSLT rejection happens *during* execution, per item: `Transforms.performTransforms` calls `checkSecureValidation(t)` inside the loop (`Transforms.java:259-268`), and the check throws `TransformationException("signature.Transform.ForbiddenTransform")` only when the XSLT item is reached (`Transforms.java:277-286`). If transform #1 throws `TransformationException` for its own reasons, or the input is consumed/partially transformed, the caller observes *that* failure — never the XSLT policy verdict — and side effects of earlier transforms have already happened.
+   "State what HEAD does TODAY …" Runtime per-item rejection exists; a pre-execution whole-chain policy verdict is **not** implemented. Kept as NET-NEW.
+4. **NEAREST PRESENCE:** `checkSecureValidation(Transform)` (`Transforms.java:277-286`) — closest policy enforcement. It fails to cover ordering (a failing earlier transform masks a later forbidden one) and pre-side-effect reporting.
+5. **ENTRY POINT:** `org.apache.xml.security.transforms.Transforms.performTransforms(XMLSignatureInput, OutputStream)` (`Transforms.java:253`) — existing; the preflight itself would be a new method (COINED) but the behaviour is observable through existing API today (exception identity changes with chain order).
+6. **EXISTING VOCABULARY AUDIT:** `Transforms`, `Transform`, `secureValidation`, `TRANSFORM_XSLT`, `TransformationException` ALL ALREADY-IN-LIBRARY; preflight method name COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **SPEC-RECALL EVIDENCE:** xmldsig-core defines the XSLT transform's semantics but no implementation may/forbid policy — forbidding XSLT under "secure validation" is a Santuario/JDK-provider hardening invention (THREAT_MODEL.md §8.2, documented-as-CVE-mitigation, Q7-open). No spec determines *when* the library reports the refusal. THREAT_MODEL §5a/§8.2 touches it directly (XSLT rejection is a §8 property; trip-timing is unspecified).
+8. **CASCADE SKETCH:** Step 1 builds the eager preflight (scan URIs before executing). Step 2's constraint: transforms whose identity depends on runtime parameters/resolution (same URI, different dereferenced content) cannot be judged from URIs alone — step 2 must rework the pure-static preflight into a staged verdict, modifying step 1's files. Step 2 cannot compute which verdicts are statically decidable without step 1's artifact (the URI-scan table). Cascade: yes (weak — disclosed as such).
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 1–2 files, ~60–100 net lines. In band (lower half).
+
+### S10. XPath2Filter evaluation complexity vs expansion bounding (OPTIMIZE TODO)
+
+1. **NAME and SUBSYSTEM:** XPath2 node-filter evaluation cost — transforms/
+2. **LENS:** control
+3. **WHAT HEAD DOES TODAY:** `XPath2NodeFilter.isNodeInclude`/`isNodeIncludeDO` evaluate set membership per node with a `//TODO OPTIMIZE` admission (`TransformXPath2Filter.java:169-180`); `rooted(...)`/`inList(...)` scans run per candidate node (`TransformXPath2Filter.java:160-189`), giving input-size-sensitive super-linear behaviour on adversarial union/subtract/intersect lists.
+   "State what HEAD does TODAY …" Correct-but-unoptimized filtering is today's behaviour; bounded/indexed evaluation is **not** implemented. Kept as subtly-wrong (DoS-adjacent) surface.
+4. **NEAREST PRESENCE:** `isNodeIncludeDO` (`TransformXPath2Filter.java:182-189+`) — the document-order fast path, closest to an optimized evaluator. It fails to cover the non-DO `isNodeInclude` path and any complexity bound.
+5. **ENTRY POINT:** `org.apache.xml.security.transforms.Transform.performTransform(XMLSignatureInput, OutputStream, boolean)` with `TRANSFORM_XPATH2FILTER` URI — existing public path. Observable via timing/size scaling, no new API.
+6. **EXISTING VOCABULARY AUDIT:** `Transform`, `NodeFilter`, `XPath2Filter` ALREADY-IN-LIBRARY; union/subtract/intersect lists ALREADY-IN-LIBRARY (as filter params); any complexity-budget knob COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **SPEC-RECALL EVIDENCE:** The XPath-Filter 2.0 REC determines filter *semantics* (which nodes survive) but specifies no evaluation complexity or resource bound; THREAT_MODEL.md §8.4 claims expansion bounding as an *inferred* property (Q7) — an implementation that is semantically correct yet super-linear sits exactly in the unspecified local-policy gap the threat model leaves open.
+8. **CASCADE SKETCH:** NO CASCADE.
+9. **DETERMINISM:** Deterministic (timing-based assertions are weak for grading — disclose: assert operation counts via an injected counter, not wall-clock; injection point would be COINED).
+10. **SIZE:** 1–2 files, ~80–150 net lines if indexed sets + tests. In band. (Honest risk: could balloon past 400 if full filter-algebra rework; scope must pin to the membership-test path.)
+
+---
+
+## Subsystem: keys/ (KeyInfo, KeyResolver chain, storage)
+
+### S11. KeyResolver chain attribution: "no resolver applied" vs "a resolver failed"
+
+1. **NAME and SUBSYSTEM:** Key-resolution failure attribution — keys/
+2. **LENS:** lens-1 (primary textbook case: chain accumulates nulls; terminal generic throw)
+3. **WHAT HEAD DOES TODAY:** Each `KeyResolverSpi` returns `null` both when it "does not apply" and when it "applied but the material was bad" (dozens of `return null` sites, e.g. `keys/keyresolver/implementations/*Resolver.java` — 100+ grep hits), and the chain terminal is a generic `throw new KeyResolverException("utils.resolver.noClass", ...)` after the loop (`KeyResolver.java:101-106`, same for `getPublicKey` at `KeyResolver.java:123-139`). The caller cannot distinguish "nothing claimed this KeyInfo" (caller-config problem: register another resolver) from "the claiming resolver rejected the key" (attacker-material problem). This is the exact boolean-collapse shape: null-accumulation + terminal give-up with attribution destroyed.
+   "State what HEAD does TODAY …" Generic terminal failure is today's behaviour; per-resolver attribution is **not** implemented. Kept as NET-NEW.
+4. **NEAREST PRESENCE:** `KeyResolver.getX509Certificate` loop (`KeyResolver.java:83-106`, quoted verbatim in behaviour: `LOG "check resolvability by class..."; cert = resolver.engineLookupResolveX509Certificate(...); if (cert != null) return cert;` then terminal throw) — closest to a diagnostic chain. It fails to cover *why* each resolver passed (not-applicable vs failed).
+5. **ENTRY POINT:** `org
+# Survey: candidate surfaces in `apache/santuario-xml-security-java` @ `497d3fb4`
+
+**Method.** Subsystem passes, not one sweep. Read `AGENTS.md` (37 lines) and `THREAT_MODEL.md` (321 lines) first. Verified the prompt-supplied admissions and screening hypotheses against HEAD with read-only reads/greps; citations below are all from this HEAD. No files modified, no build run. No JIRA/CHANGELOG consulted (per containment, possible matches are flagged from code vocabulary only, not from issue trackers).
+
+**Yield: 16 surfaces** (5 lens-1, 6 lens-2, 5 control), not 18. Two subsystems reported empty with evidence (§11). I do not pad: `transforms/` beyond the XPath2Filter admission and `jcp/` beyond the unverified `XXX` admission yielded nothing that survives the SPEC-RECALL test, and those are recorded as empty rather than padded.
+
+**Threat-model routing (global).** Per `THREAT_MODEL.md` §5a/§13, every surface below that concerns `secureValidation` limits/exceptions is by construction about the *trusted-input vs. untrusted-input posture knob*, not a §8 property break: none of these surfaces claims a signature forgery or bypass with secure validation on. A surface contradicting §9 (key trust, XSW coverage) would be dead — none does; all per-reference/coverage-adjacent surfaces explicitly leave coverage decisions to the caller (§9/§10). Surfaces the threat model declares out of scope (C++ project, JCE-provider primitives, §3/§11a) are not proposed. The model's §12 explicitly names "The StAX stack diverging from the DOM stack on any §8 property" as model-changing — S3/S7 touch that nerve directly.
+
+---
+
+## Subsystem: `signature/` (Reference, Manifest, SignedInfo, XMLSignature, VerifiedReference)
+
+### S1. Per-reference tri-state verification reporting (unresolvable ≠ digest-mismatch)
+1. **NAME and SUBSYSTEM:** Per-reference tri-state reporting — `signature/`
+2. **LENS:** lens-1 (boolean accumulator collapses NO vs UNEVALUABLE)
+3. **WHAT HEAD DOES TODAY:** `Manifest.verifyReferences(boolean)` accumulates `boolean verify` (`src/main/java/org/apache/xml/security/signature/Manifest.java:328`), sets `verify=false` on digest mismatch (`Manifest.java:339-341`), but on unresolvable input the `catch (ReferenceNotInitializedException)` at `Manifest.java:403` **throws `MissingResourceFailureException` out of the whole loop** (`Manifest.java:406-408`), aborting verification of all remaining references. `Reference.verify()` itself returns only boolean (`Reference.java:785-800`); unresolvable inputs surface as thrown `ReferenceNotInitializedException` from `calculateDigest`/`getContentsBeforeTransformation` (`Reference.java:430-444`, `Reference.java:735-736`). **State what HEAD does TODAY: the loop aborts the entire operation on the first unresolvable reference (throw escapes loop, `verificationResults` for later references never appended); digest-mismatch is a clean `false`. The behaviour I am describing (a per-reference report distinguishing the two) is NOT implemented there — it is absent, not already-implemented.**
+4. **NEAREST PRESENCE:** `public List<VerifiedReference> getVerificationResults()` (`Manifest.java:449`) and `VerifiedReference(boolean valid, String uri, List<VerifiedReference> manifestReferences)` (`VerifiedReference.java:39-47`) — the closest existing thing. It fails to cover the unresolvable case: `VerifiedReference` has only `valid` (boolean), no `UNKNOWN/UNRESOLVABLE` state, and the throw path means no entry is ever recorded for references after (or including) the unresolvable one.
+5. **ENTRY POINT:** `public boolean verifyReferences(boolean followManifests) throws MissingResourceFailureException, XMLSecurityException` (`Manifest.java:307-308`), reached via `XMLSignature.checkSignatureValue(Key)` (`XMLSignature.java:936`) → `SignedInfo.verify(boolean)` (`SignedInfo.java:284-287`). A test can observe the abort-vs-false distinction with existing public API (throw vs `false` + `getVerificationResults()`); a test **cannot** observe a per-reference reason code without new public API.
+6. **VOCABULARY AUDIT:** `Manifest` ALREADY-IN-LIBRARY; `Reference` ALREADY-IN-LIBRARY; `VerifiedReference` ALREADY-IN-LIBRARY; `MissingResourceFailureException` ALREADY-IN-LIBRARY; `ReferenceNotInitializedException` ALREADY-IN-LIBRARY; `getVerificationResults()` ALREADY-IN-LIBRARY; tri-state enum / per-reference status (`UNKNOWN`, `UNRESOLVABLE`) COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmldsig-core §5.2 ("Reference Validation") specifies the *outcome* (each reference's digest either validates or validation fails) but says nothing about what a library reports per-reference, in what order, or whether one unresolvable reference aborts the rest — and the per-reference result list is a Santuario Java API surface the REC never mentions. The JDK JSR-105 provider reports per-reference via `Reference.validate()` booleans, likewise a local choice.
+8. **CASCADE SKETCH:** Step 1 builds the obvious eager version: catch-and-record per-reference status into the existing `verificationResults` list (no abort). Step 2 (streaming constraint, cf. S3): the StAX stack sees each reference once in document order with no re-read — step 2 **cannot compute the DOM-order-indexed result list without step 1's artifact** (the recorded per-reference ledger keyed by document position), because in one pass there is no second chance to align results to references. (Cascade: yes.)
+9. **DETERMINISM:** Deterministic; no network/clock/threads/randomness. Injection point: `perManifestResolvers` / `ResourceResolver` registration to force the unresolvable path deterministically.
+10. **SIZE:** 2–3 files (`Manifest.java`, `VerifiedReference.java`, maybe `MissingResourceFailureException`), ~80–120 net lines. In band.
+
+### S2. Nested-Manifest follow guard suppresses nested verification after any earlier failure
+1. **NAME and SUBSYSTEM:** Nested-Manifest short-circuit guard — `signature/`
+2. **LENS:** lens-1 (the `verify &&` accumulator gates a whole subtree of evaluation)
+3. **WHAT HEAD DOES TODAY:** `if (verify && followManifests && currentRef.typeIsReferenceToManifest())` (`Manifest.java:347`): once any earlier reference digest-mismatches (`verify=false` at `Manifest.java:339-341`), **no later Manifest-typed reference is dereferenced or verified at all**, yet a `VerifiedReference(currentRefVerified, …)` with an empty `manifestReferences` list is still appended (`Manifest.java:402`), indistinguishable from "nested manifest was empty/valid". **State what HEAD does TODAY: the guard as cited skips nested-manifest evaluation after a prior failure and records a bare entry. The behaviour I describe (evaluating or explicitly marking skipped nested manifests) is NOT implemented there.**
+4. **NEAREST PRESENCE:** The `manifestReferences = referencedManifest.getVerificationResults()` assignment (`Manifest.java:394`) is the closest thing to nested-result propagation — it fails to cover the `verify==false` case, where `manifestReferences` stays `Collections.emptyList()` (`Manifest.java:344`) with no skipped-marker.
+5. **ENTRY POINT:** Same as S1: `Manifest.verifyReferences(true)` / `SignedInfo.verify(true)` (`SignedInfo.java:284-287`). Observable today: 4-reference doc, ref #2 digest-bad, ref #3 Manifest-typed → `getVerificationResults().get(2).getManifestReferences()` is empty although the manifest was never evaluated.
+6. **VOCABULARY AUDIT:** `followManifests` ALREADY-IN-LIBRARY; `typeIsReferenceToManifest()` ALREADY-IN-LIBRARY (`Reference.java:391-393`); `VerifiedReference.getManifestReferences()` ALREADY-IN-LIBRARY; skipped/not-evaluated marker COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmldsig-core §4.3.2 defines `Manifest` as a list of references and core validation (§5.2) but `followManifests` is a Santuario invention (the spec has no "follow nested manifests" switch and no short-circuit rule); whether a library skips, evaluates, or marks nested manifests after a failure is unspecified local policy.
+8. **CASCADE SKETCH:** Step 1: evaluate all nested manifests unconditionally and record results. Step 2 (streaming constraint): a one-pass StAX reader cannot revisit the nested `Manifest` element's bytes after moving on — **step 2 cannot compute the nested digest without step 1's artifact** (the eagerly captured canonical bytes / pre-computed digest of the nested manifest subtree). (Cascade: yes. Second REVERT-AND-REDO-shaped surface alongside S3: step 2 reworks step 1's recursive `new Manifest(...); referencedManifest.verifyReferences(...)` at `Manifest.java:362-385` into something non-recursive.)
+9. **DETERMINISM:** Fully deterministic. Injection: hand-built DOM with 3+ references.
+10. **SIZE:** 1–2 files (`Manifest.java`, `VerifiedReference.java`), ~60–100 net lines. In band.
+
+### S3. StAX/DOM agreement on per-reference verification observables (the second stack is the constraint)
+1. **NAME and SUBSYSTEM:** Streaming per-reference verification agreement — `signature/` × `stax/`
+2. **LENS:** lens-1, highest-value instantiation named in the brief (DOM-natural representation vs. one-pass constraint)
+3. **WHAT HEAD DOES TODAY:** The DOM stack exposes ordered per-reference results (`Manifest.getVerificationResults()`, `Manifest.java:449`) and random-access re-read (`dereferenceURIandPerformTransforms`, `Reference.java:592-604`; `getNodesetBeforeFirstCanonicalization`, `Reference.java:488-514`). The StAX stack has **no `maxReferences`-style cap at all** (grep for `maxReferences|tooManyReferences|MAXIMUM` under `stax/` returns no files) and no `getVerificationResults` equivalent — it validates in document order, once. **State what HEAD does TODAY: DOM reports an index-aligned per-reference ledger with re-readable inputs; StAX reports no per-reference ledger and enforces none of the DOM's count caps. The behaviour I describe (a streaming-compatible per-reference report both stacks agree on) is NOT implemented.**
+4. **NEAREST PRESENCE:** `Manifest.getVerificationResults()` (`Manifest.java:449`) — fails to cover StAX entirely (no counterpart), and `XMLSignatureInput`'s streaming-friendly `isNodeSet()/isElement()/hasUnprocessedInput()` trichotomy (`Reference.java:610-652`) — fails to cover reporting (it describes data shape, not verification status).
+5. **ENTRY POINT:** DOM side reachable via `XMLSignature.checkSignatureValue(Key)` (`XMLSignature.java:936`). StAX side: `InboundXMLSec`-driven input processors (no single per-reference-result method exists — a test **cannot reach a StAX per-reference ledger without new public API**; that absence is the surface).
+6. **VOCABULARY AUDIT:** `VerifiedReference` ALREADY-IN-LIBRARY; `XMLSignatureInput` ALREADY-IN-LIBRARY; `InboundXMLSec` ALREADY-IN-LIBRARY; streaming event/ordering vocabulary ALREADY-IN-LIBRARY; cross-stack result-ledger type COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmldsig-core specifies validation outcomes, not implementation architecture; DOM-vs-streaming API agreement is purely a Santuario-internal concern (the W3C RECs, the C `xmlsec` reference, the .NET stack, and the JDK provider never mention Santuario's StAX stack or its result types).
+8. **CASCADE SKETCH:** Step 1 builds the eager DOM ledger (S1's artifact: ordered per-reference statuses incl. UNKNOWN). Step 2 imposes one-pass streaming: the ledger must be produced without re-read or lookahead, forcing removal/rework of step 1's index-aligned `ArrayList` approach into an append-only event stream — **step 2 cannot compute position-aligned results for out-of-order-resolved references without step 1's artifact** (the eager ledger that defines the expected positions). (Cascade: yes. REVERT-AND-REDO #1.)
+9. **DETERMINISM:** Deterministic; StAX processors are in-process. No network/clock/threads needed.
+10. **SIZE:** Honestly 200–400 net lines across 3–5 files if both stacks are touched (above the 80–150 band — say so). A DOM-side-only ledger half fits the band (~100 lines).
+
+### S4. KeyResolver chain: "cannot handle" vs. "handled and failed" both surface as `null`
+1. **NAME and SUBSYSTEM:** Key-resolver failure classification — `keys/`
+2. **LENS:** lens-1 (loop accumulates first-non-null; `null` means two different things)
+3. **WHAT HEAD DOES TODAY:** `KeyResolver.getX509Certificate` / `getPublicKey` iterate `resolverList` and return the first non-null (`KeyResolver.java:83-99`, `KeyResolver.java:123-139`); every `KeyResolverSpi` implementation returns `null` both when the element type is not its business and when it tried and failed (e.g. `X509CertificateResolver.java:64-113`, `RSAKeyValueResolver.java:52-104`, `RetrievalMethodResolver.java:92-169` — dozens of `return null`). Total failure surfaces only as generic `KeyResolverException("utils.resolver.noClass", …)` (`KeyResolver.java:101-106`). **State what HEAD does TODAY: per the cited loops, a resolver declining and a resolver failing are identical (`null`); the caller learns nothing about which resolvers were attempted. The behaviour I describe (distinguishing decline from failure) is NOT implemented.**
+4. **NEAREST PRESENCE:** `throw new KeyResolverException("utils.resolver.noClass", exArgs)` (`KeyResolver.java:106`) — the closest thing to a terminal report; fails to cover *which* resolvers ran and *why each* declined/failed. `KeyResolverSpi.engineLookupAndResolvePublicKey` default `return null` (`KeyResolverSpi.java:90`) bakes the collapse in.
+5. **ENTRY POINT:** `public static PublicKey getPublicKey(Element, String, StorageResolver, boolean)` (`KeyResolver.java:120-122`) — reachable from `KeyInfo.getPublicKey()` during `checkSignatureValue`. Observable today only as success-key vs. generic exception.
+6. **VOCABULARY AUDIT:** `KeyResolver` / `KeyResolverSpi` / `StorageResolver` / `KeyInfo` ALREADY-IN-LIBRARY; `secureValidation` ALREADY-IN-LIBRARY; decline-vs-failure status COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmldsig-core §4.4 says `KeyInfo` "MAY" contain keys/names/certificates and §6 describes key processing only loosely ("the application MAY…"); resolver-chain structure, ordering, and failure reporting are Santuario Java API design with no REC counterpart. Threat-model §3/§9 explicitly disclaim key *trust* — this surface is about key *resolution diagnostics*, which the model does not assign, so it stays LOCAL-POLICY (and must not drift into trust decisions, else BY-DESIGN-dead per §9).
+8. **CASCADE SKETCH:** Step 1: record per-resolver decline/fail ledger (eager, unconditional). Step 2 (constraint): `RetrievalMethodResolver` can dereference remote material — under secure validation the ledger itself must not trigger extra dereferences or retain attacker bytes; step 2 must rework step 1's ledger to be lazy/redacted — **step 2 cannot compute the redaction boundary without step 1's artifact** (the eager ledger showing which resolvers touch remote input). (Cascade: yes, weak.)
+9. **DETERMINISM:** Deterministic with registered test resolvers; no network if remote resolvers are unregistered in the test.
+10. **SIZE:** 2–4 files (`KeyResolver.java`, `KeyResolverSpi.java`, one impl, tests), ~80–130 net lines. In band.
+
+### S5. ResourceResolver chain ordering and the unresolvable/forbidden collapse
+1. **NAME and SUBSYSTEM:** Resource-resolver give-up semantics — `utils/resolver/`
+2. **LENS:** lens-1 (try-each-then-give-up; `ResourceResolverException` from one resolver vs. chain-exhausted are different give-ups)
+3. **WHAT HEAD DOES TODAY:** `ResourceResolver.resolve(ResourceResolverContext)` iterates the static `resolverList` (`CopyOnWriteArrayList`, `ResourceResolver.java:45`) plus `perManifestResolvers` (`Manifest.java:381` wires them into nested manifests); individual resolvers throw `ResourceResolverException` for both "not mine" and "mine but forbidden/failed" (e.g. `ResolverFragment.java:76-84`, `ResolverXPointer.java:71-84` branch on `context.secureValidation`, `ResolverDirectHTTP.java:162`). Chain exhaustion throws generic `"utils.resolver.noClass"` (`ResourceResolver.java:162`). Registration order is settable via `registerAtStart` (`ResourceResolver.java:79-99`). **State what HEAD does TODAY: per cited lines, the chain conflates decline, policy-forbidden, and I/O-failed; ordering is globally mutable static state. The behaviour I describe (classified give-up + deterministic ordering policy) is NOT implemented.**
+4. **NEAREST PRESENCE:** `ResourceResolverContext(attr, baseUri, secureValidation, properties)` (`ResourceResolverContext.java:44-51`) — carries the policy bit into each resolver but nothing carries a *reason* back out; fails to cover the return path.
+5. **ENTRY POINT:** `Reference.getContentsBeforeTransformation()` (`Reference.java:430-444`) → `ResourceResolver.resolve(...)`. A test can register resolvers and observe success-vs-generic-exception; reason codes need new API.
+6. **VOCABULARY AUDIT:** `ResourceResolver` / `ResourceResolverSpi` / `ResourceResolverContext` / `perManifestResolvers` / `resolverProperties` ALREADY-IN-LIBRARY; give-up reason COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmldsig-core §5.2 reference validation says dereference the URI but leaves URI-scheme support, resolver ordering, and error reporting to implementations ("the application" language throughout §5.1/§6); the resolver chain is Santuario-specific.
+8. **CASCADE SKETCH:** NO CASCADE — step 1 (classified give-up reasons) fully determines step 2's consumers; no step-1 artifact is a computational prerequisite for a follow-up constraint I can state honestly.
+9. **DETERMINISM:** Deterministic if network resolvers (`ResolverDirectHTTP`) are excluded/unregistered in the test. Injection point: `ResourceResolver.registerAtStart` / per-manifest resolvers.
+10. **SIZE:** 2–3 files, ~80–120 net lines. In band.
+
+---
+
+## Subsystem: `signature/` policy (`secureValidation`, count caps) — screening hypothesis C
+
+### S6. Double-checked reference cap: constructor vs. verify-time, and which limit trips first
+1. **NAME and SUBSYSTEM:** Reference-cap double-check ordering — `signature/`
+2. **LENS:** lens-2 (two policies both apply; which trips first is observable)
+3. **WHAT HEAD DOES TODAY:** The cap is enforced in **two** places: `Manifest(Element, String, boolean)` constructor at `Manifest.java:139-143` (`if (secureValidation && le > referenceCount) throw … "signature.tooManyReferences"`) and again in `verifyReferences(boolean)` at `Manifest.java:321-325` with the same message but different `exArgs` values. `referenceCount` is a **mutable static** read once from system property `org.apache.xml.security.maxReferences` (`Manifest.java:62-65`). **State what HEAD does TODAY: both checks exist as cited; construction-time failure yields no object (caller sees constructor throw), verify-time failure yields `XMLSecurityException` from `verifyReferences`. The behaviour I describe (a single defined check point + specified precedence when transform-count and reference-count limits interact) is NOT implemented.**
+4. **NEAREST PRESENCE:** The two `throw new XMLSecurityException("signature.tooManyReferences", exArgs)` sites (`Manifest.java:142`, `Manifest.java:324`) — closest to a policy definition; fail to cover which one a caller will hit (depends on whether the caller constructed the `Manifest`/`XMLSignature` object itself or received it mid-flight) and fail to say anything when *both* reference-cap and transform-cap trip.
+5. **ENTRY POINT:** `new Manifest(Element, String, boolean)` (`Manifest.java:114-116`) and `Manifest.verifyReferences(boolean)` (`Manifest.java:307-308`); `XMLSignature(Element, String, boolean)` (`XMLSignature.java:532-548`) for the end-to-end path.
+6. **VOCABULARY AUDIT:** `secureValidation` ALREADY-IN-LIBRARY; `MAXIMUM_REFERENCE_COUNT` ALREADY-IN-LIBRARY (`Manifest.java:58`); `signature.tooManyReferences` message key ALREADY-IN-LIBRARY; precedence/first-tripped ordering vocabulary COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** No W3C REC mentions reference-count caps, `secureValidation`, or `org.apache.xml.security.maxReferences` — these are Santuario hardening (threat-model §8 item 4, "Expansion bounding," explicitly marked *inferred* with open Q7 on exact caps). Threat-model §5a/§14-Q7 confirms the cap set is maintainer-defined local policy.
+8. **CASCADE SKETCH:** Step 1: single-check, specified-precedence implementation (constructor check removed or explicitly ordered vs. transform-count check). Step 2 (streaming constraint): StAX cannot know the reference count until end-of-`SignedInfo` — step 2 must rework step 1's up-front check into a streaming abort — **step 2 cannot compute the abort position (how much attacker XML is processed before tripping) without step 1's artifact** (the defined precedence order that says which counter trips first). (Cascade: yes.)
+9. **DETERMINISM:** Deterministic. Injection: system property `org.apache.xml.security.maxReferences` (static — test-pollution risk to note, but deterministic).
+10. **SIZE:** 2 files (`Manifest.java`, `Reference.java`), ~60–90 net lines. In band. (Type: existing-behaviour-subtly-under-specified; borderline subtly-wrong.)
+
+### S7. Nested-Manifest reference budget: is 30+30 legal while 31-in-one fails?
+1. **NAME and SUBSYSTEM:** Nested-manifest budget composition — `signature/`
+2. **LENS:** lens-2 (which limit trips first when parent and nested policies both apply) with lens-1 shape (REVERT-AND-REDO #2)
+3. **WHAT HEAD DOES TODAY:** Each `Manifest` object enforces its own cap independently: parent constructor (`Manifest.java:139-143`), and each nested manifest constructed fresh inside the follow loop (`Manifest.java:362-365`) gets its own `referencesEl.length > referenceCount` check. Nothing sums parent + nested. So 30 top-level + 30 nested passes while 31 flat fails. **State what HEAD does TODAY: per cited lines, budgets are per-`Manifest`-instance and therefore composable without bound by nesting depth; the nested case is evaluated recursively (`referencedManifest.verifyReferences(followManifests)`, `Manifest.java:384-385`). The behaviour I describe (a composed/flat budget) is NOT implemented.**
+4. **NEAREST PRESENCE:** `referencedManifest.perManifestResolvers = this.perManifestResolvers` (`Manifest.java:381-382`) — shows parent-to-child policy *propagation* exists for resolvers, but fails to cover count budgets (no `referenceCount` propagation, and the field is static anyway, `Manifest.java:62-65`).
+5. **ENTRY POINT:** `SignedInfo.verify(true)` / `Manifest.verifyReferences(true)` (`Manifest.java:307-308`) with a nested-`Manifest` document. Observable today with existing API (pass/fail boundary at 30+30 vs 31).
+6. **VOCABULARY AUDIT:** `followManifests` / `MAXIMUM_REFERENCE_COUNT` / `referenceCount` / `perManifestResolvers` ALREADY-IN-LIBRARY; composed-budget / depth-weighted-budget COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** Same as S6: caps are Santuario hardening, absent from all RECs; nesting-depth composition is additionally unspecified anywhere (threat-model §8-item-4/Q7). Threat-model §12 (StAX/DOM divergence changes the model) is directly relevant if the stacks disagree here.
+8. **CASCADE SKETCH:** Step 1 builds the obvious eager recursive fix: thread a remaining-budget counter through `verifyReferences` (extends the recursion at `Manifest.java:384-385`). Step 2 states the streaming constraint: one-pass StAX cannot do recursion into nested manifests with a shared counter without buffering — the solver must REMOVE the threaded-counter recursion and rework it (e.g. flat pre-scan or depth-weighted static rule) — **step 2 cannot compute the non-recursive budget rule's depth weights without step 1's artifact** (the threaded counter's observed consumption profile across nesting depths). (Cascade: yes. REVERT-AND-REDO #2.)
+9. **DETERMINISM:** Deterministic; hand-built nested manifests.
+10. **SIZE:** 1–2 files (`Manifest.java`), ~80–120 net lines. In band.
+
+### S8. Transform-count vs. reference-count: ordering and exception-class observability
+1. **NAME and SUBSYSTEM:** Transform/reference limit precedence — `signature/` × `transforms/`
+2. **LENS:** lens-2
+3. **WHAT HEAD DOES TODAY:** `Reference(Element,…,boolean)` throws `"signature.tooManyTransforms"` when `transforms.getLength() > MAXIMUM_TRANSFORM_COUNT` under secure validation (`Reference.java:253-257`); the `Manifest` constructor throws `"signature.tooManyReferences"` (`Manifest.java:139-143`). Construction order in `verifyReferences` is: `new Reference(…)` per element (`Manifest.java:330-331`) — so the transform cap trips *during* reference iteration, *after* the verify-time reference cap (`Manifest.java:321-325`). **State what HEAD does TODAY: per cited lines, a document violating both caps deterministically reports `tooManyReferences` (verify-time) before any transform is inspected — but only on the verify path; on the construct-then-verify path the constructor reference check fires first anyway. The behaviour I describe (a specified, path-independent precedence) is NOT implemented.**
+4. **NEAREST PRESENCE:** The two message keys `signature.tooManyReferences` / `signature.tooManyTransforms` — closest to a policy taxonomy; fail to cover cross-cap precedence (neither site mentions the other).
+5. **ENTRY POINT:** `Manifest.verifyReferences(boolean)` (`Manifest.java:307-308`); exception class/message observable via `XMLSecurityException.getMsgID()` with existing API.
+6. **VOCABULARY AUDIT:** All nouns (`MAXIMUM_TRANSFORM_COUNT`, `MAXIMUM_REFERENCE_COUNT`, `secureValidation`, `Transforms.getLength()`) ALREADY-IN-LIBRARY; precedence rule COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** As S6/S7 — caps and their interaction are Santuario hardening, absent from RECs and reference implementations (C `xmlsec` has no equivalent caps).
+8. **CASCADE SKETCH:** NO CASCADE — a precedence specification is terminal; no follow-up constraint needs a step-1 artifact to compute.
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 2 files, ~40–70 net lines (small; below band — honest). (Type: existing-behaviour-subtly-wrong candidate: path-dependent first-tripped limit.)
+
+### S9. XSLT-forbidden: two enforcement sites, two exception types
+1. **NAME and SUBSYSTEM:** Forbidden-transform enforcement duality — `transforms/`
+2. **LENS:** lens-2 (which policy trips first; what the caller sees)
+3. **WHAT HEAD DOES TODAY:** `Transforms.checkSecureValidation` throws `TransformationException("signature.Transform.ForbiddenTransform", …)` per-transform at execution time (`Transforms.java:277-286`, called at `Transforms.java:261-267`); *separately*, `TransformXSLT.enginePerformTransform` refuses under secure validation itself (`TransformXSLT.java:76-94`, observed via grep; engine-level `if (secureValidation)` guard). A direct `Transform`-level invocation vs. a `Transforms`-chain invocation therefore surface different exception classes for the same policy. **State what HEAD does TODAY: two cited enforcement sites with different exception types. The behaviour I describe (single enforcement point with a specified exception contract) is NOT implemented.**
+4. **NEAREST PRESENCE:** `checkSecureValidation` (`Transforms.java:277-286`) — fails to cover direct-`Transform` use (bypasses the chain check; only the engine guard remains).
+5. **ENTRY POINT:** `Transforms.performTransforms(XMLSignatureInput, OutputStream)` (`Transforms.java:253-255`) vs. `Transform.performTransform(XMLSignatureInput, OutputStream, boolean)` (`Transform.java:322`). Observable today: different exception classes for the same forbidden URI.
+6. **VOCABULARY AUDIT:** `TRANSFORM_XSLT` / `secureValidation` / `TransformationException` / `ForbiddenTransform` ALREADY-IN-LIBRARY; unified-contract vocabulary COINED-BY-ME (minimal).
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** The XSLT transform is a legitimate W3C REC mechanism (xmldsig-core §6.6.5); forbidding it is Santuario hardening under `secureValidation` (threat-model §8 item 2, *documented* as historical-CVE mitigation). Which Java exception class surfaces is pure local API policy. Threat-model §5a-reachability note: with secure validation off, XSLT reachability is a KNOWN-NON-FINDING (§11a) — this surface stays in-model by constraining itself to the on-posture contract.
+8. **CASCADE SKETCH:** NO CASCADE.
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 2 files, ~40–70 net lines. Below band (honest). (Type: existing-behaviour-subtly-wrong.)
+
+### S10. Weak-digest rejection site: MD5 refused in `getMessageDigestAlgorithm`, but what about the sign path?
+1. **NAME and SUBSYSTEM:** Digest-allow-list enforcement asymmetry — `signature/` × `algorithms/`
+2. **LENS:** lens-2 (terminal-vs-recoverable classification + which check the caller sees)
+3. **WHAT HEAD DOES TODAY:** `Reference.getMessageDigestAlgorithm()` throws `XMLSignatureException("signature.signatureAlgorithm", …)` for MD5 under secure validation (`Reference.java:296-300`). The *signing*/digest-instantiation path (`MessageDigestAlgorithm.getInstance`, `JCEMapper.register…` at `JCEMapper.java:53-61`) has no such gate observed in this survey. The prompt-supplied admission `Reference.java:165` ("TODO should we throw XMLSignatureException if MessageDigestAlgoURI is wrong?") is confirmed present at HEAD. **State what HEAD does TODAY: verify-path MD5 refusal as cited; no observed sign-path gate. The behaviour I describe (symmetric allow-list with a specified exception contract on both paths) is NOT implemented.**
+4. **NEAREST PRESENCE:** The MD5 guard (`Reference.java:296-300`) — fails to cover (a) unknown/typo'd digest URIs (the line-165 TODO: `MessageDigestAlgorithm.getInstance` failure mode unspecified) and (b) the digest-instantiation path outside `Reference`.
+5. **ENTRY POINT:** `Reference.getMessageDigestAlgorithm()` is public (`Reference.java:285`); end-to-end via `checkSignatureValue` / `Manifest.verifyReferences`. Unknown-URI behaviour observable today (whatever `getInstance` throws — unspec'd).
+6. **VOCABULARY AUDIT:** `MessageDigestAlgorithm` / `ALGO_ID_DIGEST_NOT_RECOMMENDED_MD5` / `secureValidation` / `JCEMapper` ALREADY-IN-LIBRARY; allow-list / symmetric-contract COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmldsig-core §5.2 requires comparing digests but never blesses or bans MD5 (algorithm agility is by URI; deprecation is community/maintainer policy). All allow-listing here is Santuario hardening (threat-model §8 item 3, Q7-open). The JDK provider and C `xmlsec` make independent, differing choices — confirming locality.
+8. **CASCADE SKETCH:** NO CASCADE.
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 2–3 files, ~60–100 net lines. In band. (Type: existing-behaviour-subtly-wrong / under-specified.)
+
+### S11. Decrypt-path failure classification: which `XMLCipher` failure is terminal, which is recoverable?
+1. **NAME and SUBSYSTEM:** Decryption error classification — `encryption/`
+2. **LENS:** lens-2 (error classification and recoverability at the decrypt boundary)
+3. **WHAT HEAD DOES TODAY:** `XMLCipher` decrypt paths (`doFinal`/`decryptData` family; factory `EncryptedData`/`EncryptedKey` impls at `XMLCipher.java:2342-2384`, `2391-…`) throw `XMLEncryptionException` variants for missing `CipherData`, bad key, and unsupported algorithms without a documented terminal-vs-retryable taxonomy; `KeyInfo` resolution inside decrypt goes through the same null-collapsing `KeyResolver` chain as S4. The prompt-supplied admissions (`XMLCipher.java:2363` relative-URI TODO — confirmed present; `2517/2556/2559` xs:any TODOs — confirmed present at `2517-2520` and `2556-2560`; `3645` referenceInformation TODO — confirmed present) show the decrypt data model itself has unspecified corners. **State what HEAD does TODAY: exceptions as cited, no recoverability taxonomy. The behaviour I describe (a classified decrypt-failure contract) is NOT implemented.**
+4. **NEAREST PRESENCE:** The `XMLEncryptionException` throws across `XMLCipher` — closest to classification; fail to cover retryability (caller cannot tell "wrong key, try next `EncryptedKey`" from "corrupt `CipherData`, stop"). `KeyReference`/`DataReference.toElement()` (`XMLCipher.java:3635-3650`) fails to round-trip `referenceInformation` (TODO at 3645), so even the retry inputs are lossy.
+5. **ENTRY POINT:** `XMLCipher.decryptData(EncryptedData, Key)` / `doFinal(Document)` family — existing public methods; observable today as exception-class/message only.
+6. **VOCABULARY AUDIT:** `XMLCipher` / `EncryptedData` / `EncryptedKey` / `CipherData` / `KeyInfo` / `XMLEncryptionException` ALREADY-IN-LIBRARY; recoverable-vs-terminal taxonomy COINED-BY-ME. (Mostly ALREADY-IN-LIBRARY — good.)
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmlenc-core §4/§5 specifies decryption *processing* but explicitly leaves error handling to implementations, and says nothing about multi-`EncryptedKey` retry ordering or Java exception taxonomy. Threat-model §9 notes decryption-oracle hardening is the *caller's protocol layer* (Q8-open) — this surface must stop at classification and not claim oracle-hardening, else it drifts out of model.
+8. **CASCADE SKETCH:** Step 1: classified decrypt errors + lossless `ReferenceInformation` round-trip (fixing the 3645 TODO). Step 2 (constraint): unbounded `EncryptedKey` retry is a CPU oracle/amplification vector under secure validation — step 2 caps retries, and **cannot compute the cap's per-key cost envelope without step 1's artifact** (the classified ledger showing which failures are cheap-decline vs. expensive-crypto). (Cascade: yes, weak.)
+9. **DETERMINISM:** Deterministic with test keys; no network (exclude `RetrievalMethod` resolvers in test).
+10. **SIZE:** 2–4 files, ~100–150 net lines. Top of band. (Type: NET-NEW capability.)
+
+---
+
+## Subsystem: `keys/` and `algorithms/`
+
+### S12. `X509Data.itemUnknownElement` is a stub (`TODO implement`, returns null)
+1. **NAME and SUBSYSTEM:** Unknown-element-tolerant X509Data access — `keys/`
+2. **LENS:** control (no lens; found by reading code: every sibling accessor is real, this one logs-and-nulls)
+3. **WHAT HEAD DOES TODAY:** `public Element itemUnknownElement(int i)` logs `"itemUnknownElement not implemented"` and `return null` (`X509Data.java:459-462`); the prompt-supplied `X509Data.java:457 TODO implement` admission is confirmed present at HEAD. All sibling accessors (`itemIssuerSerial`, `itemSKI`, `itemSubjectName`, `itemDigest`, `X509Data.java:430-450+`) are implemented. **State what HEAD does TODAY: stub returning null as cited. The behaviour I describe (enumerating non-standard `X509Data` children, e.g. XKMS or custom elements) is NOT implemented — premise confirmed, not already-implemented.**
+4. **NEAREST PRESENCE:** `itemDigest(int i)` (`X509Data.java:440-450`) — the template the stub would follow; fails to cover any element type outside the known set (there is no generic child enumerator).
+5. **ENTRY POINT:** `X509Data.itemUnknownElement(int)` — existing public method, observable today (always null). A test reaches it with any `X509Data` containing an extension element.
+6. **VOCABULARY AUDIT:** `X509Data` / `XMLX509*` family ALREADY-IN-LIBRARY; unknown-element enumeration needs no new nouns (fully ALREADY-IN-LIBRARY — ideal).
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmldsig-core §4.4.4 (`X509Data`) explicitly permits "any element from any namespace" as further children ("The X509Data element MAY contain… elements from other namespaces") — the spec *authorizes* extension content but defines no accessor semantics; a Java enumeration API is pure local policy. Threat-model §3/§9 caveat: must not become key-*trust* of unknown elements — enumeration only.
+8. **CASCADE SKETCH:** Step 1: eager full enumeration API. Step 2 (constraint): callers iterating unknown elements into key resolution would widen `KeyInfo` trust surface — step 2 must rework step 1's API to return inert `Element`s decoupled from resolution — **step 2 cannot compute the decoupling boundary without step 1's artifact** (the eager API showing which call sites would consume unknown elements as keys). (Cascade: yes, weak.)
+9. **DETERMINISM:** Fully deterministic.
+10. **SIZE:** 1–2 files, ~40–80 net lines. Below-to-in band. (Type: NET-NEW capability.)
+
+### S15. Algorithm registry introspection: `JCEMapper`/`SignatureAlgorithm` are register-only
+1. **NAME and SUBSYSTEM:** Read-only algorithm-registry snapshot — `algorithms/`
+2. **LENS:** control (no lens; found by reading code: `register` exists, `list`/`snapshot` does not)
+3. **WHAT HEAD DOES TODAY:** `JCEMapper.register(String, Algorithm)` (`JCEMapper.java:53`) and `registerDefaultAlgorithms()` (`JCEMapper.java:61`); `SignatureAlgorithm.register(…)` with `AlgorithmAlreadyRegisteredException` on collision (`SignatureAlgorithm.java:361-414`). No public enumeration, snapshot, or unregister observed (grep for register/list in `algorithms/` shows only register paths). **State what HEAD does TODAY: write-only global registry as cited. The behaviour I describe (a read-only snapshot for diagnostics/policy audit) is NOT implemented.**
+4. **NEAREST PRESENCE:** `SignatureAlgorithm.getJCEAlgorithmString()` (`SignatureAlgorithm.java:218`) / `MessageDigestAlgorithm` equivalent (`MessageDigestAlgorithm.java:189`) — per-instance strings; fail to cover the registry as a whole (cannot answer "which URIs are currently mapped?" without instantiating each).
+5. **ENTRY POINT:** No existing public read method — a test **cannot reach registry contents without new public API** (stated explicitly). Instantiation probes (`getInstance(doc, uri)`) are the only current oracle.
+6. **VOCABULARY AUDIT:** `JCEMapper` / `SignatureAlgorithm` / `MessageDigestAlgorithm` / `AlgorithmAlreadyRegisteredException` ALREADY-IN-LIBRARY; snapshot type COINED-BY-ME (one noun).
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** Algorithm registries are Java-provider plumbing; W3C RECs define algorithm URIs and processing but never a registry API. Threat-model §5 (JCE provider correctness is the provider's) bounds this: the surface is about *mapping visibility*, not primitive correctness.
+8. **CASCADE SKETCH:** NO CASCADE.
+9. **DETERMINISM:** Deterministic (static registry; note test-ordering sensitivity from global mutation — deterministic but order-dependent).
+10. **SIZE:** 1–2 files, ~50–80 net lines. In band (low end). (Type: NET-NEW capability.)
+
+---
+
+## Subsystem: `encryption/` (admission-driven)
+
+### S13. Relative-URI `EncryptedData` handling (`XMLCipher.java:2363 TODO`)
+1. **NAME and SUBSYSTEM:** Relative-URI base resolution for `EncryptedData` factory — `encryption/`
+2. **LENS:** control (no lens; repo's own admission)
+3. **WHAT HEAD DOES TODAY:** `Factory.newEncryptedData(Element)` copies Id/Type/MimeType/Encoding, `EncryptionMethod`, `KeyInfo`, `EncryptionProperties` (`XMLCipher.java:2342-2384`) with `// BFL 16/7/03 - simple implementation // TODO: Work out how to handle relative URI` at `XMLCipher.java:2362-2363` (confirmed present). No `baseURI` threading observed in this factory path (contrast `Reference`, which carries `baseURI` everywhere, e.g. `Reference.java:436-440`). **State what HEAD does TODAY: relative `URI`/`Target` attributes are consumed without documented base resolution as cited. The behaviour I describe (specified base-URI resolution) is NOT implemented.**
+4. **NEAREST PRESENCE:** `result.setId/setType/setMimeType/setEncoding` block (`XMLCipher.java:2349-2352`) — shows what the factory *does* resolve; fails to cover URI-valued attributes (`Target` on `EncryptionProperty`, `URI` on `DataReference`/`KeyReference`).
+5. **ENTRY POINT:** `XMLCipher` factory (`Factory.newEncryptedData`) is package-visible; end-to-end observable via `XMLCipher.decryptData`/`loadEncryptedData` on docs with relative references. New public API is likely needed for a base-URI parameter (state explicitly if so).
+6. **VOCABULARY AUDIT:** `EncryptedData` / `EncryptedKey` / `CipherData` / `EncryptionProperty.Target` / `baseURI` ALREADY-IN-LIBRARY; resolution rule COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY leaning UNCLEAR. **EVIDENCE:** xmlenc-core references RFC 2396 for URI semantics but the *factory's* base-establishment (which base — document? caller's?) for the ` merit is implementation-defined; neither the REC nor the C/.NET reference implementations determine Santuario's Java factory signature. I mark LOCAL-POLICY (not RECALLABLE) because no spec section dictates this factory's behaviour, but note the underlying URI-resolution algorithm itself (RFC 3986) is RECALLABLE — only the *wiring* is local.
+8. **CASCADE SKETCH:** Step 1: eager absolute-resolution at factory time. Step 2 (streaming constraint): StAX decrypt cannot resolve against a base only known later in the stream — step 2 reworks eager resolution into deferred resolution — **step 2 cannot compute the deferral points without step 1's artifact** (the eager implementation showing every consumption site of the resolved URI). (Cascade: yes.)
+9. **DETERMINISM:** Deterministic (no network if test URIs are same-document fragments).
+10. **SIZE:** 2–3 files, ~80–120 net lines. In band. (Type: NET-NEW capability.)
+
+### S14. `EncryptionProperty`/`EncryptionMethod` xs:any round-trip loss (TODOs at 2517/2556/2559, 3645)
+1. **NAME and SUBSYSTEM:** Extension-content round-trip for encryption model objects — `encryption/`
+2. **LENS:** control (no lens; repo's own admissions)
+3. **WHAT HEAD DOES TODAY:** `newEncryptionMethod` drops `<any namespace='##other'>` (`XMLCipher.java:2517-2518`, confirmed); `newEncryptionProperty` drops `anyAttribute` and `<any … processContents='lax'>` (`XMLCipher.java:2556-2560`, confirmed); `ReferenceImpl.toElement()` drops `referenceInformation` (`XMLCipher.java:3645-3647`, confirmed). Parse→model→serialize is lossy for schema-legal extension content. **State what HEAD does TODAY: lossy as cited at three sites. The behaviour I describe (lossless round-trip) is NOT implemented.**
+4. **NEAREST PRESENCE:** The surrounding complete accessors (e.g. `newEncryptionProperties` iterating known children, `XMLCipher.java:2532-2544`) — closest to full fidelity; fail to cover exactly the `##other` slots the schema allows.
+5. **ENTRY POINT:** `EncryptedData`/`EncryptionProperty` model objects via `XMLCipher` encrypt/decrypt round-trip — observable today (extension content vanishes). Some new accessor API needed for the preserved content (COINED-BY-ME, one or two methods).
+6. **VOCABULARY AUDIT:** `EncryptionMethod` / `EncryptionProperty` / `EncryptionProperties` / `ReferenceList` / `DataReference` / `KeyReference` ALREADY-IN-LIBRARY; preserved-extension accessor COINED-BY-ME.
+7. **SPEC-RECALL:** LOCAL-POLICY. **EVIDENCE:** xmlenc-core schema *allows* the extension points but defines no fidelity requirement for a Java object model; whether `toElement()` round-trips unknown children is Santuario API policy. (For S13/S14 JIRA/CHANGELOG match: unknown — not checked per containment; flag if matched during task construction and mark DEAD then.)
+8. **CASCADE SKETCH:** Step 1: preserve-and-reserialize extension content (eager DOM retention). Step 2 (streaming constraint): StAX cannot retain arbitrary lookahead subtrees cheaply — step 2 must rework retention into skip-or-capture policy — **step 2 cannot compute the capture budget without step 1's artifact** (the eager retention showing which extension points actually carry content in practice). (Cascade: yes, weak.)
+9. **DETERMINISM:** Deterministic.
+10. **SIZE:** 2–3 files (all inside `XMLCipher.java` inner classes + tests), ~80–130 net lines. In band. (Type: NET-NEW capability.)
+
+---
+
+## Subsystem: `c14n/` (canonicalization)
+
+### S16. Subset-boundary namespace/`xml:*` rendering (screening hypothesis B — reported RECALLABLE/DEAD)
+1. **NAME and SUBSYSTEM:** c14n subset-boundary rendering — `c14n/`
+2. **LENS:** control (screening hypothesis B, investigated and rejected)
+3. **WHAT HEAD DOES TODAY:** `Canonicalizer.canonicalizeSubtree(Node)` / `canonicalizeXPathNodeSet(Set)` produce bytes with ancestor-namespace/`xml:*` handling in `NameSpaceSymbTable` + `XmlAttrStack` (FIXMEs at `XmlAttrStack.java:288` and `:322` confirmed present — both concern RFC 3986 §5.2.2 "complete path segment" edge cases in `remove_dot_segments`, i.e. URI normalization during same-document resolution, *not* namespace rendering). The namespace-visibility rules for c14n 1.0 vs 1.1 vs exc-c14n differ by design. **State what HEAD does TODAY: three canonicalizers implement their respective REC rules; the FIXME comments concern dot-segment edge cases as cited. The namespace-rendering behaviour I was asked to look for is ALREADY-IMPLEMENTED per the RECs — kept in the list and marked accordingly.**
+4. **NEAREST PRESENCE:** The c14n 1.0 / 1.1 / exc-c14n implementations themselves — they *are* the specified behaviour; there is no absence to cite beyond the dot-segment FIXMEs, which are URI-processing corners, not rendering policy.
+5. **ENTRY POINT:** `Canonicalizer.canonicalizeSubtree(Node)` / `canonicalizeXPathNodeSet(Set<Node>)` — existing public methods.
+6. **VOCABULARY AUDIT:** `Canonicalizer` / `NameSpaceSymbTable` / `XmlAttrStack` / `XMLSignatureInput` ALREADY-IN-LIBRARY; nothing coined.
+7. **SPEC-RECALL:** RECALLABLE — **DEAD for task purposes, reported for visibility.** **EVIDENCE:** Canonical XML 1.0 §2.2 (namespace nodes / `xml:` attributes in document subsets), C14N 1.1 §2.2 (the `xml:id`/`xml:base` changes vs 1.0), and Exclusive XML Canonicalization §§2–3 (inclusive-namespace-prefix list) jointly determine exactly which ancestor namespaces render into a subset; the JDK provider, C `xmlsec`, and .NET agree because they implement the same sections. A solver can recall the answer. (The `XmlAttrStack` dot-segment FIXMEs are RFC 3986 §5.2.2 corners — also RECALLABLE against the RFC + its test vectors.)
+8. **CASCADE SKETCH:** NO CASCADE (dead surface).
+9. **DETERMINISM:** Deterministic (byte-comparison against REC examples).
+10. **SIZE:** N/A (dead). Would have been ~30–60 net lines had there been anything local.
+
+---
+
+## Subsystem sweep notes (empty with evidence — good results, not padding)
+
+- **`parser/` (XMLParser / pooled DocumentBuilder):** swept `XMLParserImpl.java:40-105` (two `DocumentBuilder` pools keyed by `disallowDocTypeDeclarations`, pool-size via `org.apache.xml.security.parser.pool-size`, `FEATURE_SECURE_PROCESSING` always on, `disallow-doctype-decl` per-pool). The pooling/flag structure is coherent; the only candidate (unbounded queue growth under concurrent miss — `queue.poll()` null → `createDocumentBuilder`, `repoolDocumentBuilder` at `:105`) is a generic Java-pooling question with no Santuario-specific observable and likely DUPLICATE-prone (pooling bugs are a common synthetic-task trope). **No surface claimed.**
+- **`jcp/xml/dsig/` (JSR-105 provider):** the prompt-supplied `DOMXMLSignature.java:612 //XXX compare signature values?` admission was **not verified** (file not read this pass — say so honestly). No surface claimed from `jcp/`; S10/S6 cover the underlying behaviours via the native stack, and the JSR-105 layer delegates to it (threat-model §2).
+- **`transforms/` (beyond S9):** `TransformXPath2Filter.java:169 //TODO OPTIMIZE` confirmed present, but it is a pure performance note on `isNodeInclude` (`TransformXPath2Filter.java:160-180`) with fully specified semantics — no under-determined behaviour; performance-only tasks are out of band. `TransformEnvelopedSignature`, Base64, XPath swept via `Transforms.performTransforms` (`Transforms.java:253-275`); nothing under-determined found. **No further surface claimed.**
+- **Admissions grep:** the ~124 weaker admissions (`not supported`/`unsupported`/`for now`/`we do not`) concentrate in `stax/` (`CanonicalizerBase.java:96` InclusiveNamespace-PrefixList, `TransformEnvelopedSignature.java:75`, `XMLSecEventFactory.java:95-105`, `SecurityTokenFactoryImpl.java:168`, `XMLEncryptOutputProcessor.java:246-311`) — each is a *declared* StAX limitation, i.e. specified-by-absence; converting one into a surface means implementing the missing StAX feature, which is 400+ lines each (honestly oversized) and RECALLABLE-adjacent (parity with the DOM side is spec-determined). Recorded here so the count is auditable; **none claimed.**
+
+---
+
+## Final table
+
+| Surface | Lens | SPEC-RECALL | Cascade? | Size band |
+|---|---|---|---|---|
+| S1 per-reference tri-state reporting | lens-1 | LOCAL-POLICY | yes | 80–120 |
+| S2 nested-manifest short-circuit guard | lens-1 | LOCAL-POLICY | yes (R&R #2 pair) | 60–100 |
+| S3 streaming per-reference agreement (DOM×StAX) | lens-1 | LOCAL-POLICY | yes (R&R #1) | 200–400 (over band, honest) |
+| S4 key-resolver decline-vs-fail | lens-1 | LOCAL-POLICY | weak yes | 80–130 |
+| S5 resource-resolver give-up semantics | lens-1 | LOCAL-POLICY | NO CASCADE | 80–120 |
+| S6 reference-cap double-check ordering | lens-2 | LOCAL-POLICY | yes | 60–90 |
+| S7 nested-manifest budget composition | lens-2 | LOCAL-POLICY | yes (R&R #2) | 80–120 |
+| S8 transform/reference precedence | lens-2 | LOCAL-POLICY | NO CASCADE | 40–70 (under) |
+| S9 XSLT dual enforcement sites | lens-2 | LOCAL-POLICY | NO CASCADE | 40–70 (under) |
+| S10 digest allow-list asymmetry | lens-2 | LOCAL-POLICY | NO CASCADE | 60–100 |
+| S11 decrypt error classification | lens-2 | LOCAL-POLICY | weak yes | 100–150 |
+| S12 X509Data unknown-element stub | control | LOCAL-POLICY | weak yes | 40–80 |
+| S13 relative-URI EncryptedData factory | control | LOCAL-POLICY | yes | 80–120 |
+| S14 encryption xs:any round-trip loss | control | LOCAL-POLICY | weak yes | 80–130 |
+| S15 algorithm-registry snapshot | control | LOCAL-POLICY | NO CASCADE | 50–80 |
+| S16 c14n subset rendering | control | **RECALLABLE (DEAD)** | no | N/A |
+
+**Shape-diversity check:** NET-NEW capability: S1, S3, S11, S12, S13, S14, S15 = 7 (≥6 ✓). REVERT-AND-REDO: S3, S7 (with S2 as the S7 step-1 companion) = 2 (≥2 ✓). Existing-behaviour-subtly-wrong: S2, S8, S9, S10 = 4 (≤6 ✓). Control: S12–S16 = 5 (≥4 ✓). Non-LOCAL-POLICY representation: 1 RECALLABLE (S16) — the survey is honest that this repo's policy surface is overwhelmingly local once c14n/digest *algorithms* are excluded (those are correctly RECALLABLE and therefore not proposed).
+
+## WHAT I COULD NOT ANSWER AND WHY
+
+1. **Whether S13/S14 match JIRA or CHANGELOG entries** (containment: do not source from merged PRs/issues/CVEs). I did not consult JIRA (Issues disabled on GitHub; JIRA only) or the changelog — flag as a pre-construction kill-check, not a survey gap I could close read-only without violating containment.
+2. **`DOMXMLSignature.java:612 //XXX` verification.** The `jcp/` file was not read this pass; the admission is prompt-supplied and unverified. One targeted read closes this.
+3. **Exact StAX reference-processing path for S3/S7.** I confirmed the *absence* of caps/ledgers in `stax/` by grep (no `maxReferences|tooManyReferences|secureValidation|MAXIMUM` hits), but did not trace the StAX verify dataflow (`*InputProcessor` chain) to name the precise insertion point for a streaming ledger. Needs a StAX pass with `filename_pattern` on `stax/impl/processor/`.
+4. **Pool-size property consumption in `parser/`.** `XMLParserImpl.java:46` reads `org.apache.xml.security.parser.pool-size` but I did not verify where the value gates queue growth — hence no parser surface claimed rather than a half-cited one.
+5. **Line-number drift risk.** All citations are HEAD `497d3fb4` as read this session; the repo's inner-class layout (especially `XMLCipher.java`, 3709 lines) means insertions shift lines — citations name enclosing method + line so they survive minor drift.

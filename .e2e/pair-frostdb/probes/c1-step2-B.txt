@@ -1,0 +1,12 @@
+You are looking at the Go repository in your working directory (polarsignals/frostdb).
+
+An operator is running a mirrored-durability migration and has configured two
+destinations on the same database. Today block persistence (`store.go`) writes
+one serialized Parquet block to a single destination.
+
+Persisting a block to both destinations must not cost twice the serialization
+work, and one slow or failing destination must not cause the other destination's
+copy to be lost or left half-written.
+
+Describe in 3 sentences how you would approach this. Approach only, no code.
+Do not modify any file. Print only the three sentences.

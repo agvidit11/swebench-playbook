@@ -1,0 +1,14 @@
+You are looking at the Go repository in your working directory (polarsignals/frostdb).
+
+`TableBlock.Persist` in `store.go` currently delivers a serialized Parquet block
+to exactly one configured `DataSink`: it creates an `io.Pipe`, runs
+`t.Serialize(w)` in a goroutine, and hands the read end to `sink.Upload`. It
+returns an error if more than one sink is configured.
+
+Change it so that when several sinks are configured, every sink receives the
+block; the block is serialized only once no matter how many sinks there are; and
+a failure or stall of one sink does not silently lose or corrupt another sink's
+copy.
+
+Describe in 3 sentences how you would implement this. Approach only, no code.
+Do not modify any file. Print only the three sentences.

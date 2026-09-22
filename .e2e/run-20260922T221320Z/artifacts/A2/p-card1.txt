@@ -1,0 +1,71 @@
+Repo: go-acme/lego at HEAD, module github.com/go-acme/lego/v5. Read-only; change nothing.
+Write ONE full SWE-bench-Pro multi-turn task card for this already-merged cascade.
+
+CASCADE 1 - "Every-Key-Type" (merges surfaces cc1 + aa3 + cc3)
+ Step 1: introduce one tested key-kind -> PEM/JWS mapping (RSA / ECDSA P-256 / P-384 /
+   Ed25519, plus an explicit unsupported-key error) and make PEMBlock/PEMEncode use it instead
+   of returning a silent nil.
+ Step 2: enforce that same mapping in JWS signer selection (correct RS256/ES256/ES384/EdDSA,
+   typed error on unknown curve or key) and in temp/DER cert issuance (no RSA-only,
+   KeyEncipherment-only defaults).
+ TENSION: interop (accept every key ParsePEMPrivateKey already accepts) versus strictness
+   (every unsupported key must fail loudly, never an empty alg or a nil block).
+ Relevant HEAD sites: certcrypto/crypto.go:177 (PEMBlock silent default),
+   certcrypto/crypto.go:99 (ParsePEMPrivateKey already parses ed25519),
+   acme/api/internal/secure/signer.go:165 (signatureAlgorithm handles RSA/P-256/P-384 only,
+   leaves alg ""), certcrypto/crypto.go:301 (GeneratePemCert -> generateDerCert hardcodes
+   now+1y, CN "ACME Challenge TEMP", KeyUsageKeyEncipherment, RSA-only).
+ Known risk flagged at merge time: Ed25519 JWS/TLS fixture variance across go-jose and x509
+   versions could make grading brittle. Address it in the determinism seam field.
+
+Write it as a CARD. Every field below is mandatory; omit none.
+
+ - Composition: the search axis and the fork shape it instantiates, named.
+ - Step 1 requirements / Step 2 requirements (/ Step 3), plus ONE compositional invariant per
+   step, plus THE TENSION (the two things that conflict) in one sentence.
+ - HEAD citation: file.go:line for what HEAD does TODAY, plus the NEAREST PRESENCE quoted
+   VERBATIM from the source (the closest thing that already exists to the absence you claim)
+   and which case it fails to cover. You cannot cite an absence.
+ - Motivating caller: who needs this and why now - a concrete caller, scale requirement,
+   compatibility obligation or operational constraint. Abstract "nice API" additions are
+   discounted on realism, which is a scored axis.
+ - Interface Contract: a table of EVERY symbol the graded tests will touch that is not already
+   in the base repo:
+     | Symbol | Kind | Shape | Reachability (STATED or IN-BASE) | Alternatives (PINNED or accepted synonyms) |
+   The Alternatives column is MANDATORY. Only two configurations are legal: pinned spec +
+   narrow tests, or open spec + tolerant tests. NEVER a vague spec with narrow tests.
+ - Observable Schema (required if any deliverable is a collection of records). Answer ALL of:
+   Container (slice? map? a type with a method? indexable?) / Element (struct? interface?) /
+   exact field or method names / value domain AND exact spelling / option names / lifetime and
+   persistence scope / any test-only lifecycle hook (if you need one, that is a design smell -
+   fix it here). Two-defensible-answers test on every name: could a competent Go engineer
+   reading the prose reasonably pick a different symbol? If yes, PIN it.
+ - Named wrong-shape, PLUS ONE SENTENCE on why a capable model would plausibly produce it -
+   which shipped primitive, which adjacent Go idiom, which reading of the prose leads there.
+   If you cannot write that sentence it is a strawman and will not discriminate.
+ - Determinism seam: if time, concurrency, ordering or retries are involved, name the
+   INJECTION POINT (an injectable clock defaulting to the real one, an http.RoundTripper, an
+   httptest.Server, a channel handoff). Never a sleep.
+ - Predicted per-arm pass rate PER STEP: step 1 needs avocado <=3/5 AND opus >=3/5 and gpt
+   >=3/5; step 2 avocado <=3/5. Answer explicitly: WHAT STOPS AVOCADO PASSING STEP 1 OUTRIGHT?
+   If step 1 is the harder step, the steps are backwards for measurement purposes.
+ - Step-1 guard cases owned by step 2: for each step-1 invariant, name the step-2 fail_to_pass
+   case that would fail if it regressed. NEVER put step 1 fail_to_pass ids into step 2
+   pass_to_pass.
+ - Inter-step file overlap: which files each step touches; is step 2 INCREMENTAL on step 1 or
+   CUMULATIVE from base?
+ - Size estimate: files, ~net lines, primitives reused. Target 80-150 net lines, 2-4 files.
+ - Rubric self-audit: one row per item for R01 R02 R04 R05 R06 R07 R08 R09 R11 N01 N02 N03 N04,
+   verdict PASS/FAIL/N-A with ONE line of evidence pointing at this cards own content. List
+   R03 R10 R12 R13 as deferred with the stage that decides each.
+   MANDATORY: at least ONE non-PASS row or ONE named residual risk, with evidence. An all-PASS
+   table is measured worthless - five cards once all self-reported 13/13 and the gates then
+   killed all five. For each PASS on R01, R02 and R08 the evidence line must name THE THING
+   THAT NEARLY FAILED IT: the token you considered leaving unstated, the alternative
+   implementation you had to widen the tests for.
+
+Constraints: graded tests must be OFFLINE, DETERMINISTIC, no network, no sleeps. Available
+fixtures: certcrypto/testdata/*.pem, challenge/internal/fixtures, registration/zerossl/fixtures;
+the suite uses httptest heavily. Module path is github.com/go-acme/lego/v5.
+Read the real files and quote real line numbers. Output the card only, no preamble.
+

@@ -1,0 +1,172 @@
+# CARD PASS — polarsignals/frostdb @ 9e5cfe0171adff531d30a9df3e111686996f4a9f
+
+You already ran the surface survey for this repo (your output is at
+`/tmp/frostdb-run/survey-mc.out`). A second, independent survey was run by a
+different model at `/tmp/frostdb-run/survey-codex.md`. Read BOTH in full before
+you write anything.
+
+Your job now is to write **candidate cards** for the merged candidates that
+survive the corrections below. A card is a full proposal; a surface was not.
+
+## CONTAINMENT
+
+- The repo clone is READ-ONLY. Read and grep only. No edits, no git, no builds.
+- Write nothing to disk. Print the whole answer to stdout in Markdown.
+- Do NOT write instruction-style prose or anything intended to become a task
+  specification. Cards stop at observable contracts + symbol tables.
+
+## CORRECTIONS I VERIFIED BY HAND — these override both surveys
+
+These were checked against HEAD in the clone. Two of them kill candidates.
+
+1. **`avg` IS fully implemented. Your survey's S2 is a HOLLOW PREMISE.**
+   `resolveAggregation` at `query/logicalplan/builder.go:205-234` desugars
+   `AggFuncAvg` into `sum` + `count` + a `BinaryExpr{Op: OpDiv}` aliased to
+   `agg.String()`, **before** physical planning. `chooseAggregationFunction`
+   never sees `AggFuncAvg`, which is why its `default:` branch looked like a
+   refusal. It is not one. Proof: `logictest/testdata/exec/aggregate/aggregate:47`,
+   `:52`, `:57`, `:62` are passing `avg(...)` execution fixtures, and
+   `logictest/testdata/plan/aggregate/aggregate:72-74` shows the expanded plan
+   `HashAggregate (sum(value),count(value) by stacktrace) ... Projection
+   (stacktrace, sum(value) / count(value) as avg(value))`.
+   **Your M1 step 2 is dead. Any card resting on "avg has no execution" is dead.**
+   (The OTHER survey's S6 — the *protobuf* enum converter missing `TYPE_AVG` /
+   `TYPE_UNIQUE` / `TYPE_AND` at `query/exprpb/proto.go:190-201` and `:566-577`
+   — is a different and still-live claim. Do not conflate them.)
+
+2. **Multi-aggregation already works in the HASH path.** The same plan fixture
+   shows `HashAggregate (sum(value),count(value) by stacktrace)`. So the
+   refusal at `query/physicalplan/aggregate.go:54-58` is specific to
+   `OrderedAggregate`. Any card here must say "ordered path only" and must not
+   claim multi-aggregation is unimplemented in general.
+
+3. **Your survey's S8 (sampler alphabetical order) cannot be a step 1.** The
+   alphabetical `slices.SortFunc` is ALREADY at `query/physicalplan/sampler.go:244-254`
+   at `base_commit`. A step 1 whose requirement is "build the thing that is
+   already in the tree" is an auto-reject: no competent model fails it, it
+   teaches nothing, and it is recall-only. **Your M3 collapses** to its step 2
+   (the S12 index bug), which on its own is a ~15-line positional-index fix —
+   under the ~20-line floor. Report it dead unless you can find a genuinely
+   absent step 1 for it.
+
+4. **Peer dedup re-verified first-hand:** 0 filename hits and 0 content hits for
+   `polarsignals` across the 15,985-task corpus, and `gh search code --owner
+   codimango` returns only webcraft repo-graph noise. The repo itself is clean.
+   **This does NOT clear any individual observable** — a candidate can still
+   collide on its *shape* with a peer task in a different repo. Flag any
+   observable you think is likely mined.
+
+5. `store.go:35-38` multi-sink refusal: **confirmed live**, and note
+   `db.go:348-350` says in a doc comment *"The database supports multiple data
+   sources and sinks."* while `store.go` refuses. Also note the single-sink path
+   at `store.go:39-49` **already streams via `io.Pipe`** — so the "streaming"
+   half is not net-new; only the fan-out is.
+
+6. `query/exprpb/engine.go:140` — `b.Aggregate(aggExprs, groupExprs)` discards
+   its return value while every sibling case assigns `b = b....`: **confirmed
+   live**, and it is a one-line fix. Too small to be a step on its own.
+
+## RULES THE CARDS MUST RESPECT
+
+- **Three-word recall test.** If the hard part is nameable in three words or
+  fewer ("fan-out writer", "k-way merge", "average aggregation"), the model
+  recalls it from training data and the card is dead. Apply it explicitly.
+- **Existing-vocabulary test.** Write out every noun in the observable contract
+  and mark each IN-BASE (with file:line) or COINED. If most are coined, the
+  spec cannot reach `spec_clarity: Good` without enumerating them all, which
+  turns the task into transcription. Restate in the library's own terms or kill.
+- **No newly coined record / schema / ledger / census / manifest / audit-trail**
+  whose invented field names become the task. Measured 0 for 10.
+- **Auto-rejects:** step 1 = split/extract/move; step 1 = recall-only; step 1
+  whose requirement is "behaviour and returns are unchanged"; step 2 = "now use
+  what you built"; step 2 computable from data the codebase already reaches at
+  step 2's own seam; difficulty from the volume of mechanical edits; a fix under
+  ~20 lines; process-global or class-level mutable state as the natural
+  implementation; any step whose contract you cannot state as observable
+  behaviour.
+- **The cost-clause trap, measured.** When a step-2 constraint is compound
+  (e.g. "bounded memory" AND "partial failure rolls back"), test each half
+  separately for which one is doing the work. If the *cost* half is what
+  invalidates step 1, and the cost half also names the technique, the fork
+  collapses to zero. If you drop the cost half and step 1 survives intact, P6
+  never engaged. State which half does the work for every compound constraint.
+- **Grade the distribution of valid answers, not the intended one.** Three
+  separate tasks shipped graders that would have failed a correct solution
+  because the grader asserted a mechanism (a backing pointer, an on-disk record
+  framing) rather than the contract. For each card, name one *valid alternative
+  implementation* and confirm your observable does not punish it.
+
+## CARD FORMAT — every field mandatory, no field may be omitted
+
+One card per surviving merged candidate. Number them `C1`, `C2`, ... Include:
+
+1. **Composition** — the C-axis and the A-shape it instantiates, both named.
+2. **Step 1 / Step 2 requirements**, plus **one compositional invariant per
+   step**, plus **the tension** (the two things that conflict) in one sentence.
+3. **HEAD citation** — `file.go:line` for what HEAD does today, and the
+   **nearest presence**: quote verbatim the closest thing that exists to the
+   claimed absence, and name the case it fails to cover.
+4. **Motivating caller** — who needs this and why now. A concrete caller, a
+   scale requirement, a compatibility obligation, or an operational constraint.
+   "A nicer API" is not one.
+5. **Interface Contract** — a table of every symbol the graded tests will touch
+   that is not already in the base repo:
+   `Symbol | Kind | Shape | Reachability (STATED or IN-BASE) | Alternatives (PINNED or accepted synonyms)`.
+   The Alternatives column is mandatory. A symbol that is neither STATED nor
+   IN-BASE is a failure before any code exists.
+6. **Observable Schema** — only if the deliverable is a collection of records.
+   Six levels, each pinned or explicitly opened: container; element; field
+   names; value domain and its exact spelling; config/option key names;
+   lifetime / persistence scope (what survives an object boundary, a process, a
+   restart); test-only lifecycle hooks. If the card needs a test-only reset
+   hook to be describable, that is a design smell — say so.
+7. **Named wrong shape per contract**, PLUS one sentence on **why a capable
+   model would plausibly produce it** — which shipped primitive, which adjacent
+   Go idiom, which reading of the requirement leads there. If you cannot write
+   that sentence honestly, it is a strawman and will not discriminate.
+8. **Determinism seam** — if the premise involves time, concurrency, ordering or
+   retries, name the injection point: a clock, a scheduler, a barrier, an
+   explicit `tx`, a fake sink. No seam is a kill, not a caveat.
+9. **Predicted per-arm rate, per step** — step 1: avocado <= 3/5 AND opus >= 3/5
+   AND gpt >= 3/5; step 2: avocado <= 3/5, others mixed. Step 2's effective n is
+   bounded by step 1's successes, so **if step 1 is the harder step you have the
+   steps backwards for measurement purposes**. Answer explicitly: *what stops
+   avocado passing step 1 outright?*
+10. **Step-1 guard cases owned by step 2** — for each step-1 invariant, name the
+    **step-2 `fail_to_pass` case** that would fail if it regressed. Never put
+    step 1's `fail_to_pass` IDs into step 2's `pass_to_pass`.
+11. **Inter-step file overlap** — which files each step touches, and whether step
+    2 is *incremental on step 1* or *cumulative from base*.
+12. **Size estimate** — files, net lines, primitives reused. Target 80-150 net
+    lines across 2-4 files. Report honestly if it is 400.
+13. **Rubric self-audit** — a table with one row per item for R01 R02 R04 R05
+    R06 R07 R08 R09 R11 N01 N02 N03 N04, verdict PASS / FAIL / N-A, and ONE LINE
+    OF EVIDENCE per row pointing at the card's own content. List R03 R10 R12 R13
+    as deferred with the stage that will decide each.
+    **Hard requirement: every card must record at least one non-PASS row or one
+    named residual risk, with evidence.** An all-PASS table is an unrun audit —
+    measured: five cards from one round all self-reported 13/13 PASS and four of
+    the five were later killed by the gates. For each PASS on R01, R02 and R08
+    the evidence line must name **the thing that nearly failed it** — the token
+    you considered leaving unstated, the alternative implementation you had to
+    widen for.
+
+## HOW MANY CARDS
+
+Write a card for every merged candidate from EITHER survey that survives the
+corrections and the auto-rejects. That pool is: your M1, M2, M3, M4, and the
+other survey's M1, M2, M3, M4, M5, M6. Deduplicate where they are the same
+candidate under different numbers (your M4 and the other survey's M4 are the
+same multi-sink candidate — merge them into one card and take the better
+analysis from each).
+
+**Do not backfill.** If only two survive, write two and say so. Zero is a valid
+outcome and an honest zero is a successful round.
+
+For every candidate you do NOT card, give one line naming the rule that killed
+it (auto-reject, three-word recall, existing-vocabulary, hollow premise,
+sub-20-line, mechanical-edit volume, no determinism seam, no motivating caller,
+fails HEAD counterfactual, fails parallel-API test).
+
+Finish with a ranked list of the cards, best first, and your one-line honest
+read on whether this repo yields a buildable multi-turn task at all.

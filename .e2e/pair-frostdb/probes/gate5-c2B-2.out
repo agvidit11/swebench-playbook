@@ -1,0 +1,7 @@
+Your streaming case hinges on pre-aggregation computation — I'll pinpoint the buffering logic to outline a fix.
+Biggrep missed — I'll inspect the workspace directly to find the aggregation path.
+Ordered aggregation is gated on row-preserving projections — I'll confirm the exact check.
+I've mapped the current streaming check — now I'll craft the three-sentence plan for expression-aware handling.
+I've narrowed the likely cause to projection handling blocking the streaming path — now I'll draft the final approach.
+Found the likely culprit in the aggregation planner — I'll pull the final details to shape the recommendation.
+The buffering occurs because the physical planner invalidates input ordering on any Projection, so the extra compute step before the aggregation makes the ordered check fail even though row order is unchanged. I would distinguish row-preserving scalar projections from operations that filter, duplicate, regroup or reorder rows by inspecting the projection expression kinds. I would then allow ordering to flow through the row-preserving case by folding that computation into the streaming path while keeping hash buffering for the truly rearranging cases.

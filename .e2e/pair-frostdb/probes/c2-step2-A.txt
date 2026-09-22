@@ -1,0 +1,19 @@
+You are looking at the Go repository in your working directory (polarsignals/frostdb).
+
+In the physical planner, `shouldPlanOrderedAggregate`
+(`query/physicalplan/physicalplan.go`) only plans the streaming
+`OrderedAggregate` operator when the plan's ordering is still maintained, which
+it learns from `planOrderingInfo` in `query/physicalplan/planordering.go`. Every
+plan node visit calls `oInfo.newNode()`, and the `Projection` case never calls
+`nodeMaintainsOrdering()`, so any projection in the plan invalidates ordering
+and the query silently falls back to hash aggregation.
+
+A query such as `sum(value + timestamp) GROUP BY ordered_col` needs a projection
+to materialize the computed operand, so it always loses the ordered path today.
+
+Change the planner so that a projection which preserves row order keeps the
+ordering information alive, while a projection that genuinely destroys order
+still invalidates it.
+
+Describe in 3 sentences how you would implement this. Approach only, no code.
+Do not modify any file. Print only the three sentences.

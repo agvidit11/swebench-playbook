@@ -1,0 +1,75 @@
+diff --git a/store.go b/store.go
+index c3bc6df..15a8dfe 100644
+--- a/store.go
++++ b/store.go
+@@ -1,10 +1,13 @@
+ package frostdb
+ 
+ import (
++	"bytes"
+ 	"context"
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"path/filepath"
++	"sync"
+ 
+ 	"go.opentelemetry.io/otel/trace/noop"
+ 
+@@ -32,10 +35,8 @@ func (t *TableBlock) Persist() error {
+ 		return nil
+ 	}
+ 
+-	for i, sink := range t.table.db.sinks {
+-		if i > 0 {
+-			return fmt.Errorf("multiple sinks not supported")
+-		}
++	if len(t.table.db.sinks) == 1 {
++		sink := t.table.db.sinks[0]
+ 		r, w := io.Pipe()
+ 		var err error
+ 		go func() {
+@@ -55,6 +56,43 @@ func (t *TableBlock) Persist() error {
+ 			}
+ 			return fmt.Errorf("failed to serialize block: %w", err)
+ 		}
++
++		t.table.metrics.blockPersisted.Inc()
++		return nil
++	}
++
++	// Multiple sinks: serialize exactly once into memory, then upload the
++	// complete copy to every sink concurrently.
++	fileName := filepath.Join(t.table.db.name, t.table.name, t.ulid.String(), "data.parquet")
++
++	var buf bytes.Buffer
++	if err := t.Serialize(&buf); err != nil {
++		return fmt.Errorf("failed to serialize block: %w", err)
++	}
++	data := buf.Bytes()
++
++	var wg sync.WaitGroup
++	var mu sync.Mutex
++	var errs []error
++	for _, sink := range t.table.db.sinks {
++		sink := sink
++		wg.Add(1)
++		go func() {
++			defer wg.Done()
++			if err := sink.Upload(context.Background(), fileName, bytes.NewReader(data)); err != nil {
++				if deleteErr := sink.Delete(context.Background(), fileName); deleteErr != nil {
++					err = fmt.Errorf("%v failed to delete partial file: %w", err, deleteErr)
++				}
++				mu.Lock()
++				errs = append(errs, fmt.Errorf("failed to upload block to sink %s: %w", sink.String(), err))
++				mu.Unlock()
++			}
++		}()
++	}
++	wg.Wait()
++
++	if len(errs) > 0 {
++		return errors.Join(errs...)
+ 	}
+ 
+ 	t.table.metrics.blockPersisted.Inc()

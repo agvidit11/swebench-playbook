@@ -1,0 +1,49 @@
+You are working in a Go repository (polarsignals/frostdb) in your working
+directory. Implement the following change. Write real code; this is not a design
+exercise.
+
+## Background
+
+`TableBlock.Persist` in `store.go` writes a serialized Parquet block to the
+database's configured data sinks. A sink is anything implementing the `DataSink`
+interface in `db.go`:
+
+    Upload(ctx context.Context, name string, r io.Reader) error
+    Delete(ctx context.Context, name string) error
+    String() string
+
+Sinks are configured through the public `WithWriteOnlyStorage` and
+`WithReadWriteStorage` options, which append, so a database may hold any number
+of them. Today `Persist` refuses to run with more than one.
+
+## What to implement
+
+Make `TableBlock.Persist` deliver the block to every configured sink, subject to
+all of the following:
+
+1. Every configured sink must receive the complete serialized block. Each sink
+   must be able to read the bytes as a valid Parquet file containing every row
+   in the block.
+
+2. The block must be serialized exactly once per `Persist` call, no matter how
+   many sinks are configured. Serializing the block separately for each sink is
+   not acceptable.
+
+3. The uploads must be able to make progress at the same time. It must not be
+   the case that one sink's `Upload` call can only begin after another sink's
+   `Upload` call has returned.
+
+4. If one sink fails, the other sinks must still receive their complete copy,
+   the returned error must identify the sink that failed, and any partial object
+   written by the failing sink must be cleaned up with that sink's `Delete`.
+
+5. The zero-sink and single-sink cases must keep working exactly as they do now.
+
+## Rules
+
+- Change only production code under the repository root and its packages.
+- Do not add, modify or delete any `_test.go` file. Do not add test helpers.
+- Do not change any public function signature.
+- Keep the code idiomatic Go and make sure `go build ./...` succeeds.
+- When you are finished, print a one-paragraph summary of what you changed and
+  which files you touched.

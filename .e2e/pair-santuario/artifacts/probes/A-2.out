@@ -1,0 +1,12 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/691258/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Three-sentence fix — checking the verify loop to outline it.
+Three-sentence approach — pulling the exact failure handling to describe it.
+Three-sentence approach — pulling the exact failure handling to describe it.
+Handle the unresolvable-input failure inside the loop by recording a per-reference failure entry flagged as unverifiable due to missing input, marking the overall run as failed, and continuing with the remaining references instead of aborting. Represent the outcome with a richer per-reference result that separates missing input from digest mismatch while keeping the existing digest-mismatch recording behavior unchanged. Keep the current boolean verification method working by having it delegate to a new detailed variant that supplies the rich result, so existing callers see unchanged boolean semantics while new callers can inspect the per-reference distinction for every entry.
