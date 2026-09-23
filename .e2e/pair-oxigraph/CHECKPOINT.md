@@ -56,10 +56,14 @@ Read `handoffs/03-A2r2-A3r2-FINAL.md` for the full kill ledger.
 | # | Thing | Evidence |
 |---|---|---|
 | A2 r1 | 18 surfaces, merge table, 2 cards | `handoffs/01-A2.md`, `/tmp/oxigraph-run/{surfaces.md,cards.out}` |
-| A3 r1 | **NO SURVIVOR**, 9/14 ticked, 5 waived | `handoffs/02-A3.md` |
-| GATE 2 harness | built and run twice | `/tmp/oxigraph-run/gate2-{spareval,both,update}.log` |
+| A3 r1 | **NO SURVIVOR**; corrected to 7/14 ticked, 6 waived, 1 withdrawn after review | `handoffs/02-A3.md` + its CORRECTION block |
+| A2 r2 | 0 cards, 18 surfaces re-dispositioned, 4 cascades attempted and killed | `handoffs/03-A2r2-A3r2-FINAL.md`, `/tmp/oxigraph-run/cards2.out` |
+| A3 r2 | **NO SURVIVOR, FINAL**; 5/14 ticked, 9 waived | `handoffs/03-A2r2-A3r2-FINAL.md` |
+| GATE 2 harness | built and run three times | `/tmp/oxigraph-run/gate2-{spareval,both,update}.log` |
+| GATE 3 sweep | 9 queries w/ total_count, branch sweep, `--comments`, feature arm | `artifacts/A3-disclosure-log.md` |
+| reviewer findings | both reviews accepted in full; corrections appended | `review/0{1,2}-*.md`, CORRECTION blocks |
 
-### The four kills (do not relitigate)
+### The kills (do not relitigate)
 - **C02 / GATE 2** — hollow. MEASURED: `explain()` already returns the complete plan tree
   before any solution is consumed (plan JSON byte-identical before vs after); statistics
   on-vs-off already yields identical solution sequences.
@@ -69,9 +73,20 @@ Read `handoffs/03-A2r2-A3r2-FINAL.md` for the full kill ledger.
 - **C01 / GATE 3** — merged public PR **#1938** = commit `4a611b81` (2026-09-12, ten days before
   base_commit), *"SPARQL UPDATE LOAD: make sure the operation is atomic even when SILENT is
   set"*, same file, same contract. Hard stop, no exception.
-- **C01 / GATE 7** — cascade decorative. `QueryEvaluationError` (spareval) and
-  `UpdateEvaluationError` (oxigraph) are separate enums in separate crates;
-  `grep -rn "can_be_silent\|QueryEvaluationError" lib/oxigraph/src/sparql/update.rs` -> nothing.
+- ~~C01 / GATE 7 — cascade decorative~~ **WITHDRAWN.** My grep was scoped to `update.rs`; the
+  conversion lives in the sibling module — `lib/oxigraph/src/sparql/error.rs:4` imports
+  `spareval::QueryEvaluationError` and `:56` implements `From<QueryEvaluationError> for
+  UpdateEvaluationError`. There IS a call edge, and C01's step-2 guards are query-side probes
+  that depend on step 1. C01 dies on GATE 3 alone, which is sufficient. See the CORRECTION block
+  in `handoffs/02-A3.md` and friction F16.
+- **S01 / GATE 3** (found in round 2) — OPEN issue **#1624**, maintainer comment: *"I recently
+  modified Oxigraph to return a nice error when a custom function is not supported instead of
+  just having its return value be always not defined"*, naming PR #1634. That is S01's whole
+  premise, publicly proposed.
+- **S02 / GATE 2** — hollow. Custom aggregates already get per-group DISTINCT via
+  `AccumulatorWrapper::DistinctExpression` + an `FxHashSet` `seen` set, same as built-ins.
+- **S08 / churn + branch** — `bb2fb65b` (2026-09-12) touches all three of its files and its exact
+  behaviour; `origin/sparql-exist` is an in-flight maintainer branch on it.
 
 ## 4. Verified facts about the repo (feeds any future round — do not re-derive)
 

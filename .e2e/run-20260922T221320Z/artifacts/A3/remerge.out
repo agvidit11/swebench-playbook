@@ -1,0 +1,53 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/1974691/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Re-merging without the killed chain surface — verifying the clean fallback and partner surfaces for two new cascades.
+I've confirmed the clean OCSP fallback surface — now digging into the partner surfaces to shape two dependent cascades.
+The history checks are coming back clean — now pulling the remaining evidence and second-file touchpoints.
+Evidence gathering is nearly done — running final verification on the TODO origin, test coverage, and wire types.
+One correction to the brief surfaced — checking the existing reason-code vocabulary before finalizing.
+## GIT-LOG-L EVIDENCE
+
+All commands run at HEAD (`58468399`), read-only. Verdict rule: clean unless a merged PR deliberately reasoned the current behaviour as desired.
+
+**1. `GetOCSP` — `git log -L ':GetOCSP:certificate/certificates.go' --oneline | grep -E '^[0-9a-f]{8} '**
+```
+8d13f8d0 feat: add support for context (#2799)
+dc2b19e1 chore: update Go (#1469)
+dac7c118 Get an existing certificate by URL (#897)
+42941cce Refactor the core of the lib (#700)
+```
+Plus `git log -S 'build fallback' --oneline -- certificate/certificates.go` → `42941cce` only (TODO origin). The #2799 hunk is mechanical context-plumbing (`HTTPClient.Get(url)` → `NewRequestWithContext` + `Do`); single-`[0]` indexing is untouched. No commit discusses single-attempt as a choice; the TODO explicitly invites fallback. **Verdict: clean.** (Corroborates the brief's execution finding: `:558` TODO, `:563`/`:597` `[0]`-only, no status check.)
+
+**2. `RevokeWithReason` — `git log -L ':RevokeWithReason:certificate/certificates.go' --oneline | grep -E '^[0-9a-f]{8} '`** → 21 commits, all mechanical around it (slog #2800/#2809, context #2799, lint #2699…); the behaviour lines come from `df54dd23 feat: Allows defining the reason (#1511)`, whose stat is `acme/commons.go | 29 +++`, `certificate/certificates.go | 6 +`, `cmd/cmd_revoke.go | 10 +`. Correction to the brief: #1511 *added* the `CRLReason*` vocabulary (`acme/commons.go:26-37`: 0,1,2,3,4,5,6,8,9,10 — note 7 absent), but wired `reason *uint` through verbatim with no range check and no discussion of validation. **Verdict: clean** — opaque forwarding is omission, not a decision.
+
+**3. `Revoke` (wire) — `git log -L ':Revoke:acme/api/certificate.go' --oneline | grep -E '^[0-9a-f]{8} '`**
+```
+8d13f8d0 feat: add support for context (#2799)
+42941cce Refactor the core of the lib (#700)
+```
+Body is `c.core.post(ctx, RevokeCertURL, req, nil)` — created in #700, context added in #2799. No error-semantics decision. **Verdict: clean.**
+
+**4. `Present` — `git log -L ':Present:challenge/tlsalpn01/tls_alpn_challenge_server.go' …`** → `ff774dc2` (context→listeners #3082), `930c5d4a`, `edd764f7`, `e26d5cee`, `8013d0fb`, `2f2f587b` (constructors #2801)…, back to creation in `d457f70a TLS-ALPN-01 (#572)`. Single `s.listener` field dates to creation; no commit reasons that one field must serve concurrent Presents. **Verdict: clean.**
+
+**5. `CleanUp` — same `-L` query** → `8013d0fb`, `2f2f587b`, `38f23c8c chore: update linter (#1278)`, `42941cce`, `d457f70a`. `git show 38f23c8c -- …server.go` proves the predicate was only lint-migrated, never designed:
+```
+-	if err := s.listener.Close(); err != nil && err != http.ErrServerClosed {
++	if err := s.listener.Close(); err != nil && errors.Is(err, http.ErrServerClosed) {
+```
+The inversion (return close error *only when it is* `ErrServerClosed`, swallow genuine failures) is accidental. **Verdict: clean.**
+
+**6. `Solve` — `git log -L ':Solve:challenge/tlsalpn01/tls_alpn_challenge.go' …`** → `d335d451`, `edd764f7`, `e26d5cee`, `8013d0fb`, `218ec2c1`, `8d13f8d0`, `81e0f2b4`, `24a46d0c` (delay option #2499), `e01131f2`, `2da1ce06`, `42941cce` — all logging/context/options churn; warn-and-drop cleanup handling never reasoned. **Verdict: clean.**
+
+*C3 note:* `do`/`parseError` (`registration/zerossl/client.go`) show a single touching commit (`2f089d36` shortcodes) — clean — but left unmerged: neither branch can supply a second step with a real artifact dependency without minting new exported error names. Reporting 2 cascades, not padding to 3.
+
+## CASCADES
+
+**Cascade 1 — "Dead responder, accountable revocation" (merges `c1` × `c2`).** Step 1: harden `GetOCSP` to exhaust both AIA lists — new *unexported* `resolveLeafIssuer` (leaf = first non-CA cert; issuer fetched across `IssuingCertificateURL[]` with 2xx check, capped body, DER-then-PEM parse, per-URL failures via `errors.Join`) then POST across `OCSPServer[]` with status check, first verified `ParseResponse` wins. Step 2: `RevokeWithReason` calls `resolveLeafIssuer` to select the revocable leaf (replacing blind `certificates[0]`) and rejects reasons outside the *existing* `acme.CRLReason*` set (7, >10); api `Revoke` refuses empty `Certificate` pre-POST. Graded assertions run through existing `Certifier.GetOCSP` (httptest TLS servers: dead-500 + live, assert live hit) and existing `Certifier.RevokeWithReason` (MockACMEServer: no POST on bad reason, correct leaf DER on good). ZERO new exported symbols (uses `acme.CRLReasonKeyCompromise` etc.); no new structs. THE TENSION: exhausting every advertised endpoint vs fail-fast pinpointing of which entry died — today's parse error names the dead entry, a naive loop reports only the last failure. Step 2 CANNOT compute `RevokeCertMessage.Certificate` bytes without step 1's (leaf, issuer) artifact, since index 0 need not be the leaf. Wrong shape: "validate reason but still revoke `certificates[0]`" — attractive because the range check looks like the whole fix while the bundle-index bug survives. ~120 net lines across `certificate/certificates.go`, `acme/api/certificate.go`. Biggest risk: graded fixture with a 2-cert bundle never exercises the fetch path, collapsing step 1's observable delta to the responder loop only.
+
+**Cascade 2 — "One port, many challenges" (merges `ch3` step-pair).** Step 1: replace single-`listener` serving with SNI dispatch in `ProviderServer` — mutex-guarded `map[domain]tls.Certificate` consulted via `GetCertificate`; `Present` inserts and starts the one listener only if absent, so concurrent Presents coexist on one port. Step 2: keyed `CleanUp` removes the entry, closes the listener only when the map drains, and fixes the inverted `ErrServerClosed` predicate; `Challenge.Solve` joins the cleanup error into its return instead of warn-and-drop. Graded assertions run through existing `ProviderServer.Present` (two Presents, TLS-dial both SNIs, each serves its domain cert) and existing `ProviderServer.CleanUp` (retiring A leaves B servable; genuine close error propagates). ZERO new exported symbols; no new structs. THE TENSION: one port admits exactly one listener vs N concurrent challenges each needing their own cert — last-write-wins orphans predecessors. Step 2 CANNOT retire one domain's cert nor decide listener lifetime without step 1's registry artifact — with one overwritten field there is nothing correct to close per-domain. Wrong shape: map-of-listeners keyed by domain on the same addr — attractive (mirrors per-challenge ownership) but the second bind fails; multiplexing on one listener is the shape that binds. ~90 net lines across `challenge/tlsalpn01/tls_alpn_challenge_server.go`, `challenge/tlsalpn01/tls_alpn_challenge.go`. Biggest risk: `GetCertificate`-closure mutation under concurrent `Present` needs exact lock discipline; a racy version flakes the deterministic graded dial test.

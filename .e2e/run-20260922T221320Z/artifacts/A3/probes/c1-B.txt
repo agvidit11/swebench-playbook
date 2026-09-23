@@ -1,0 +1,6 @@
+In this Go repo (go-acme/lego), a user reports: "I called Certifier.RevokeWithReason with a PEM
+bundle I assembled myself and lego revoked the wrong certificate. I also passed reason=7 and lego
+happily sent it to the CA, which rejected the whole request with an opaque error."
+
+Describe in 3 sentences how you would change certificate/certificates.go so neither happens.
+Approach only, no code.

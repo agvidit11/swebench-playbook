@@ -115,6 +115,32 @@ Read the function. If the precedence / ordering / guard the candidate proposes i
 
 ## GATE 3 — public and peer disclosure, per candidate
 
+> **Run these four FIRST. Each one killed a candidate on 2026-09-22 that had already cleared
+> earlier gates.** `STATUS: LIVE`
+>
+> ```bash
+> # 1. FUNCTION-scoped history. The file-scoped form returns noise and hides this.
+> git log -L :<func>:<path> --oneline | head -40
+> # 2. remote branches — count them properly; "all dependabot" was false 23 of 26
+> git branch -r | grep -vE 'dependabot|^\s*origin/HEAD'
+> git diff --stat origin/main...origin/<branch>        # for anything related
+> # 3. issues WITH comments; a maintainer answer hides in the thread, not the title
+> gh issue view <n> --comments
+> # 4. JIRA-only repos: gh returns zero because the tracker is elsewhere. Sweep JIRA.
+> ```
+>
+> **① is the highest-value command in this act and it was in no act-file.** On the lego run it
+> caught step 1 being a **character-for-character revert of merged PR #1334** — a candidate that
+> had already passed `GATE 0` at 14/14, `GATE 1`, and an *executed* `GATE 2` reproduction. The
+> file-level form returned 12 commits of noise and showed nothing.
+>
+> **② found an 8,306-line finished implementation** on `origin/comments` in prism, with a
+> 2,229-line test file, on a repo every other gate passed.
+>
+> **③ found the maintainer of santuario naming the fix** in a comment, and **④** found santuario's
+> real issue count is 33, not the 12 `A1` recorded.
+
+
 Repo-level screening does not cover this. Run per surviving candidate on the **specific behaviour** — the last point where dropping a candidate costs nothing. `STATUS: LIVE`
 
 Hard kill, no exception for obfuscation, contamination score or post-cutoff timing: any **merged** public PR touching the surface; any **closed-unmerged** PR whose diff or thread contains the remedy; any open issue whose **body or comments** propose the direction, workaround, API or remedy — even informally, even with no code, even if our oracle would be more robust; rewinding `base_commit` to a public PR's parent; a **documented design decision** rejecting the capability, unless explicitly overruled with new justification. **Finding the premise in open issues is a disqualifier, not a confirmation** — it feels like validation and is training-data exposure.
@@ -141,6 +167,37 @@ grep -rln "<behaviour keyword>" <clone>/src/test | head   # a shipped test = the
 - **Peer dedup on this candidate's own invariant and symbols** — method and traps are owned by `→ A1-repo-screen.md §3`. **Sweep the concept under several plausible names, not one**: a P6-adjacent peer was found only because someone searched the concept — the searcher grepped `with_budget`, the peer's symbol was `ExecutionBudget`.
 
 ## GATE 4 — the outcome-variance probe (PRIMARY)
+
+> ### First: GATE 4 as written could not run, and every run tonight waived it
+>
+> `STATUS: LIVE` — found independently by three runs on 2026-09-22. The probe below grades
+> implementations "against your own assertions", but the contract comes from `B2` and the grader
+> from `B3`, **neither of which exists at `A3`.** So the PRIMARY gate was waived every time and
+> the decision fell to `GATE 5`, which this file itself calls *"weakest, and what we wrongly
+> optimised for."* Thirteen candidates died that way.
+>
+> **Run GATE 4 in the A3-LOCAL form below. It is not optional and it is not the same as GATE 5.**
+>
+> **A3-LOCAL form.** You do not need `instruction.md` or a real grader — you need the card's
+> `CONSTRAINT` and a *throwaway* assertion sketch:
+>
+> 1. Take `CONSTRAINT` verbatim from the card. That is your contract; do not improve it.
+> 2. Write **3–5 throwaway assertions** that distinguish `DESIRED` from `NON-DESIRED` — in a
+>    scratch file, never in `<task>/tests/`. They must **observe the discriminating behaviour**,
+>    not a proxy for it. frostdb's assertion never observed serialization completion, which is
+>    why its 5/5 meant nothing.
+> 3. Validate the sketch at `base_commit` **before** using it: the current code must FAIL it. An
+>    assertion that already passes measures nothing.
+> 4. Generate n=5 cold implementations from `CONSTRAINT` alone and run the sketch against them.
+> 5. Want **1–3 of 5**. 0/5 or 5/5 kills the candidate — *and 5/5 after step 3 passed is a real
+>    kill, unlike a GATE 5 convergence reading.*
+>
+> If the assertion sketch cannot be written without naming the data structure, stop: that is
+> `GATE 1` pre-filter 2 and the fork is already zero.
+>
+> **A candidate may only be killed on `GATE 5` alone if GATE 4 A3-LOCAL was run and is
+> inconclusive.** Record which form you ran in the handoff.
+
 
 **Outcome variance is the target, not design divergence.** Across **22 scored tasks, 59% land at an extreme (0/5 or 5/5) and only 23% in band.** A task can have two genuinely different valid designs and have both pass every time. `STATUS: LIVE`
 
@@ -180,6 +237,35 @@ done
 The probe also reveals **which assertion carries the task**: impl-1's 9 failures were the entire difficulty — remove that one assertion cluster and all five implementations pass, taking the task to 5/5 and flipping a passing gate to failing. Before removing a test that looks unfair, check whether that test IS the difficulty.
 
 ## GATE 5 — the model-prior fork probe (SECONDARY, design)
+
+> ### MANDATORY PRE-CHECKS — two of four kills on 2026-09-22 were invalid without them
+>
+> `STATUS: LIVE`
+>
+> **① The card must declare `CONSTRAINT:`, `DESIRED:` and `NON-DESIRED:` BEFORE you probe.**
+> Direction is fixed in advance and never read off the outputs afterwards.
+>
+> **② Lint every probe prompt before it counts:**
+> ```bash
+> python3 ~/swebench-playbook/tools/probe-lint.py <card.md> <probeA.txt> <probeB.txt>
+> ```
+> It fails the probe if the prompt does not state the constraint, if it leaks the desired design,
+> or if the two phrasings are the same phrasing twice. **frostdb C1 and santuario C3 were both
+> killed by prompts that omitted the card's own constraint.** A probe that does not state the
+> constraint measures nothing.
+>
+> **③ Apply the mapping in the stated direction, and say which direction you applied.**
+>
+> | Result | Meaning |
+> |---|---|
+> | ≥4 of 5 produce **DESIRED** | fork ~1 — candidate DEAD |
+> | ≥4 of 5 produce **NON-DESIRED** | **STRONG FORK — candidate LIVES.** This is not a kill. |
+>
+> frostdb C1's five implementations were all the card's own *wrong-path* shape. That is the
+> second row. It was recorded as "10/10 desired" and killed.
+>
+> **④ Every GATE 5 kill gets an adversarial audit before it is final** (§KILL AUDIT below).
+
 
 **Never score fork strength by argument. Argued fork strength has been wrong 11 times out of 11** — candidates scoring **24–33/35** all measured **Fork 1** when probed. franz-go argued its way to a good fork score and returned **1.0**. `STATUS: LIVE`
 
@@ -247,6 +333,32 @@ Only candidates past GATE 0–7 reach scoring, and a **different** model scores 
 **Read the per-axis scores, never the total — veto axes cannot be outvoted.** A bc-java candidate was dispatched as a multi-turn build off its **30/35 headline**; the same report's step table said in plain text `| C5 ITS snapshots | single-turn | unchanged (not probed) |` — Cascade **2**, never probed, realism flagged two paragraphs later. A full cycle was spent rediscovering a written-down verdict. **A high total with Cascade ≤2 is a single-turn candidate at best.**
 
 **Calibration target, easy to get backwards.** In-band on Avocado is **1–3 of 5 and LOWER IS BETTER**: 1/5 ideal, 3/5 ceiling, 4/5 over it; a step reading 1/5 is a success, leave it alone. **Avocado 0/5 is NOT a failure** — the server says *too hard* only when no model passed (`avocado 0, opus 0, gpt 0`), so read Opus and GPT first; 1–3/5 is a stricter operational target, not the server's validation condition. Corollary: **harder is cheap, easier is expensive.** Decode → `reference/R1-field-authority.md`; is the number real → `reference/R2-signal-integrity.md`.
+
+## KILL AUDIT — no GATE 5 kill is final until this runs
+
+`STATUS: LIVE`. On 2026-09-22 four repos were declared dead. Reviewers later found **two of the
+four kills invalid**, both from the same defect: the probe never stated the card's constraint.
+The reviewers caught it — after the runs had ended and the repos were written off. Make it a
+gate, not a postmortem. It is cheap: the kill is already written up.
+
+**Dispatch Codex with one instruction: argue this candidate is ALIVE.** Give it the card, the
+probe prompts, the raw probe outputs, and the kill write-up. It must answer all six:
+
+| # | Question | The case it catches |
+|---|---|---|
+| 1 | Does each probe prompt state the card's `CONSTRAINT`? | frostdb C1, santuario C3 |
+| 2 | Does the assertion actually **observe** the discriminating behaviour, or a proxy? | frostdb's never observed serialization completion |
+| 3 | Was the DESIRED/NON-DESIRED mapping applied in the declared direction? | frostdb scored a strong fork as a kill |
+| 4 | Was GATE 4 run in its A3-LOCAL form, or waived? | waived on every run tonight |
+| 5 | Would a **different constraint on the same surface** survive? | the surface may be live even if this card is not |
+| 6 | Is the kill a **fact** (merged PR, importable reference, already-true premise) or a **convergence reading**? | facts stand; readings need 1–3 re-checked |
+
+**A kill that rests only on a convergence reading, with any of 1–4 unmet, is NOT a kill.** Fix
+the instrument and re-measure. Record the audit verdict in the handoff next to the kill.
+
+**Steelman before you kill.** One sentence: the strongest version of this candidate, and whether
+a different constraint on the same surface survives. If you cannot write it, you have not
+understood the candidate well enough to reject it.
 
 ## THE GATE CHECKLIST
 

@@ -1,0 +1,10 @@
+In this Go repo (go-acme/lego), `challenge/tlsalpn01`'s `ProviderServer` stores a single
+`s.listener` field. `Present` starts a listener serving one challenge certificate; a second
+concurrent `Present` overwrites the field. `CleanUp` closes `s.listener`.
+
+Requirement: several domains must be able to have an outstanding tls-alpn-01 challenge at the
+same time on the same address, and `CleanUp` for one domain must not break the others; the last
+`CleanUp` should shut the listener down, and a genuine close failure must be reported to the
+caller rather than swallowed.
+
+Describe in 3 sentences how you would implement this. Approach only, no code.

@@ -1,123 +1,98 @@
 # CHECKPOINT — run-20260922T221320Z
 
-> Rewritten after every meaningful sub-step. A stranger with zero context should be able to
-> read this and continue without redoing work.
-
-**Last updated:** 2026-09-22, A2 survey dispatched to MetaCode (in flight).
+**Last updated:** 2026-09-22, run TERMINATED at A3 with `EXIT: NO SURVIVOR`. `DONE` written.
+Handoffs 01 and 02 were **amended after reviewer audit** — see `handoffs/05-CORRECTIONS.md`.
 
 ---
 
-## Current position
+## Final position
 
 | | |
 |---|---|
-| **Act** | `A2` — idea generate. Checklist lines 1-7 done; **line 7 (the survey) IS IN FLIGHT.** |
-| **Where inside it** | waiting on MetaCode. Next after it returns: line 8 merge table -> 9 auto-rejects -> 10 cards -> 11 self-audit -> 12 count -> 13 HANDOFF. |
-| **A1 status** | CLOSED, `EXIT: PARTIAL`. Handoff at `handoffs/01-A1.md`. **Repo chosen: `go-acme/lego`.** |
-| **Target format** | `swebench-multi` (multi-turn) |
-| **Run root** | `/home/agvidit/swebench-playbook/.e2e/run-20260922T221320Z/` |
-| **Docker lock** | **NOT HELD BY ME.** `/tmp/swebench-docker.lock` exists, size 0, mtime 2026-09-22 15:18:55, owner unknown — another session on this host is running `ruby-terraform-plan-model-empty__bqrhh2b-main-1` and `redb-database-drop-hangs-outstan__yut52b8-main-1`. I have run **zero** Docker commands. |
+| **Run state** | **STOPPED.** Four candidates gated, four evidenced kills. Nothing to scaffold. |
+| **Acts executed** | `A1` → `A2` → `A3` → `A2 (r2)` → `A3 (r2)`. **`B1`–`B5` never started.** |
+| **Repo** | `go-acme/lego`, clone `/tmp/e2e-lane-GO/lego`, base `58468399a23fbdf4cb3a366e6d81925c1f97b4fe`, module `github.com/go-acme/lego/v5` |
+| **Task dir** | **none created** — `B1` was never reached |
+| **Docker lock** | never held by me. I ran **zero** Docker commands all run. |
+| **Clone state** | clean — `git status --porcelain` empty; my GATE-2 reproduction file was deleted after measurement |
 
----
+## Act exit states
 
-## Decisions already made — do not relitigate
+| act | handoff | exit |
+|---|---|---|
+| `A1` repo screen | `handoffs/01-A1.md` | **NOT MET** (corrected from an invalid "PARTIAL"). 0 repos with the prescribed containerised G10; 1 with a native substitute (lego); 7 unmeasured or blocked. Proceeded anyway — deviation owned in `handoffs/05-CORRECTIONS.md` §1. |
+| `A2` idea generate | `handoffs/02-A2.md` | **NOT MET** (corrected from "MET"). 18 surfaces → 2 cards, but 4 checklist lines do not hold — both cards abandoned the chosen A-shape, the auto-rejects were not applied to the survivors, and both self-audits used invented rubric labels. `handoffs/05-CORRECTIONS.md` §2. |
+| `A3` idea gate (r1) | `handoffs/03-A3.md` | both cards killed (GATE 0, GATE 3) |
+| `A2` idea generate (r2) | `handoffs/04-A2r2.md` | **MET** — 2 new cascades, each with function-scoped history evidence |
+| `A3` idea gate (r2) | `handoffs/03-A3.md` | both cascades killed (GATE 5 ×2) → **NO SURVIVOR** |
 
-1. **Three lanes, not four: GO / RS / JV. Ruby deliberately excluded** despite having the best
-   taxonomy gap (−5.81). Reason: this author already has 14+ in-flight Ruby tasks
-   (webauthn-ruby ×3, ruby-auth0 ×4, state-machines ×3, qdrant-ruby, sparql-ruby, net-imap,
-   ruby-terraform ×2, zendesk-biz) — A1 §3 "check our own in-flight work" makes Ruby the
-   highest self-collision territory available, and `ruby` is absent from the host toolchain
-   so every Ruby G10 would be Docker-bound.
-2. **G10 split out of the fan-out.** A1 §10 line 14 requires a container run; router §6 makes
-   Docker serial-only while making A1 the canonical parallel act. Lanes were told to run
-   G1–G9 in parallel and measure G10 natively only where the host toolchain exists; container
-   G10 is queued serially through the coordinator. See `friction.md` F3.
-3. **Corpus refresh done once centrally, not per lane** (shared git index). See `friction.md` F1.
-4. **Lane brief passed the `aai-instruction-validator` gate before fan-out** — verdict APPROVE
-   with three tightenings, all applied: 22s `gh search code` cadence with per-lane offsets
-   (GO +0s / RS +7s / JV +14s) because the 10/min cap is org-wide and shared, not per-lane;
-   `PROVISIONAL — G10 pending` labelling; explicit checklist-line-1 waiver wording.
+## The four kills
 
----
+| # | candidate | gate | evidence |
+|---|---|---|---|
+| 1 | Every-Key-Type | **GATE 0** | 3 coined tokens (`ErrUnsupportedPrivateKey`, `PrivateKeyPEMType`, `ErrUnsupportedSignerKey`), all 0 hits at base, all load-bearing for the assertions |
+| 2 | No-Silent-Fallback Selection | **GATE 3** | step 1 = revert of merged PR **#1334** "fix: preferred chain only match root name"; found by `git log -L` on the function, a command in no act-file |
+| 3 | Dead responder, accountable revocation | **GATE 5** | 5/5 desired path phrasing A, **5/5 phrasing B (non-leading)**, 4/4 on step 1 |
+| 4 | One port, many challenges | **GATE 5** | 5/5 desired path, near-verbatim reproduction of both steps |
 
-## DONE — with evidence path for each
+## Decisions made — do not relitigate
 
-| Item | Evidence |
-|---|---|
-| Dedup corpus refreshed | `cd /tmp/llc && git pull` → `Already up to date.`; HEAD `d8472c4` **2026-09-02** = **20 days stale**. Recorded in `friction.md` F2. |
-| Peer repo pools downloaded | `/tmp/e2e-pools/` — `CANDIDATE-POOL.md` (1726 lines) + 4 lane-relevant sweeps from `codimango/swe-bench-pro-jayzong:docs/repo-candidates/` |
-| Host toolchain receipt (A1 §8 was assertion-only) | go1.26.5 ✓, gcc 11.5.0 ✓, cmake 3.31.8 ✓, python3 3.12 ✓, mvn 3.6.3 ✓, **java = JDK 1.8 ONLY** (`/usr/local/fbprojects/packages/java-runtime/539/impl/8`, no `/usr/lib/jvm`, `JAVA_HOME` unset), node v24 ✓, **ruby ABSENT, cargo/rustc ABSENT**. Confirms + sharpens `A1:212`. |
-| `gh` code-search budget confirmed shared | `gh api rate_limit` → `code_search.limit = 10` (per-minute, org-wide) |
-| Lane brief validated | `aai-instruction-validator` → `VERDICT: APPROVE` + 3 tightenings, all applied |
-| **Lane GO complete** | `/tmp/e2e-lane-GO/shortlist.md`; 11 repos screened, 3 survivors, 8 evidenced rejects |
-| **Lane RS complete** | `/tmp/e2e-lane-RS/shortlist.md`; 13 repos screened, 2 provisional survivors, 11 evidenced rejects |
-| **Lane JV complete** | `/tmp/e2e-lane-JV/shortlist.md`; 12 repos screened, 3 provisional survivors, 9 evidenced rejects |
-| Tooling health | `codimango task list` OK (42 tasks); `mc.sh` present; `codex` on PATH; fixed `instruction-lint.py` in place (2026-09-22 15:22) |
+1. **Three A1 lanes GO/RS/JV, Ruby excluded** — 14+ in-flight Ruby tasks make it the highest
+   self-collision territory, and `ruby` is absent from the host so every Ruby G10 would be
+   Docker-bound (the resource that turned out unavailable).
+2. **G10 split out of the A1 fan-out** — router §6 makes Docker serial-only while making A1 the
+   canonical parallel act. Lanes measured natively where the toolchain existed; container G10 was
+   queued and then blocked. → friction F3.
+3. **Repo = `go-acme/lego`** — the only repo with a measured graded path (25s build / 12s graded /
+   11s offline), MIT, 0% AI-authorship, 90 real open issues, real fixtures.
+4. **Lens = AXIS 19 × P6** — AXIS 19 is the only *measured* axis in R5; P6 was at 2 of ~3
+   instantiations, both Ruby/rom-rb, so a Go PKI instance varies the domain. **The survey returned
+   no P6** — both round-1 cards self-reported "not P6, step 1 survives intact". Recorded, not
+   relabelled.
+5. **Stopped rather than running an A2 round 3.** The 18-surface inventory is fully dispositioned
+   (7 killed at A3, 9 auto-rejected at A2, 1 unmergeable). The run brief and A1 §1 both forbid
+   manufacturing a survivor. → friction F21 (no termination rule exists; this is my call, flagged).
 
-**36 repos screened across the three lanes. 8 survivors, 28 evidenced rejects.**
+## What a successor should know
 
----
+- **`go-acme/lego` is exhausted for THIS LENS, not dead.** It passed every A1 gate. A second survey
+  under a different C-axis is the cheapest next move — the Dockerfile, dedup and toolchain work is
+  already amortised (A1 §1 "few repos, many tasks").
+- **`c1` (`GetOCSP` AIA/OCSP exhaustion) is the best-evidenced premise the run produced and is still
+  clean** — 2018 `TODO`, `total_count=0` on three disclosure queries, no shipped test, clean function
+  history, premise confirmed **by execution**. It died only on the fork probe (4/4 obvious).
+  If anyone wants it as a single-turn task, the evidence is all in `handoffs/03-A3.md`.
+- **Three surfaces are parked as single-turn candidates:** `c2` typed revocation reasons (the
+  `acme.CRLReason*` constants already exist, only validation is missing — note **7 is absent** from
+  the set), `ch3` tls-alpn listener lifetime + the linter-introduced inverted `errors.Is` predicate,
+  `C3` zerossl typed-nil error.
+- **Two hard-won environment facts about lego**, either of which would have cost an hour later:
+  lego's `api.Core` HTTP client **rejects plain `http://`** ("HTTPS is required"), so graded tests
+  must use `httptest.NewTLSServer` and that server's own `Client()`; and `api.New` needs a live ACME
+  directory, so the harness must serve `/dir` and `HEAD /nonce` (copy `internal/tester/api.go`).
+- **Three more repos are one Docker run from being fully gated:** `nmstate/nmstate`,
+  `apache/mina-sshd`, `spiffe/spire`. Exact G10 commands in `handoffs/01-A1.md` §G10 QUEUE.
 
-## Survivor table (consolidated)
+## Artifacts
 
-| # | slug | lane | licence | LOC / subsys | real open issues | G10 | blocker |
-|---|---|---|---|---|---|---|---|
-| 1 | **`go-acme/lego`** | GO | MIT | 111,352 / 262 | 90 (104−14) | **MEASURED 37s native** | none — **only repo past every gate** |
-| 2 | `spiffe/spire` | GO | Apache-2.0 | 126,069 / 100 | 93 (115−22) | ~30s native (needs `GOTOOLCHAIN=auto`, go≥1.27.1) | self-collision: author already has 2 spire tasks |
-| 3 | `smallstep/certificates` | GO | Apache-2.0 | 51,797 / 42 | 246 (301−55) | 32s native (subset) | sibling `smallstep/crypto` has 3 peers; 83% dependabot; needs `libpcsclite-dev` |
-| 4 | `nmstate/nmstate` | RS | Apache-2.0 | 68,042 / 4 crates | 77 (96−19) | **DEFERRED** (`rust:1-slim`) | Docker contended |
-| 5 | `retis-org/retis` | RS | GPL-2.0-only | 32,378 / 5 crates | 22 (27−5) | **DEFERRED** | core `src/collect` needs root+eBPF; only `retis-events` gradeable — weak |
-| 6 | `apache/mina-sshd` | JV | Apache-2.0 | 161,233 / 14 | 55 (68−13) | **DEFERRED** (JDK17) | Docker contended |
-| 7 | `jetty/jetty.project` | JV | EPL-2.0 | 586,816 / 36 | 220 (274−54) | **DEFERRED** (JDK17) | 586k LOC is 4× the A1 §6 target band ceiling |
-| 8 | `GoogleCloudPlatform/jit-groups` | JV | Apache-2.0 | 20,598 / 1 mod | 5 (5−0) | **DEFERRED** (JDK25) | **G9 FAIL risk** — zero test-fixture files anywhere |
+```
+handoffs/01-A1.md 02-A2.md 03-A3.md 04-A2r2.md 05-CORRECTIONS.md
+artifacts/A1/                   the three lane shortlists (36 repos screened), made durable
+friction.md                     24 entries, tagged REPEAT / EARLIER / WASTE / PINPOINT
+artifacts/A2/                   18-surface table, 5 subsystem passes, merge table, 2 full cards, briefs
+artifacts/A3/remerge.out        round-2 cascades + 6 function histories
+artifacts/A3/probes/            4 probe briefs + 20 probe outputs
+```
 
-**Leading pick: `go-acme/lego`.** Only repo with a measured graded path; MIT; 0% AI-authorship by
-the corrected 3-signal method; peer-clean local + live; 111k LOC / 262 subsystems sits inside the
-A1 §6 60k–150k band; 90 real open issues is inside the `<150` "normal screening" band; rich
-existing public API (`Certifier.Obtain`, `challenge.Provider{Present,CleanUp}`) satisfies G8
-without naming anything new. Race-risk flag: appears in `swe-bench-pro-aaitemp:discovery-f/*.json`
-under both networking and security_and_privacy pools — signal, not kill (A1 §3).
-
----
-
-## NEXT — concrete commands
-
-1. **Coordinator-side confirmatory re-screen of `go-acme/lego`** (A1 §1: "do not accept any
-   pre-screen, *including this brief's own repo list*" — a lane report is a pre-screen):
-   ```bash
-   gh search code --owner codimango "lego" --limit 30
-   gh search code --owner codimango "go-acme" --limit 30     # 22s apart
-   ls -d /tmp/e2e-lane-GO/lego/{.claude,CLAUDE.md,AGENTS.md,docs/claude} 2>/dev/null
-   git -C /tmp/e2e-lane-GO/lego branch -r | grep -icE 'claude|codex|copilot'
-   grep -rli "lego" /tmp/llc/tmp/tasks | head -40
-   ```
-2. **Drain the serial G10 queue** once `/tmp/swebench-docker.lock` frees — nmstate, then
-   mina-sshd. Exact commands in `handoffs/01-A1.md` §G10 QUEUE.
-3. Write `handoffs/01-A1.md`, then proceed to `A-source/A2-idea-generate.md`, one dispatch per
-   surviving repo (owner = MetaCode per router §1).
-
----
-
-## In-flight dispatches
-
-**MetaCode / Avocado — A2 survey.** THE ONE THING A SUCCESSOR MUST NOT RE-RUN BLIND.
-| | |
-|---|---|
-| launcher | `~/.claude/skills/swebench-mt/mc.sh` (mandatory — a hand-rolled `script -qec` returns a 192-byte banner at exit 0, and apostrophes in the prompt get silently deleted) |
-| brief | `/tmp/lego-run/survey.txt` (~15 KB) |
-| repo dir | `/tmp/e2e-lane-GO/lego` |
-| output | `/tmp/lego-run/survey.out` · launcher log `/tmp/lego-run/mc.log` |
-| timeout | 1700s inside mc.sh |
-| expected back | 18 surfaces in subsystem passes, a merge table, an auto-reject list, and 2-4 cards in the A2 §8 format |
-| **acceptance check** | **byte size.** `<600 bytes` = the gateway banner, not an answer -> re-run. A2 §3 is explicit that these tools fail with exit 0. |
-
-## Task-scoped /tmp paths in use
+## /tmp paths in use
 
 | path | purpose |
 |---|---|
-| `/tmp/llc` | dedup corpus (shared, read-only for me) |
-| `/tmp/e2e-pools/` | downloaded peer repo-candidate pools |
-| `/tmp/e2e-lane-GO/`, `/tmp/e2e-lane-RS/`, `/tmp/e2e-lane-JV/` | lane clones + shortlists |
-| `/tmp/e2e-g10/` | G10 container logs (empty — queue blocked) |
-| `/tmp/lego-run/` | A2 working dir: `survey.txt`, `survey.out`, `mc.log`, `admissions.txt` |
-| `/tmp/swebench-docker.lock` | **held by another session**, not me |
+| `/tmp/llc` | dedup corpus, HEAD `d8472c4` 2026-09-02 (20 days stale) |
+| `/tmp/e2e-pools/` | peer repo-candidate pools |
+| `/tmp/e2e-lane-{GO,RS,JV}/` | lane clones + shortlists (36 repos screened) |
+| `/tmp/lego-run/` | A2/A3 working dir: briefs, surface passes, cards, probes |
+
+## In-flight dispatches
+
+**None.** All MetaCode dispatches and all subagents returned.

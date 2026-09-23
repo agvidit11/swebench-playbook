@@ -200,9 +200,34 @@ yours to honour, not the guard's to enforce. Violation protocol → `reference/R
 
 ## 6. Concurrency
 
+### The Docker mutex — the actual protocol
+
+`STATUS: LIVE`. "One at a time" without a mechanism cost three repos their harness timing on
+2026-09-22, because two acts both believed they were allowed to proceed.
+
+```bash
+flock /tmp/swebench-docker.lock <your docker command>          # blocks until free
+flock -w 1800 /tmp/swebench-docker.lock <cmd> || echo "waited 30m, still held"
+```
+
+- **Holder identity:** write `<pair>/<act>/<pid>` to `/tmp/swebench-docker.holder` on acquire,
+  truncate on release, so a blocked act can name who it is waiting on.
+- **There is no TTL.** `flock` releases when the process exits, including on kill. A stale lock
+  means a live holder — find it before breaking it.
+- **Scope the lock to the Docker call, never to a whole act.** Holding it across an `A1` lane
+  serialises the entire fan-out.
+
+### `A1` fan-out versus the mutex — they conflict, and here is the resolution
+
+`STATUS: LIVE`. `A1` is the canonical parallel act, yet its exit gate (G10 harness timing)
+requires a container. Both rules cannot be obeyed as written. **Split the act:** run every
+non-container gate in parallel across lanes, then queue *only* the G10 timing runs through the
+mutex. A lane that cannot get the lock reports `G10: not measured — lock contention`, which is
+an honest unmet line, not a waiver.
+
 | Parallel-safe | Serial-only |
 |---|---|
-| repo screening (3+ agents, proven) | anything spawning Docker — parallel runs exhaust host memory |
+| repo screening — every gate except G10 | **G10 timing, and anything else spawning Docker** — parallel runs exhaust host memory |
 | ideation, fork probes, novelty sweeps | `contract → solve → submit` for a given task |
 | reading trial artifacts | repairs — one at a time, always |
 | independent tasks in **separate worktrees** | shared git index; shared `/tmp` paths |

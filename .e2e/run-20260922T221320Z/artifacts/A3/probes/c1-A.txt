@@ -1,0 +1,10 @@
+In this Go repo (go-acme/lego), `Certifier.RevokeWithReason` in certificate/certificates.go
+currently does `certificates, err := certcrypto.ParsePEMBundle(cert)` and then revokes
+`certificates[0]`, guarded only by an `IsCA` check.
+
+Requirement: the caller may pass a PEM bundle whose entries are in any order, so the code must
+select the actual end-entity (leaf) certificate to revoke rather than assuming index 0, and it
+must reject a revocation reason that is not one of the RFC 5280 CRL reason codes the package
+already defines.
+
+Describe in 3 sentences how you would implement this. Approach only, no code.

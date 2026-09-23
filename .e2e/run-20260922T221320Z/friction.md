@@ -365,3 +365,145 @@ a premise that is, as far as any of my sweeps can tell, genuinely undisclosed.
 and therefore belongs at GATE 0/1, above the executed reproduction. Suggested order:
 `GATE 0 namability -> GATE 0b function-history -> GATE 1 pre-filters -> GATE 2 reproduction`.
 That single reordering would have saved the whole GATE 2 build.
+
+## F20 — **A3's PRIMARY gate cannot be run inside A3.** GATE 4 needs artifacts that B2 and B3 create
+**File:** `A-source/A3-idea-gate.md:143-180`
+GATE 4 is labelled **PRIMARY** and GATE 5 **SECONDARY**. GATE 4's procedure is:
+> "**The probe: n=5 cold implementations from the task's own contract, graded against your own
+> assertions.**"  `mc.sh /tmp/<task>/build-prompt.txt <clone> impl-$i.out` … "then run YOUR graded
+> assertion against each of the five"
+At A3 there is **no contract** — `B2` writes `instruction.md`, and router §5 forbids this act's
+owners from writing it — and **no graded assertion** — `B3` writes `tests/`, owned by Codex. The
+validated instance the act cites proves the point: it graded five implementations "in a local
+rebuild of the task image", i.e. **after `B4`**, not at A3.
+**Consequence, which bit this run.** With GATE 4 unrunnable, GATE 5 decided everything. And A3
+itself says GATE 5 measures the **weakest** signal:
+> "DESIGN — picks path X vs Y | mostly deterministic; **weakest, and what we wrongly optimised
+> for**" … "Outcome variance is the target, not design divergence. A task can have two genuinely
+> different valid designs and have both pass every time."
+So the act's own text says design divergence is the wrong thing to optimise for, then hands it the
+veto (GATE 8: "Fork strength ≤2" is one of three veto axes, scored from GATE 5). **Two of my four
+kills are on the instrument the act calls weakest, because the instrument it calls primary could not
+be executed.**
+**Fix, one of:**
+ (a) move GATE 4 out of A3 into a new gate between `B3` and `B5`, and say so in the router state
+     table — the run would then push a task only after a measured outcome-variance figure; or
+ (b) define an A3-runnable GATE 4: n=5 implementations from a **probe brief** (explicitly not
+     `instruction.md`) graded against a **throwaway assertion the act owner writes for the probe
+     only** — and say in the act that the assertion is a probe artifact, not a `tests/` artifact,
+     so the ownership matrix does not block it.
+Either way the act must stop calling GATE 4 primary while leaving it unreachable.
+
+## F21 — `PINPOINT:` nothing tells you how many A2↔A3 rounds to run before declaring the repo dead
+**Files:** `A3:286` (`NEXT: … or back to A-source/A2-idea-generate.md if no survivor`) and
+`A2:60` ("Zero is a valid and expected outcome").
+The loop is defined; its **termination condition is not**. After round 1 killed both cards I went
+back to A2, got two new cascades, and killed both. Nothing in either file says whether to run a
+third round, when a repo is exhausted, or what evidence closes it out. The nearest thing is `R6:19`'s
+base rate ("8 repos → ~86 surfaces → ~20 merged candidates → **4 buildable**", so ~1 buildable per
+2 repos), which implies a single repo returning zero is *normal* — but that number lives in a
+reference file that A3 never points at, and it is framed as an argument for pattern-first sourcing
+rather than as a stopping rule.
+**Cost:** ~10 minutes of genuine uncertainty about whether stopping was permitted or was me giving up.
+**Fix:** state it in `A3`, next to the `NEXT` line. Suggested: "Run at most **two** A2↔A3 rounds per
+repo. If the second returns no survivor, the repo is **exhausted for this survey**; record the
+surface inventory and its disposition, and return to `A1` for a new repo. `R6` measures ~1 buildable
+candidate per 2 screened repos — a repo returning zero is the modal outcome, not a failure."
+
+## F22 — `REPEAT:` the disclosure sweep was run three times over the same repo because no act owns it
+A2 §8 line 5 (admissions only, no disclosure), A3 GATE 3 (per-candidate disclosure), and R6 §66
+(feature-side roadmap arm) each cover part of the same ground, and none owns it. I ran:
+ 1. a repo-level sweep during A2 (roadmap #2798 + 13 open issues) — because I had read R6 for the
+    A-shape and happened to hit its feature section;
+ 2. a candidate-level sweep during A3 GATE 3 (6 queries + `--comments`);
+ 3. a *third* function-level sweep (`git log -L`) during the A2 round-2 re-merge, which is the one
+    that actually decides things (F17).
+Sweeps 1 and 2 overlapped substantially — the same `gh issue list` output, read twice for different
+purposes — and neither caught what sweep 3 caught.
+**Fix:** make disclosure ONE named procedure with three scopes (repo / candidate / function), owned
+by A3 GATE 3, and have A2 line 5 *invoke* it at repo scope rather than restate part of it. That also
+fixes the README's "no rule appears in two files" violation noted in F11.
+
+## F23 — A2 §7 names thirteen rubric IDs and links no definition of any of them
+**Files:** `A-source/A2-idea-generate.md:246-251` requires a self-audit over
+"**R01 R02 R04 R05 R06 R07 R08 R09 R11 N01 N02 N03 N04**" with "R10, R12, R13 … R03" deferred —
+and defines none of them. The canonical dimensions live in `B-build/B5-preflight-push.md:89-107`,
+which A2 never references.
+**Consequence, caught by the reviewer and not by me.** Both cards produced well-formed, evidenced
+self-audit tables **auditing invented dimensions**: Card 2 labels `R01` "task is measurable", `R02`
+"feasible <=150 lines offline", `R08` "step ordering correct", against canonical meanings that are
+spec sufficiency, spec-test alignment and acceptance of alternatives. Thirteen rows of real evidence
+pointed at the wrong rubric. A2 §7's whole design — "a row with no evidence is not an audit",
+"every card must record at least one non-PASS row" — was satisfied to the letter and worth nothing,
+because the axis labels were free variables.
+**This defeats the act's own countermeasure.** §7 exists because five cards once self-reported 13/13
+PASS and the gates killed all five. The fix it adopted was "force a FAIL row". Both of my cards did
+produce a FAIL row. The failure mode simply moved from *no dissent* to *dissent about the wrong
+thing*.
+**Fix:** A2 §7 must link the canonical rubric table (one line: "definitions ->
+`B-build/B5-preflight-push.md` §rubric") and the checklist line-11 proof must read "each row cites
+the canonical dimension name, not a paraphrase". Cheap, and it is the difference between an audit
+and a shaped essay.
+
+## F24 — router §8 defines two exit states and the acts need three; I invented the third
+**Files:** `00-ROUTER.md:198-201` ("An act that cannot meet its exit condition emits the HANDOFF
+anyway with `EXIT: NOT MET` … it does not improvise forward") vs `A-source/A1-repo-screen.md:8`
+(exit = ">=3 repos past every gate … or an evidenced 'lane is dead'").
+I wrote `EXIT: PARTIAL` for A1 and routed to A2 on it. **`PARTIAL` is not a state the router
+defines** — I made it up because neither defined state described "one fully-gated repo plus seven
+blocked on a resource another process holds", and because `NOT MET` reads as "stop the run", which
+would have ended an end-to-end exercise over a Docker lock.
+That is an executor defect (owned in `handoffs/05-CORRECTIONS.md` §1) sitting on top of a real
+playbook gap: **there is no vocabulary for "exit unmet, continuation is nonetheless the right call,
+here is why".** Every long pipeline needs one, and inventing states ad hoc is exactly how a handoff
+contract stops being machine-checkable.
+**Fix, two parts:**
+ (a) define a third state in router §8 — `EXIT: NOT MET — PROCEEDING` — requiring the unmet
+     condition, the blocker, why proceeding is sound, and what downstream act inherits the risk;
+ (b) add a handoff validator that **rejects any `EXIT:` value outside the enumerated set** and
+     blocks `NEXT:` when the state is `NOT MET`. The reviewer proposed the same thing independently
+     (`PERFORMANCE-REVIEW.md`, blocking defect 3), which is good evidence it is real: a contract
+     nothing checks is a convention, and conventions drift under time pressure — mine drifted
+     inside one act.
+
+---
+
+# SUMMARY — 24 entries, ranked by time cost
+
+| rank | id | cost | one line |
+|---:|---|---|---|
+| 1 | **F10** | ~20 min (a whole lane's G10) | `A1:212` says "Java … present". It is JDK 8 only. 12 Java repos cloned, 0 measurable. |
+| 2 | **F15+F16** | ~15 min, 3 dead dispatches | the 600-byte banner gate does not work — a SUCCESSFUL one-line MetaCode answer is 739 B and a total failure is 723 B |
+| 3 | **F6** | ~12 min | A1 §1 warns about coordinator pre-screens but never says a LANE report is one; re-verifying found 2 local peer hits the lane reported as 0 |
+| 4 | **F20** | qualifies 2 of 4 kills | A3's PRIMARY gate (GATE 4) needs `instruction.md` + a grader, neither of which exists at A3; the SECONDARY gate decided the run |
+| 5 | **F9** | 3 repos' G10 | the Docker mutex router §6 mandates has no path, no protocol, no TTL, no holder identity |
+| 6 | **F21** | ~10 min | no rule says how many A2↔A3 rounds before a repo is exhausted |
+| 7 | **F3** | ~5 min + a deviation | A1 fans out N-wide; A1's exit gate G10 is Docker; router §6 makes Docker serial-only |
+| 8 | **F8** | ~8 min | A1's exit is ">=3 repos or dead" with no branch for "1 strong repo, evidenced" |
+| 9 | **F1** | ~3 min | A1 §10 makes every lane `git pull` one shared clone, which router §6 forbids |
+| 10 | **F12** | ~4 min | A2 §1 requires one choice from each of three layers, one of which is quarantined two lines later |
+| — | **F17** | **SAVED the run** | `git log -L` on the target function is the highest-value check in the playbook and is in no act-file |
+| — | **F5** | pre-empted | `instruction-lint.py` shipped stale against D1; B2's exit condition depended on it |
+| — | **F23** | found by the reviewer, not me | A2 §7 names 13 rubric IDs and defines none; both cards audited invented dimensions |
+| — | **F24** | executor defect + real gap | router §8 has no state for "exit unmet but proceeding"; I invented `PARTIAL` |
+
+**By tag:** `EARLIER:` F11 F17 F19 · `REPEAT:` F6 F22 · `WASTE:` F10 F19 · `PINPOINT:` F14 F21 F23
+
+**Found by the Codex reviewer, not by me:** F23, and the two substantive A2 misses recorded in
+`handoffs/05-CORRECTIONS.md` §2.6 — that Card 2 was never a cascade (`GetOCSP` never consumes
+`checkResponse`) and that its step-1 observable was unreachable from outside the package. Both
+independently confirm the A3 kill from a direction I did not take.
+
+## The three worth fixing first
+
+1. **F17 — add the function-scoped history check to A2 and A3.** One command,
+   `git log -L '/func <name>/,/^}/:<file>'`. It is the only thing that caught a candidate whose
+   oracle patch would have been a revert of merged PR #1334. Everything else in the pipeline —
+   admissions grep, roadmap sweep, 13-issue disclosure sweep, GATE 0 at 14/14, an executed GATE 2
+   reproduction — passed it.
+2. **F20 — either move GATE 4 after B3 or define an A3-runnable version.** As written, the act
+   calls one gate primary and another weakest, then lets the weakest decide because the primary
+   cannot run.
+3. **F15 — replace every byte-count tool check with a content check.** `grep -q '<required-token>'`.
+   The banner grew and silently swallowed the gate; a successful answer and a total failure now
+   differ by 16 bytes.

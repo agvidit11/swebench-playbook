@@ -1,0 +1,11 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/3389105/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Checking the revoke path to pin the bundle and reason fixes.
+Got the outline — now reading the revoke path to shape the three-sentence fix.
+Change RevokeWithReason to select the target by scanning the parsed PEM bundle for the single non-CA leaf certificate instead of blindly revoking the first entry. Fail fast with a clear error when the bundle contains no leaf or multiple non-CA candidates rather than guessing and revoking the wrong certificate. Validate the optional reason against the ACME-permitted revocation codes before sending, rejecting 7 and any other disallowed value locally so invalid input never reaches the CA as an opaque server error.

@@ -1,0 +1,9 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2910266/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+I would iterate over all certificates returned by ParsePEMBundle and identify the leaf as the sole non-CA certificate whose issuer matches the subject of another certificate in the bundle, retaining the existing IsCA guard to reject CA revocation and returning an error if no unique leaf is found. I would validate the supplied reason against the package's existing RFC 5280 CRL reason code constants with an allowlist lookup, rejecting any value outside that set before any network call. I would then pass the selected leaf certificate to the existing revocation path in place of certificates[0].
