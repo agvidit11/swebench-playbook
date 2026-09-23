@@ -5,9 +5,34 @@
 | **Owner** | Claude (verification, probes, novelty sweeps) + Codex (scoring, step breakdown). Neither may write contract prose — `→ 00-ROUTER.md` §5 |
 | **Input** | the candidate cards from `HANDOFF A2` |
 | **Output** | survivors, ranked — or an evidenced **"no survivor"** |
-| **Exit** | **≥1 survivor carrying a MEASURED fork**, or an honest "no survivor" naming the gate that killed each card |
+| **Exit** | **≥1 survivor that clears every FACTUAL veto and carries a credible branch count ≥3**, or an honest "no survivor" naming the gate that killed each card. A fork reading is recorded, never decisive. |
 
 You measure claims; you do not generate replacements. A candidate that dies here goes back to `A2`, it is not repaired in place. Claude-as-analyst was the wave-1 error source (repo pre-screen wrong on 2 of 4, a false "standards-pinned has no fork" rule, a dedup method returning 0 on a repo with 11 peer tasks); Claude-as-verifier held up across four spot-checks with zero inflated. **A well-evidenced kill is a good outcome** — three of four A/B repos returned zero survivors and those were the correct answers.
+
+## 0a. POSTURE — this act exists to disqualify, not to predict
+
+`STATUS: LIVE`, 2026-09-23. **Changed deliberately after two nights of ~17 kills and zero tasks.**
+
+This act used to try to predict which candidates would land in band. It cannot, and neither can
+anything else we own:
+
+- **55.9%** of all tasks land in band (n=23,524). **5.8%** come back 5/5, and even those are
+  accepted **45.5%** of the time. 0/5 is accepted **81.2%**.
+- Nothing about a contract predicts its band — a step avocado solves 5/5 and one it solves 0/5
+  have statistically identical prompts across 1,585 step observations.
+- Even a perfectly tuned task at true p=0.40 lands in band only **83.5%** of the time.
+
+**We were rejecting ~95% of candidates to avoid a 5.8% outcome.** That trade is backwards.
+
+So the job here is to **disqualify what is genuinely dead** — recall-solvable, already fixed,
+ungradeable, unnamable — and then get out of the way. Everything that survives goes to `B`.
+
+**The server is a better instrument than any local proxy.** `GATE 4`'s local n=5 said in-band on
+`connect-go`; the server said 5/5. We built `C1`–`C6` to repair tasks from real trial data and have
+never once reached them, because everything died here. A 5/5 return is a `C3` hardening round on a
+task that exists, with real evidence attached — strictly better than a line in the kill ledger.
+
+**Bias toward building.** When a candidate clears the factual vetoes and you are unsure, build it.
 
 ## 0. Gate order — and why order is the whole economy
 
@@ -29,17 +54,20 @@ One language-sensitive exception: GATE 2 is priced "one file read" but mandates 
 a ~7-minute GATE 5 probe killed the card. **In compiled languages, take any cheap kill available
 from GATE 3, 6 or 7 before paying for the GATE 2 build.**
 
-| Gate | Kills | Cost | Run at |
-|---|---|---|---|
-| **0** | grader needs a name absent at `base_commit` | free | 1st |
-| **1** | the fork is zero by construction, or the difference is unobservable | free | 2nd |
-| **2** | the premise is already true at HEAD | one file read — **a BUILD in compiled languages** | 3rd |
-| **3** | the direction is public | a few searches | 4th |
-| **4** | no outcome variance — **PRIMARY** | 5 calls | **7th** |
-| **5** | the model already prefers the desired path | 10 calls | **8th** |
-| **6** | ungradeable / nondeterministic / trivial seam | free | **5th** |
-| **7** | the cascade is decorative | free | **6th** |
-| **8** | scoring and ranking — **survivors only** | a Codex pass | last |
+**Vetoes vs recorded numbers.** Only the FACTUAL gates kill. The fork-proxy gates are measured,
+recorded in the handoff, and do not decide — see GATE 5.
+
+| Gate | Kills | Cost | Run at | status |
+|---|---|---|---|---|
+| **0** | grader needs a name absent at `base_commit` | free | 1st | **VETO** |
+| **1** | pre-filter 4 (difference unobservable through the grader's interface) | free | 2nd | **VETO** — pre-filters 1–3 are recorded only |
+| **2** | the premise is already true at HEAD | one file read — **a BUILD in compiled languages** | 3rd | **VETO** |
+| **3** | the cause or remedy is public | a few searches | 4th | **VETO** |
+| **4** | no outcome variance | 5 calls | **7th** | recorded — local n=5 mispredicted the server once |
+| **5** | the model already prefers the desired path | 10 calls | **8th** | **RECORDED ONLY — no longer a veto** |
+| **6** | ungradeable / nondeterministic / hangs / trivial seam | free | **5th** | **VETO** |
+| **7** | the cascade is decorative | free | **6th** | recorded — restructure, do not kill |
+| **8** | scoring and ranking — **survivors only** | a Codex pass | last | advisory |
 
 ## GATE 0 — can the graded assertion be written using only names that exist at `base_commit`?
 
@@ -333,98 +361,31 @@ The probe also reveals **which assertion carries the task**: impl-1's 9 failures
 
 ## GATE 5 — the model-prior fork probe (SECONDARY, design)
 
-> ### ⚠ THIS GATE IS UNDER REVIEW — two independent lines of evidence say it does not predict outcome
+> ### DECIDED 2026-09-23 — this gate no longer kills. Record the number and move on.
 >
-> `STATUS: CONTESTED — awaiting a human decision. Keep running it; do not rely on it alone.`
+> `STATUS: LIVE`. Three independent lines said it does not predict outcome, and it had cost ~17
+> candidates across two nights for zero built tasks:
 >
-> **Line 1, population, n=23,524** (`.e2e/avocado-study/FINDINGS.md`): nothing about a contract
-> predicts its band. A step avocado solves 5/5 and one it solves 0/5 have statistically identical
-> prompts across 1,585 step observations. Category moves the rate ≤±8pp; the only axis above base
-> is `extend_behavior`, which this act is built to discourage.
+> 1. **Population, n=23,524** — nothing about a contract predicts its band; a step avocado solves
+>    5/5 and one it solves 0/5 have statistically identical prompts (n=1,585 step observations).
+> 2. **Trial forensics, 51 failing trials across 19 arms** — every failure is a QUALITY failure:
+>    a missing member of an enumerable set, a missed interaction, a placement error. DESIGN
+>    divergence does not appear as a primary label.
+> 3. **One candidate dissected** — *"its variance carrier was QUALITY (completeness of a reset),
+>    not DESIGN — and the fork axis only measures DESIGN, so that premise shape cannot clear
+>    GATE 5 by construction."* The gate is not mismeasuring QUALITY premises; it is blind to them,
+>    and will reject every one it is shown.
 >
-> **Line 2, trial forensics, 51 failing trials across 19 arms** (`.e2e/w3-3/artifacts/FAILURE-TAXONOMY.md`):
-> every failure is a QUALITY failure — a missing member of an enumerable set, a missed interaction,
-> or a placement error. **DESIGN divergence, which is what this gate measures, does not appear as a
-> primary label anywhere in the sample.** (The stronger claim "DESIGN 0/51" was withdrawn by its
-> own author as not cleanly separable from the placement category — the weaker claim stands.)
+> **The one case where fork-1 correctly predicted 5/5 (`connect-go`) also had branch count ~1**, so
+> `B3`'s branch count caught it too. Branch count is right where this gate is right, and right
+> where this gate is structurally blind. It dominates.
 >
-> **Line 3, a single candidate dissected** (`.e2e/loop-1/`): a card cleared gates 0, 1, 2, 3, 6 and
-> 7 cleanly, then measured fork 10/10 DESIRED across two lint-passing phrasings, and the mandatory
-> adversarial KILL AUDIT upheld it. Its author's root cause is the sharpest statement we have:
+> **So: run the probe, record the number in the handoff, and do not kill on it.** The number still
+> earns its keep as paired data — if fork and branch count ever disagree on a task that reaches the
+> server, that is the observation which would reopen this.
 >
-> > *its variance carrier was QUALITY (completeness of a reset), not DESIGN — and the fork axis
-> > only measures DESIGN, so that premise shape **cannot clear GATE 5 by construction**.*
->
-> That is the whole objection in one sentence. The gate is not mismeasuring those candidates; it
-> is measuring the wrong axis for them, and will reject every QUALITY premise it is shown.
->
-> **What this gate has cost:** ~17 candidates killed across two nights.
->
-> **The proposed replacement is `B3`'s BRANCH COUNT** — how many independent ways a competent
-> implementation can be incomplete such that the graded set catches it. That measures the thing
-> that actually produced every observed band, and it is measured on the grader rather than argued
-> about the idea.
->
-> **Until a human rules:** run GATE 5, record the number, and **do not kill a candidate on a fork
-> reading alone if its branch count is ≥3.** Send the pair to `B3`, measure the branch count, and
-> let that decide. Record both numbers in the handoff so the paired data accumulates.
-
-> ### MANDATORY PRE-CHECKS — two of four kills on 2026-09-22 were invalid without them
->
-> `STATUS: LIVE`
->
-> **① The card must declare `CONSTRAINT:`, `DESIRED:` and `NON-DESIRED:` BEFORE you probe.**
-> Direction is fixed in advance and never read off the outputs afterwards.
->
-> **② Lint every probe prompt before it counts:**
-> ```bash
-> python3 ~/swebench-playbook/tools/probe-lint.py <card.md> <probeA.txt> <probeB.txt>
-> ```
-> It fails the probe if the prompt does not state the constraint, if it leaks the desired design,
-> or if the two phrasings are the same phrasing twice. **frostdb C1 and santuario C3 were both
-> killed by prompts that omitted the card's own constraint.** A probe that does not state the
-> constraint measures nothing.
->
-> **③ Apply the mapping in the stated direction, and say which direction you applied.**
->
-> | Result | Meaning |
-> |---|---|
-> | ≥4 of 5 produce **DESIRED** | fork ~1 — candidate DEAD |
-> | ≥4 of 5 produce **NON-DESIRED** | **STRONG FORK — the candidate SURVIVES GATE 5.** This is not a kill. |
->
-> **"Survives GATE 5" is not "is a good task."** A strong fork only means models build different
-> things; it says nothing about whether your grader can tell those things apart. frostdb C1
-> measured **9 of 10 NON-DESIRED — a genuinely strong fork — and then died at GATE 4 with 0 of 5
-> outcome variance**, because every implementation was observationally identical through the
-> interface the grader could see. Fork is necessary, not sufficient. GATE 4 decides.
->
-> frostdb C1's five implementations were all the card's own *wrong-path* shape. That is the
-> second row. It was recorded as "10/10 desired" and killed.
->
-> **④ Every GATE 5 kill gets an adversarial audit before it is final** (§KILL AUDIT below).
-
-
-**Never score fork strength by argument. Argued fork strength has been wrong 11 times out of 11** — candidates scoring **24–33/35** all measured **Fork 1** when probed. franz-go argued its way to a good fork score and returned **1.0**. `STATUS: LIVE`
-
-```bash
-for i in 1 2 3 4 5; do
-  timeout 600 script -qec "metacode run --yolo --format text --dir <clone> \
-    'Describe in 3 sentences how you would implement <the capability>. Approach only, no code.'" \
-    /dev/null > /tmp/<repo>-run/prior-$i.out
-done
-```
-
-| Result | Reading |
-|---|---|
-| ≥4/5 take the SAME path and it is **NOT** the desired one | **strong fork** — build it |
-| ≥4/5 take the desired path | **no fork.** It will one-shot. Do not build |
-| roughly even split | weak fork — some trials pass by luck; expect a noisy pass-rate |
-
-1. **Probe the step that STATES THE CONSTRAINT — usually step 2, never only step 1.** A 30/35 candidate was scored on a step-1 probe and inherited that score: step 1 genuinely held at Fork 5 (**0/3** desired) while **step 2 measured 5/5 desired**, and the prescribed re-cut — capability without strategy — still gave **3/3**. **8 of 8 overall.** P6's premise is that step 2 states the constraint, so step 2 is where collapse happens.
-2. **Probe TWICE with different phrasing.** One run cannot separate "the model prefers this path" from "I led the witness". A rom candidate returned 5/5, then **5/5 again** on a deliberately non-leading variant — that second run made the 10/10 kill trustworthy.
-3. **"0 of n volunteered it" measures NOVELTY, not fork and not cascade.** It conflates *un-volunteered* with *un-executable*. bc-java's caller-scoped MLS registry had **0/10 volunteer** the constraint and **10/10 execute it correctly once stated**, including non-obvious slice-propagation plumbing; the rule was used to overturn Codex's "two tasks in a trench coat" verdict and inflate the candidate to 33/35. **Codex was right.** Since the instruction MUST state the step-2 constraint, **probe step 2 WITH the constraint stated; ≥4/5 correct = dead.** `STATUS: LIVE` (corrected 2026-09-18)
-4. **Priors are language-specific and they invert.** Rust: **3/3** returned generational slots + free list unprompted; **3/3** returned `Arc` + `Arc::make_mut` + path-copying unprompted — persistence/COW/generational handles are model-PREFERRED there, Fork 1. Ruby: **10/10** replaced a plain argument array with a single-use pending object unprompted, volunteering the unstated contract too (`cancel` in 7 of 10, result memoization in 4). The generalizable error: **the inverted premise is true about the REPO and false about the MODEL.**
-5. **Two measured verdicts not to re-litigate.** P6 failed **5 of 13** probed candidates because the "clever" design was already idiomatic — including the highest scorer, p2c picker-state continuity, argued Fork 5 and scored 29/30, with **5 of 5** cold models writing the sophisticated design unprompted. Conversely "standards-pinned behaviour has no fork" is **RETRACTED and false**: RFC 5280 §4.2.1.10 says an implementation "MUST either process the constraint or reject the certificate", writing the fork down for you; a candidate vetoed on that claim re-scored 22–23/30.
+> **What decides instead:** `B-build/B3-grader.md` §④ BRANCH COUNT ≥3, and two steps with step 1
+> carrying real difficulty (`A2` §3b).
 
 ## GATE 6 — Tier-0 structural gates
 
