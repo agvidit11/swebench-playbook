@@ -1,8 +1,0 @@
-In this Go repo (go-acme/lego), `Certifier.GetOCSP` in certificate/certificates.go is given a PEM
-bundle containing only the leaf certificate. The leaf advertises two entries in
-`IssuingCertificateURL` and two in `OCSPServer`. The first entry of each is currently unreachable
-and returns HTTP 500.
-
-Requirement: `GetOCSP` must succeed in this situation.
-
-Describe in 3 sentences how you would change GetOCSP. Approach only, no code.

@@ -1,3 +1,0 @@
-Planning the ordered-aggregate fix — inspecting the planner to outline the approach.
-Checked the planner layout — now I'll examine the ordering logic to shape the three-sentence plan.
-In the Projection branch of Build, inspect the projection expressions to determine whether the current ordering columns survive unchanged. If every non-covered sorting column from planOrderingInfo is still present as a plain column reference after the projection, call nodeMaintainsOrdering so the ordered-aggregate path remains eligible. Otherwise omit that call so the existing newNode invalidation logic correctly falls back to hash aggregation.

@@ -1,4 +1,0 @@
-  [33mWARN[0m  c1-step2-A.txt: 98% constraint coverage, missing ['deliver']
-  [33mWARN[0m  c1-step2-B.txt: 85% constraint coverage, missing ['data', 'deliver', 'exactly', 'failing', 'identifies', 'sink', 'uploadable']
-  [32mPASS[0m  probe states the constraint, does not leak the design, two distinct phrasings
-exit=0

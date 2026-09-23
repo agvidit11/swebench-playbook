@@ -1,9 +1,0 @@
-MetaCode at Meta (https://fburl.com/metacode)
-Using AI Gateway (Meta Model API upstream)
-[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
-Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2910277/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
-[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
-MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
-Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
-
-Scan all certificates in the parsed bundle and select the leaf as the non-CA certificate that is not an issuer for any other certificate in the bundle, failing with an error if none or more than one candidate exists. Validate the requested revocation reason by checking it against the finite set of RFC 5280 reason codes already declared in the package and return an error for any value outside that set without attempting revocation. Revoke only the selected leaf certificate so bundle ordering no longer matters while retaining the existing safeguard that prevents revocation when the selected certificate is a certificate authority.

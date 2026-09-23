@@ -1,7 +1,0 @@
-Three-sentence projection fix — inspecting the planner to outline it.
-Checking the ordering tracker to outline the projection fix.
-I found the ordering tracker — the Projection case never marks ordering as maintained. Now I'll examine the Projection node to distinguish order-preserving from order-destroying cases.
-I found the ordering tracker — the Projection case never marks ordering as maintained. Now I'll examine the Projection node to distinguish order-preserving from order-destroying cases.
-I see the gap — projections invalidate ordering while other order-preserving ops maintain it. I'll check the Projection definition to craft the precise fix.
-I see the gap — projections invalidate ordering while other order-preserving ops explicitly preserve it. I'll check the aggregate requirements to complete the picture.
-Inspect the Projection branch in Build to classify each projection as order-preserving versus order-destroying by checking that it is a row-for-row mapping and that every surviving ordering column needed by shouldPlanOrderedAggregate appears as an unmodified plain column reference rather than being dropped, renamed, or recomputed. If the projection is a wildcard or otherwise passes all relevant ordering/group columns through unchanged, call nodeMaintainsOrdering so the existing newNode/orderingMaintained state machine keeps the ordered path alive for the downstream aggregation. Otherwise leave nodeMaintainsOrdering uncalled so the next newNode call invalidates ordering and the planner correctly falls back to hash aggregation.

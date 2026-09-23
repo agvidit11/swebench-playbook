@@ -1,6 +1,0 @@
-Investigating the streaming aggregation path to draft your three-sentence plan.
-Biggrep is unavailable — I'll inspect the local repo directly.
-That search came up empty, so I'm switching to a local sweep for the aggregation path.
-Found the ordered aggregation path — now tracing why the expression blocks streaming.
-I've pinpointed where the planner decides between streaming and buffered aggregation — now checking how it classifies row-preserving expressions to finish the plan.
-Trace the planner to confirm the `value + timestamp` operand inserts a Projection node that fails to call `nodeMaintainsOrdering` and forces `shouldPlanOrderedAggregate` to fall back to buffering hash aggregation. Classify pure row-preserving scalar projections as order-maintaining in `planOrderingInfo` while continuing to invalidate ordering for operators that filter, reorder, or drop rows. Evaluate the scalar operand inline in `OrderedAggregate`'s streaming path so each input row updates only the current group without materializing all groups.

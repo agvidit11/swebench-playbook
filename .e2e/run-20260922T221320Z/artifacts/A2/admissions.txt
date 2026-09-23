@@ -1,3 +1,0 @@
-/tmp/e2e-lane-GO/lego/acme/errors.go:42:	// BadRevocationReasonErrorType The revocation reason provided is not allowed by the server.
-/tmp/e2e-lane-GO/lego/certificate/renewal.go:54:	// TODO: Otherwise, if the selected time is before the next time that the client would wake up normally, attempt renewal immediately.
-/tmp/e2e-lane-GO/lego/certificate/certificates.go:558:		// TODO: build fallback. If this fails, check the remaining array entries.

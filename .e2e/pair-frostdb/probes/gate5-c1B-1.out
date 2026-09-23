@@ -1,3 +1,0 @@
-Single serialization, isolated dual commit — crafting your three-sentence approach.
-Your three-sentence approach is next — I'm locating the persistence file first to ground it.
-Serialize the TableBlock once into a shared immutable in-memory buffer and reuse those bytes for both destination uploads to pay serialization cost only once. Upload to both sinks concurrently with independent contexts and per-sink atomic failure cleanup so a slow or failing sink cannot block, corrupt, or delete the other sink's complete copy. Collect per-sink errors independently so one failure is reported and retried without losing the successful copy.

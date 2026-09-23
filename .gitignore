@@ -1,0 +1,7 @@
+# Run artifacts, not playbook source. The .e2e tree holds live agent runs,
+# including full repo clones -- committing them once added 4 embedded git repos.
+# check-playbook.py already excludes this tree; git must too.
+.e2e/
+.review/
+__pycache__/
+*.pyc

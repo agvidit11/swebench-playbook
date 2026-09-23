@@ -1,2 +1,0 @@
-Serializing once for two destinations — I'll outline a single-encode approach that isolates slow destinations.
-Serialize the block once into a shared immutable in-memory buffer and reuse those bytes for both destination uploads. Upload to the two destinations concurrently with independent, atomic write-then-commit operations and separate error handling so failures do not propagate. Treat each destination's result independently so one failure or timeout never aborts, truncates, or rolls back the other's completed copy.
