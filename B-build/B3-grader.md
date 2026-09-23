@@ -267,6 +267,41 @@ correctly, resque's does not). `franz-go`'s third step was rebuilt against the s
 after a stale local branch was found **109 lines behind.** Each step must ship **both** `patch`
 and `test_patch` — the training pipeline silently drops incomplete steps.
 
+## ④ BRANCH COUNT — the discriminating power of a graded set
+
+`STATUS: LIVE` — 51 failing server trials across 19 non-degenerate arms, `.e2e/w3-3/artifacts/FAILURE-TAXONOMY.md`.
+
+**A graded set's discriminating power is BRANCH COUNT, not test count.** A *branch* is an
+independent way an otherwise-correct implementation can be incomplete that your set will actually
+catch. Twenty tests exercising one condition is one branch.
+
+The three measured cases:
+
+| task | f2p tests | branches that ever discriminated | outcome |
+|---|---:|---:|---|
+| `dropshot-option-return-nullable-openapi` | 6 | **0** — zero partial rows in 10 trials | **5/5 too easy** |
+| `object-rs-atomic-rewriter-modify` | 14 | **1** | 3/5 and 1/5 — in band |
+| `connect-go-trailing-metadata-parity` | 3 | ~1 (broad contract, ~30% of domain graded) | **5/5 too easy** |
+
+Six tests that never separate anybody are six tests, not six branches. **This is the mechanism
+behind `BAD_GRADING_WEAK` and behind "too easy" alike** — and it is the thing the whole
+contract-domain enumeration above is really buying you.
+
+**Estimate it before you push.** For each independent condition in your enumeration, ask: *could a
+competent implementation get this one wrong while getting every other one right?* Count only those.
+
+| branch count | read |
+|---|---|
+| **≤2** | expect a degenerate band. The set cannot separate. Widen it or do not push. |
+| 3–6 | workable |
+| 7+ | good, provided each is genuinely independent |
+
+**Why this matters more than it looks:** 33 of 51 failing trials failed **exactly one** graded
+test (median 1, suites of 10–153), and the population study independently measures a median failed
+fraction of 0.077 — about one test in thirteen. **Nobody fails wholesale.** A failing
+implementation is a passing one with one hole in it, so the only question that decides your band is
+how many distinct holes your set can see.
+
 ## THE THREE CHECKS THAT CATCH `BAD_GRADING_WEAK`
 
 `STATUS: LIVE` — added 2026-09-23 after `connect-go-trailing-metadata-parity` returned
@@ -357,6 +392,10 @@ a whole validation cycle. → `C-drive/C3-harden.md` for the mutant-is-a-floor c
         one that catches silent-contract + pinning-test (4 of 4 BAD_GRADING_WRONG)
         proof: `python3 ~/.claude/skills/swebench-mt/instruction-lint.py <task> <clone>`
                must report PASS, and must NOT print "no test_patch yet"
+[ ] 20b2. BRANCH COUNT estimated and >=3: how many INDEPENDENT ways can a competent
+        implementation be incomplete such that this graded set catches it?
+        proof: the list, one line each. Test count is not branch count -- one task
+        shipped 6 f2p tests that produced ZERO partial rows across 10 trials
 [ ] 20c. CONTRACT-DOMAIN ENUMERATION written: every universal claim in the contract,
         with its input classes derived from the platform/spec -- NOT from your tests
         proof: the enumeration, and which graded test samples each class      [R06]

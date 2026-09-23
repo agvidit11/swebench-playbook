@@ -305,6 +305,32 @@ The probe also reveals **which assertion carries the task**: impl-1's 9 failures
 
 ## GATE 5 — the model-prior fork probe (SECONDARY, design)
 
+> ### ⚠ THIS GATE IS UNDER REVIEW — two independent lines of evidence say it does not predict outcome
+>
+> `STATUS: CONTESTED — awaiting a human decision. Keep running it; do not rely on it alone.`
+>
+> **Line 1, population, n=23,524** (`.e2e/avocado-study/FINDINGS.md`): nothing about a contract
+> predicts its band. A step avocado solves 5/5 and one it solves 0/5 have statistically identical
+> prompts across 1,585 step observations. Category moves the rate ≤±8pp; the only axis above base
+> is `extend_behavior`, which this act is built to discourage.
+>
+> **Line 2, trial forensics, 51 failing trials across 19 arms** (`.e2e/w3-3/artifacts/FAILURE-TAXONOMY.md`):
+> every failure is a QUALITY failure — a missing member of an enumerable set, a missed interaction,
+> or a placement error. **DESIGN divergence, which is what this gate measures, does not appear as a
+> primary label anywhere in the sample.** (The stronger claim "DESIGN 0/51" was withdrawn by its
+> own author as not cleanly separable from the placement category — the weaker claim stands.)
+>
+> **What this gate has cost:** ~17 candidates killed across two nights.
+>
+> **The proposed replacement is `B3`'s BRANCH COUNT** — how many independent ways a competent
+> implementation can be incomplete such that the graded set catches it. That measures the thing
+> that actually produced every observed band, and it is measured on the grader rather than argued
+> about the idea.
+>
+> **Until a human rules:** run GATE 5, record the number, and **do not kill a candidate on a fork
+> reading alone if its branch count is ≥3.** Send the pair to `B3`, measure the branch count, and
+> let that decide. Record both numbers in the handoff so the paired data accumulates.
+
 > ### MANDATORY PRE-CHECKS — two of four kills on 2026-09-22 were invalid without them
 >
 > `STATUS: LIVE`
