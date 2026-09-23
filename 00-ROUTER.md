@@ -142,6 +142,31 @@ work, go do it — `C5` exists to sequence exactly this.
 | 4 | TBD quality review | `tbdReviewStatus` + `tbrNotFinalized` | `pass` **and** finalised |
 | 5 | Agentic Full-Task Review | `job review <task> --commit <40-hex>` | `Verdict: GOOD` |
 
+### 0/5 IS NOT A FAILURE, AND IT IS NOT SYMMETRIC WITH 5/5
+
+`STATUS: LIVE` — n=23,524, `.e2e/avocado-study/FINDINGS.md`. We had been treating "too hard" and
+"too easy" as equally costly. They are not, by a factor of nearly two:
+
+| avocado band | tasks accepted or in training |
+|---|---:|
+| in band | 84.9% |
+| **0/5** | **81.2%** |
+| 4/5 | 80.7% |
+| **5/5** | **45.5%** |
+
+**0/5 passes the single-turn gate outright** — verbatim: `Passed — avocado can pass at most 3/5 and
+>=1 model solved (avocado: 0/5, opus: 1/5, gpt: 0/5)`. Of 462 tasks graded under the current
+single-turn rule, **every 0/5 passed; every failure was over-ceiling.** In multi-turn a 0-rate step
+survives whenever a third-party model shows a gradient on it — measured, 2-step `('in','0')` passes
+92.6%.
+
+On a 0/5 task the oracle still passes 98.8% of the time and **opus averages 44.2%**; only 16.8%
+defeat opus entirely. "Too hard" usually means *avocado specifically* could not, not that the task
+is broken.
+
+**Aim away from 5/5, not toward the middle.** Erring hard is cheap; erring easy is what gets
+rejected.
+
 ### Criterion 2 — SINGLE-TURN AND MULTI-TURN HAVE DIFFERENT RULES. Do not mix them.
 
 **Read `format` in `task.toml` before reading any pass rate.**

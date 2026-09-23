@@ -160,7 +160,7 @@ needs a name absent at `base_commit` (`→ A3-idea-gate.md §GATE 0`). So the be
 existing public API where behaviour can go wrong**. For each shortlisted repo answer concretely:
 *if a defect existed in subsystem X, could I assert it through an existing public entry point
 without naming anything new?* Repos whose value is "you could add feature Y" score LOW —
-`expose_interface` is **1 passed / 13 failed** corpus-wide. Favour parsers/serialisers with
+`expose_interface` measures **52.1% at n=647** — ordinary, not disqualifying. Favour parsers/serialisers with
 round-trip APIs, engines with an execute/apply entry point, clients with request paths, stores with
 read/write APIs, anything with an existing observer/callback/hook.
 

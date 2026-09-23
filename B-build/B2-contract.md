@@ -85,7 +85,7 @@ solver had no way to know:
 | go-zero-flush | `nil` vs empty-non-nil slice | a valid impl failed with `pending flushes = [], want []` |
 
 And the category split that drove the absolute rule: `semantic_bugs` **7 of 7** passing,
-`expose_interface` **1 passed / 13 failed**.
+`expose_interface` **52.1% at n=647** — ordinary.
 
 ### 3.3 Reconciled
 

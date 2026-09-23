@@ -60,8 +60,7 @@ This is the gate that makes the naming policy work. The illegal configuration is
    REJECT is wrong in one measured case: a feature/`expose_interface` task fails the
    server at **0/0/0 "too hard"** unless the contract names module, signature and
    error type — so for that shape, coining and *naming* is the only configuration
-   that works at all. Against that, this gate's own corpus figure is **1 passed / 13
-   failed**. The odds are bad; they are not zero.
+   that works at all. Against that, the old corpus figure of 1 passed / 13 is REFUTED — at n=647 it is **52.1%**. The odds are bad; they are not zero.
 
    So a COINED token may pass GATE 0 **only** with an override written to
    `<task>/audit/gate0-override.md` before `B1`, containing:
@@ -89,7 +88,7 @@ have left `A3`.
 
 Mechanical proxy once tests exist: `check-symbol-reachability.py <task_dir> --repo <base_checkout>` classifies every asserted symbol STATED / IN-BASE / TEST-LOCAL / UNREACHABLE. **Any UNREACHABLE is the R01/R02 pattern.** The stated ratio ran **3/30, 6/25 and 4/25** on the three tasks that failed R01/R02/R08 — a low ratio is the signal before you read a single name.
 
-Two consequences to accept: this makes most `expose_interface` tasks unwritable (**1 passed / 13 failed** corpus-wide, so the trade is worth taking — prefer candidates where existing behaviour becomes correct, observable or safe); and it **subsumes the coined-observability auto-reject** (`→ A2-idea-generate.md §6`), since a ledger whose invented field names carry the contract fails at step 3 every time. What the contract may still state later is `B2`'s business, not this gate's.
+Two consequences to accept: this makes most `expose_interface` tasks unwritable (**52.1% at n=647 — ordinary**, so this trade is NOT obviously worth taking — prefer candidates where existing behaviour becomes correct, observable or safe); and it **subsumes the coined-observability auto-reject** (`→ A2-idea-generate.md §6`), since a ledger whose invented field names carry the contract fails at step 3 every time. What the contract may still state later is `B2`'s business, not this gate's.
 
 ## GATE 1 — the four free pre-filters
 
@@ -275,7 +274,7 @@ Effort is not variance: one task passed **5/5 at 903–1236s and $6–7/trial**;
 
 | Source of variance | Mechanism | Evidence |
 |---|---|---|
-| **SEARCH** — must FIND the defect/invariant/call site before acting | finding is stochastic | `semantic_bugs` **7 passed / 7**; `expose_interface` **1 / 13** |
+| **SEARCH** — must FIND the defect/invariant/call site before acting | finding is stochastic | `semantic_bugs` **49.6%, n=268**; `expose_interface` **52.1%, n=647** |
 | **QUALITY** — the artifact exists either way; the standard varies | this is what rescues net-new capability | — |
 | **DESIGN** — picks path X vs Y | mostly deterministic; **weakest, and what we wrongly optimised for** | 11 candidates measured Fork 1 after scoring 24–33/35 |
 

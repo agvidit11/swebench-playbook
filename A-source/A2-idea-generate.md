@@ -22,7 +22,7 @@ usefully into a cascade later (§4b).
 > So before you may write "no candidates", you must have tried **all four** of these and said what
 > each produced:
 >
-> 1. **Existing behaviour is wrong** — a real defect with an observable consequence (`semantic_bugs`, **7 passed / 7** corpus-wide — the best category there is).
+> 1. **Existing behaviour is wrong** — a real defect with an observable consequence (`semantic_bugs`) — but see the correction below: at n=268 it measures **49.6%**, *below* the 55.9% base.
 > 2. **Existing behaviour is under-constrained** — correct on the happy path, wrong under fault, concurrency, reentry, ordering or resource pressure.
 > 3. **Net-new capability graded on a QUALITY property**, never on "did you build it" — robustness, edge-condition correctness, resource behaviour, interaction with an existing subsystem.
 > 4. **A merge of two thin surfaces** into a causally dependent cascade (§4b).
@@ -212,6 +212,30 @@ completes"; the probe dropped that clause and measured nothing.
 | **Inter-step file overlap** | which files each step touches, and whether step 2 is *incremental on step 1* or *cumulative from base*. **Two tasks broke on patch composition because both steps rewrote the same file from the same base.** Heavy overlap is a yellow flag, not a disqualifier — it tells the scaffolder step 2 must be a delta. Barely-overlapping file sets are a legitimate tiebreak |
 | **Size estimate** | files, ~lines, primitives reused. Target **80–150 net lines across 2–4 files** |
 | **Rubric self-audit** | §7 |
+
+## 3b. STEP STRUCTURE IS THE ONLY LEVER THAT MEASURABLY WORKS
+
+`STATUS: LIVE` — n=23,524, `.e2e/avocado-study/FINDINGS.md`. Read this before you shape a card.
+
+Across every axis measurable at population scale — category, language, repo size, instruction
+length, specificity, stated-vs-unstated, grader size — **nothing moves the in-band rate by more
+than ~10pp around a 55.9% base.** One thing does:
+
+| steps | n | 0/5 | **in band** | 5/5 |
+|---:|---:|---:|---:|---:|
+| 1 | 21,196 | 18.2% | **54.9%** | 6.1% |
+| 2 | 1,954 | 17.5% | **65.3%** | 2.5% |
+| 3 | 354 | 21.8% | 62.7% | 2.0% |
+
+**Shape for two steps.** 1→2 is +10.4pp in band and cuts 5/5 risk 2.4× at no cost in 0/5 risk.
+**2→3 buys nothing and adds 4pp of 0/5 risk** — a third step is a cost, not a hedge.
+
+**Step 1 must not be a warm-up. This is the single most common authoring mistake in the corpus.**
+In 2-step tasks **81% of all "too easy" blame lands on step 1** (114 of 131). Step 1 of a 3-step
+task has a mean avocado rate of **79%** and is over ceiling **72.5%** of the time.
+
+So when you write the card: **step 1 carries real difficulty on its own**, and step 2 reaches back
+into it (§4b). A step 1 that merely sets up step 2 is the shape that fails most often.
 
 ## 4a. Every surface carries a `HISTORY:` field — ask for it in the survey
 
