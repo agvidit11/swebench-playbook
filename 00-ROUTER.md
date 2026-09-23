@@ -150,6 +150,39 @@ work, go do it — `C5` exists to sequence exactly this.
 
 ---
 
+## 3b. THE QUALITY LADDER — what to aim for, and what to sacrifice
+
+`STATUS: LIVE`. The five criteria in §4 are a binary check. **This is the target**, and its order
+tells you what to give up when you cannot have everything.
+
+| rung | what it is | the gates that get you there |
+|---|---|---|
+| **L0** | structure bad · oracle bad · agentic review bad | — |
+| **L1 — THE FLOOR** | **every validation passing except calibration, AND the agentic review says `GOOD`** | `preflight` clean · oracle 3/3 *stable* · `B3` §①②④ · `B5` p2p flake screen |
+| **L2** | L1, plus **calibration 2/5–3/5 avocado on every step** | branch count ≥3 · two steps · step 1 carries real difficulty |
+| **L3** | L2, plus the review rates it **`GENUINELY_HARD`** and the problem is one a maintainer would actually prioritise | a real defect or a real capability gap in code that matters |
+
+**The floor is L1, and calibration is not part of it.** A task can miss the band and still be a
+good task — 0/5 is accepted 81.2% of the time, 4/5 80.7%. What is *not* acceptable is failing
+structure, oracle or the agentic review. Those are craft, not luck.
+
+**`connect-go` was L0** — oracle 2/3, step gate too easy, and `BAD_GRADING_WEAK`. All three of the
+things you control, wrong at once. That is the worst outcome available and it is the one we
+shipped. Do not repeat it.
+
+Read the ladder downward when you are deciding what to spend effort on:
+
+- **Never trade L1 for L2.** Hardening a task whose grader is weak makes a bad task harder. Fix
+  the grader first; that is what `B3` §①②④ is for.
+- **L2 is 2/5–3/5, deliberately tighter than the 1–3/5 gate band.** Aim at the middle, not the
+  edge — you are sampling five trials, and the edge of a band is a coin flip away from outside it.
+- **L3 is not a harder contract, it is a better problem.** `GENUINELY_HARD` comes from the problem
+  mattering, not from you withholding information — de-specifying was measured and changes nothing
+  (`B-build/B2-contract.md` §6b).
+
+**Delivery mode is autonomous, or minimal input.** A rung reached only because a human stepped in
+mid-run is recorded as reached *with* intervention, and the intervention is a friction entry.
+
 ## 4. Definition of done — five surfaces, read each at its own source
 
 | # | Criterion | Read at | Green when |
@@ -334,6 +367,8 @@ ticked or explicitly waived with a reason.
 ```
 HANDOFF <act-id>
   EXIT:      <the exit condition, and the command output proving it met>
+  RUNG:      <L0|L1|L2|L3 believed reached, per §3b, and the evidence -- or "pre-push" with
+              the rung you are targeting and what currently blocks it>
   CHECKLIST: <n of m ticked; every waived line with its reason>
   ARTIFACTS: <paths written>
   FACTS:     <named facts the next act needs and cannot re-derive cheaply>

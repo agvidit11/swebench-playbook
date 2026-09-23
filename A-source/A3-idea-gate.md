@@ -34,6 +34,12 @@ task that exists, with real evidence attached — strictly better than a line in
 
 **Bias toward building.** When a candidate clears the factual vetoes and you are unsure, build it.
 
+**What you are aiming at is the quality ladder** (`00-ROUTER.md` §3b). The floor is **L1** — every
+validation passing except calibration, plus an agentic review of `GOOD`. Calibration is the rung
+above it. So a candidate that will plainly grade cleanly and review well is worth more than one
+that argues better on paper, and the gates here exist to stop you building something that cannot
+reach L1 — not to predict which rung it lands on.
+
 ## 0. Gate order — and why order is the whole economy
 
 Novelty runs **before** scoring: on the spire run C4 scored highest of five and was then killed by two open issues, making the entire scoring pass waste. Probes run at stage 0, **not** after scoring: ten cheap calls invalidate candidates that otherwise consume hollow-premise, novelty, grounding and a seven-axis pass. Budget **~6 minutes per candidate** through GATE 0–3; still ambiguous → kill. `STATUS: LIVE`

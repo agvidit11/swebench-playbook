@@ -201,6 +201,17 @@ voided a real calibration run. `STATUS: LIVE`
 
 ---
 
+## What this act is protecting: the L1 floor
+
+`STATUS: LIVE`. Everything below exists to guarantee **L1** (`00-ROUTER.md` §3b) — every validation
+passing except calibration, and an agentic review of `GOOD`. Calibration is luck within a wide
+band; **L1 is craft, and it is entirely in your control.** The one task that reached the server
+without it came back L0 — oracle 2/3, step gate too easy, `BAD_GRADING_WEAK` — three controllable
+things wrong at once.
+
+Before you push, state the rung you believe you are at and why. If you cannot claim L1, say which
+of structure, oracle or review quality you expect to fail, and do not push until it is fixed.
+
 ## ⛔ GATE ZERO OF VALIDATION — ANSWER EVERY PRIOR REVIEW FINDING
 
 `STATUS: LIVE`. **This runs before any other pre-push check, and it blocks.** If the task has ever
@@ -333,6 +344,9 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
        the top-level gates are Structural checks, Oracle validation, Metacode or Opus
        pass/fail balance, Contamination check, Provenance check. All five are read.
 [ ] 5. Append one line to <task>/audit/drive-log.md
+[ ]  Z. RUNG CLAIMED: state L1/L2/L3 per router §3b with evidence, and name
+        anything you expect to fail. Do NOT push below L1 -- structure, oracle
+        and review quality are craft, not luck. L0 was shipped once; never again.
        `<utc> | pushed | <sha> | preflight=0 oracle=3/3 | <what changed> | next check <when>`
 ```
 
