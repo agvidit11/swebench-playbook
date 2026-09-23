@@ -21,8 +21,11 @@ were spent repairing a field that was lying.
 ls <task-dir>/steps/*/tests/config.json 2>/dev/null   # exists -> S5 or later
 ls <task-dir>/steps/*/instruction.md    2>/dev/null   # exists -> S5
 ls -d <task-dir>                        2>/dev/null   # exists -> S4
-grep -l 'EXIT:.*SURVIVOR' .e2e/*/handoffs/*A3* 2>/dev/null   # a SURVIVOR -> S3
-grep -l 'EXIT:.*NO SURVIVOR' .e2e/*/handoffs/*A3* 2>/dev/null  # -> back to A2, NOT B1
+grep -lE 'EXIT: *SURVIVOR' .e2e/*/handoffs/*A3* 2>/dev/null      # a SURVIVOR -> S3
+grep -lE 'EXIT: *NO SURVIVOR' .e2e/*/handoffs/*A3* 2>/dev/null   # -> A2 or A1, NOT B1
+# ^ the NO-SURVIVOR line MUST be checked with an anchored pattern. `EXIT:.*SURVIVOR`
+#   also matches "EXIT: NO SURVIVOR", so the loose form routed an exhausted repo
+#   straight into B1 to build a task that does not exist. Caught on redo-lego.
 ls .e2e/*/handoffs/*A2*                 2>/dev/null   # cards, unprobed  -> S2
 # a repo chosen but no cards -> S1 ;  nothing at all -> S0
 #
