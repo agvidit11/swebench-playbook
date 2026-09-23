@@ -201,6 +201,42 @@ voided a real calibration run. `STATUS: LIVE`
 
 ---
 
+## THE p2p FLAKE SCREEN — run before every push
+
+`STATUS: LIVE` — added 2026-09-23. `connect-go-trailing-metadata-parity` failed **R09 and R13**
+on the server because an unrelated upstream `pass_to_pass` test flaked on a context deadline:
+one oracle trial scored 0.5 and the gate read `Oracle validation: 2/3`. **Calibration is skipped
+entirely below 3/3**, so a single flaky p2p test voids the whole run.
+
+It is not catchable by running the oracle more times — locally it was 3/3 on **four** separate
+runs and the server still hit it at 1 in 3. The fix is to screen the set, not resample it.
+
+**A large `pass_to_pass` inherited wholesale from an upstream suite always carries timing-sensitive
+tests.** That task shipped **127 p2p entries, 10 of them timing- or concurrency-named**
+(`TestAwaitResponseRespectsContext`, `TestConcurrentStreams`, `TestConnectEncodeTimeout`,
+`TestGRPCParseTimeout`, …).
+
+```bash
+# 1. name the hazards
+python3 - <<'PY'
+import json, glob, re
+pat = re.compile(r'Context|Deadline|Timeout|Cancel|Race|Concurren|Parallel|Sleep|Retry|Backoff|Async|Block', re.I)
+for c in sorted(glob.glob('<task>/steps/*/tests/config.json')):
+    d = json.load(open(c))
+    risky = [t for t in d.get('pass_to_pass', []) if pat.search(t)]
+    print(c.split('/')[-3], f"{len(risky)} risky of {len(d.get('pass_to_pass', []))}")
+    for r in risky: print('   ', r)
+PY
+# 2. run the p2p set at base_commit at least 3x and diff the result sets
+```
+
+**Any p2p test that is not identical across every run is removed from `pass_to_pass`.** It is not
+protecting anything — it is a coin flip attached to your oracle. Removing it costs nothing, since
+p2p exists to catch regressions your change could cause, and a test that fails on its own timing
+cannot distinguish a regression from noise.
+
+Record the screen in the handoff: how many runs, how many entries removed, and which.
+
 ## 6. PRE-SUBMISSION CHECKLIST
 
 ```
@@ -225,6 +261,9 @@ voided a real calibration run. `STATUS: LIVE`
 [ ] 10. Push executed with the explicit :22 URL; no --no-verify, no SKIP_TASK_VERIFY
         proof: the push output and the resulting SHA
 [ ] 11. MULTI-TURN steps-validation, final pass:
+[ ] 10b. p2p FLAKE SCREEN: p2p set run >=3x at base_commit, result sets identical;
+        every timing/concurrency-named entry either proven stable or REMOVED
+        proof: the run diffs, and the list of entries removed          [R09/R13]
         a. every step present in `[[steps]]` ships files, and every shipped step is declared
         b. per-step oracle reward 1, not just the mean
         c. TIER 4b replay green for every step

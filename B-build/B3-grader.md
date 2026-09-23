@@ -267,6 +267,56 @@ correctly, resque's does not). `franz-go`'s third step was rebuilt against the s
 after a stale local branch was found **109 lines behind.** Each step must ship **both** `patch`
 and `test_patch` — the training pipeline silently drops incomplete steps.
 
+## THE THREE CHECKS THAT CATCH `BAD_GRADING_WEAK`
+
+`STATUS: LIVE` — added 2026-09-23 after `connect-go-trailing-metadata-parity` returned
+`BAD_GRADING_WEAK` with R06, R07 and R12 all failing. **Every gate we had was green when it
+shipped.** Oracle was 3/3 four times locally. These are the three questions nothing asked.
+
+### Why `oracle 3/3` can never catch this, by construction
+
+Oracle 3/3 asks **"does the golden pass MY tests."** It never asks **"does the golden satisfy the
+CONTRACT."** Those two diverge exactly when the tests under-cover the contract — which *is* the
+definition of `BAD_GRADING_WEAK`. A green oracle is therefore not evidence against it. You need
+checks that reach outside your own test list.
+
+### ① Contract-domain enumeration → catches R06
+
+For every **universal** claim in the contract — "all X", "parity across Y", "never Z" — enumerate
+the input domain **from the platform, spec or library**, not from the tests you already wrote.
+Then show the graded set samples each class.
+
+The measured miss: the contract said strictest-wire *parity*. The tests covered NUL, CR, LF, DEL,
+padding, repeated values and protocol-owned trailers. They did **not** cover invalid UTF-8 values
+or **HTTP-forbidden trailer names** (`Authorization`, `If-*`) — a class you find by asking "what
+does Go's `net/http` treat specially in trailers?", never by re-reading your own test file.
+
+Write the enumeration down. An unlisted class is an ungraded requirement.
+
+### ② Golden-vs-contract differential → catches R12, the serious one
+
+**Run the golden against the classes your tests do NOT cover.** If the golden violates the
+contract on any of them, the task is broken no matter how green the oracle is.
+
+The measured miss: *"A temporary check against the golden showed an `Authorization` trailer
+survives Connect and gRPC-Web but is dropped by gRPC, violating the stated strictest-wire parity
+rule."* **The golden itself did not satisfy the contract the instruction states.** That is R12,
+and every local gate passed it.
+
+This is the single highest-value check on this page. It costs one scratch run per class from ①.
+
+### ③ The tested-cases-only mutant → catches R07
+
+Write an implementation that handles **exactly the inputs your tests exercise and nothing else**.
+If it passes the graded set, the set is thin and a partial solution will be paid for.
+
+The measured miss: *"A partial solution that filters only the tested bad values and protocol-owned
+keys can pass while still allowing legal-looking but HTTP-forbidden trailer fields to diverge."*
+
+This is the same mutant discipline `C-drive/C3-harden.md` applies **after** a "too easy" verdict.
+It belongs here too — running it before the first push costs one scratch implementation and saves
+a whole validation cycle. → `C-drive/C3-harden.md` for the mutant-is-a-floor caveat.
+
 ## 9. CHECKLIST
 
 ```
@@ -307,6 +357,16 @@ and `test_patch` — the training pipeline silently drops incomplete steps.
         one that catches silent-contract + pinning-test (4 of 4 BAD_GRADING_WRONG)
         proof: `python3 ~/.claude/skills/swebench-mt/instruction-lint.py <task> <clone>`
                must report PASS, and must NOT print "no test_patch yet"
+[ ] 20c. CONTRACT-DOMAIN ENUMERATION written: every universal claim in the contract,
+        with its input classes derived from the platform/spec -- NOT from your tests
+        proof: the enumeration, and which graded test samples each class      [R06]
+[ ] 20d. GOLDEN-vs-CONTRACT DIFFERENTIAL run on every class the tests do NOT cover
+        proof: one scratch run per class; the golden must satisfy the contract on
+        all of them. A violation here is R12 and the task is broken regardless
+        of oracle 3/3 -- oracle only proves the golden passes YOUR tests        [R12]
+[ ] 20e. TESTED-CASES-ONLY MUTANT written and run: an implementation handling
+        exactly the inputs your tests exercise and nothing else
+        proof: it must FAIL the graded set. If it passes, the set is thin       [R07]
 [ ] 21. IF a graded assertion changed on a task with existing server results:
         routed to C-drive/C6-replay-verify.md before B4
 ```
