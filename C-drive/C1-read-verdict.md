@@ -15,6 +15,21 @@ true and which lies — is **not** restated here: → `00-ROUTER.md` §2 and
 
 ---
 
+## FIRST: pull everything and write the ledger version entry
+
+`STATUS: LIVE`. Before diagnosing anything, pull the **complete** evidence set and append this
+version's entry to `<task>/audit/REVIEW-LEDGER.md`. Commands, format and the carry-forward rules
+are in `reference/R9-review-ledger.md`.
+
+Pull all of it — `task errors`, `task show`, `job review`, the TBD full assessment, **the human
+reviews** (`tasks reviews --full`, authoritative and carrying sourcing/novelty rejections that
+`job review` never surfaces), and **every failing trial's artifacts including trajectories**. The
+reviewer's prose is a summary; the quoted exception in `run-script-stdout.txt` is the evidence.
+
+Then regenerate the carry-forward table: every finding ever raised on this task, with its current
+status. **Anything still `OPEN` is input to this diagnosis, not history** — `B5` will block the
+next push on it.
+
 ## 1. Freshness first — a stale read is not an attempt
 
 **STATUS: LIVE.** If `commitSha` on the task record ≠ your latest pushed commit for that task,

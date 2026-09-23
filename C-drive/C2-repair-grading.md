@@ -21,6 +21,13 @@ oracle and your own fixtures is unverified. → `00-ROUTER.md` §8b.
 
 ---
 
+## Update the review ledger before you hand off
+
+`STATUS: LIVE`. Whatever you changed, set the disposition on every finding you touched in
+`<task>/audit/REVIEW-LEDGER.md` — `FIXED v<n>` with the commit **and the check that now catches
+it**, or leave it `OPEN` and say why. `B5` blocks the next push on anything still `OPEN`.
+→ `reference/R9-review-ledger.md`.
+
 ## 1. `BAD_GRADING_WRONG` and `BAD_GRADING_WEAK` have mutually exclusive remedies
 
 **STATUS: LIVE. Applying the wrong one makes the task worse, and applying both in sequence is

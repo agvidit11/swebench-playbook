@@ -201,6 +201,33 @@ voided a real calibration run. `STATUS: LIVE`
 
 ---
 
+## ⛔ GATE ZERO OF VALIDATION — ANSWER EVERY PRIOR REVIEW FINDING
+
+`STATUS: LIVE`. **This runs before any other pre-push check, and it blocks.** If the task has ever
+been pushed, it has a `<task>/audit/REVIEW-LEDGER.md` (`→ reference/R9-review-ledger.md`).
+
+```bash
+grep -c 'OPEN' <task>/audit/REVIEW-LEDGER.md    # must be 0
+```
+
+**Every finding from every prior version must be `FIXED`, `OBSOLETE-BY-PIVOT`, or `WAIVED` — each
+with its evidence line. One `OPEN` finding and you do not push.**
+
+Why this is gate zero and not a later line: `connect-go` returned `BAD_GRADING_WEAK` on R06, R07
+and R12. Those findings were **fully stated in the agentic review**, and nothing forced the next
+version to answer them. Every other check in this file was green. A pipeline that does not
+re-check prior findings will re-ship the same defect under a new SHA indefinitely.
+
+| disposition | what you must show |
+|---|---|
+| `FIXED v<n>` | the commit, **and the check that now catches it** — not "addressed" |
+| `OBSOLETE-BY-PIVOT v<n>` | **both** pivot conditions, each with evidence (`R9`) — artifact gone **and** requirement gone. Artifact-gone alone leaves it OPEN. |
+| `WAIVED v<n>` | a named owner and a reason. Not a disposition you give yourself twice for the same finding. |
+
+**And re-run the checks the prior findings imply, not just their text.** An R06 finding about a
+missing input class means re-running the contract-domain enumeration (`B3` §①), not re-reading the
+sentence. An R12 finding means re-running the golden-vs-contract differential (`B3` §②).
+
 ## THE p2p FLAKE SCREEN — run before every push
 
 `STATUS: LIVE` — added 2026-09-23. `connect-go-trailing-metadata-parity` failed **R09 and R13**
@@ -245,6 +272,12 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
 ## 6. PRE-SUBMISSION CHECKLIST
 
 ```
+[ ]  0. REVIEW LEDGER: zero OPEN findings from ANY prior version
+        proof: `grep -c OPEN <task>/audit/REVIEW-LEDGER.md` = 0, and for each
+        finding the disposition line with its evidence. A pivot disposition needs
+        BOTH conditions shown (R9). BLOCKING — no push with an OPEN finding.
+[ ] 0b. Re-ran the CHECKS each prior finding implies, not just re-read its text
+        proof: the B3 §1/§2 outputs for any R06/R12 finding in the ledger
 [ ]  1. HANDOFF B2, B3 and B4 all in hand, each with its CHECKLIST line
         proof: the three blocks
 [ ]  2. Every OPEN item from B1-B4 is either closed or restated here with its owner

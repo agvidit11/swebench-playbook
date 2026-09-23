@@ -19,6 +19,11 @@ This act exits through `C-drive/C6-replay-verify.md`. → `00-ROUTER.md` §8b.
 
 ---
 
+## Update the review ledger before you hand off
+
+Set the disposition on every finding you touched → `C-drive/C2-repair-grading.md`
+§Update the review ledger. `B5` blocks the next push on anything left `OPEN`.
+
 ## 0. Never harden by making the interface vaguer
 
 The rule itself lives in `B-build/B2-contract.md` (interface never vaguer; approach vaguer is

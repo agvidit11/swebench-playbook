@@ -200,6 +200,10 @@ three models at 0/5. In both formats **avocado 0/5 is not itself a failure**: th
 pass and one fail on the *same* model, which may be Opus or GPT. Full decode →
 `reference/R1-field-authority.md` §5.
 
+**Before you push a revision, criterion 0 is the review ledger.** Zero `OPEN` findings from any
+prior version → `B5` §GATE ZERO. The five criteria below judge the *current* run; the ledger is
+what stops you re-shipping a defect the server already told you about.
+
 3 and 5 are **different surfaces** — a task can pass 3 while 5 is stale, and can have no
 row 3 at all while 5 returns `GOOD`. Never substitute one for the other.
 
@@ -312,6 +316,9 @@ the next one's contract is written. `C5` owns the queue once more than one task 
 3. **Never act on an UNMEASURED number.** → §2, `R2`.
 4. **Never edit an instruction file during C1–C5.** Record it, `Owner: human`, keep going.
 5. **Never harden by making the contract vaguer.** Approach vaguer is good; interface never. → `B2`.
+6. **Never push a task with an OPEN finding in its review ledger.** Every finding from every
+   prior version must be `FIXED`, `OBSOLETE-BY-PIVOT` or `WAIVED`, each with evidence.
+   → `B-build/B5-preflight-push.md` §GATE ZERO, `reference/R9-review-ledger.md`.
 
 ---
 
@@ -382,6 +389,18 @@ passed two consecutive rounds while the real blocker went untouched.
 graded suite, the solution, the environment, the README and the rationale are all suspect
 until re-checked against the new text.
 → `B-build/B2-contract.md` §contract-change re-audit.
+
+**Every task keeps a versioned review ledger, and validation checks against it.**
+`<task>/audit/REVIEW-LEDGER.md` — written by `C1` on every server verdict, gating `B5` before
+every push. Pull the complete evidence set each version: gate strings, the full agentic review,
+the TBD assessment, the **human** reviews, and **every failing trial's artifacts and
+trajectories**. A finding stays OPEN across versions until it is fixed with evidence or proven
+obsolete by a pivot — and a pivot needs the artifact *and* the requirement gone, not just the
+artifact. → `reference/R9-review-ledger.md`.
+
+`connect-go` came back `BAD_GRADING_WEAK` on three rubrics that were fully stated in its review,
+while every local gate was green. Nothing forced the next version to answer them. This is that
+mechanism.
 
 **Tracing a finding to the file that owns it** → `reference/R8-finding-to-file.md`.
 
