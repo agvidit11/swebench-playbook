@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Owner** | MetaCode (Avocado). Codex may run the wide survey; **Claude never generates ideas or surfaces** |
-| **Input** | one screened repo **+ its `HANDOFF A1`** (clone path, HEAD sha, LOC, subsystem count, the existing entry point that makes a name-free assertion possible) |
-| **Output** | candidate cards — dispatch target **≥8**, scaled to the repo per §2 |
+| **Input** | one screened repo **+ an A1 FACTS record** — either a literal `HANDOFF A1`, or an **imported shortlist receipt** carrying the same fields (§0). Do not re-measure what it carries. |
+| **Output** | candidate cards — **however many the §2 funnel yields.** There is no numeric target; see §2 |
 | **Exit** | cards written, **each axis-composed (§1) and carrying the self-audit (§7)**. The exit is the quality of the cards, not their count |
 
 Nothing here is verified. Every card is a claim; `A3-idea-gate.md` measures them. Do not run gates
@@ -18,6 +18,40 @@ cannot supply prose for someone else to paste there.** For those runners, cards 
 observable contracts plus the grader API surface, and the `Interface Contract` table is the
 deliverable in place of prose. The instruction itself is written in `B2`, by its own owner.
 `STATUS: LIVE`
+
+## 0. Your input: `HANDOFF A1`, or an imported shortlist receipt
+
+`STATUS: LIVE`. Three reviewers found this blocking: the router routes "repo picked, no cards"
+straight here, while this act demanded a literal `HANDOFF A1` that in that case does not exist.
+Every round-2 pair hit it and had to improvise.
+
+Either form is valid. An **imported shortlist receipt** must carry the same facts, and you must
+paste it into your handoff so the provenance is visible:
+
+```
+A1-RECEIPT
+  source:        <path to the shortlist log, or 'HANDOFF A1'>
+  repo / clone:  <slug> / <clone path>
+  base sha:      <40-hex>
+  LOC (non-test):        <n>
+  SUB_distinct / SUB_fanout:  <n> / <n>     # see the caveat below
+  licence:       <spdx>
+  peer dedup:    <result + the command>
+  AI-authorship: <% + the method used>
+  issues:        <real count, PRs excluded, tracker named>
+  harness:       <measured seconds, or NOT MEASURED>
+  entry point:   <the existing public surface a name-free assertion can go through>
+```
+
+**Any field missing or marked NOT MEASURED is yours to measure before you rely on it** — but say
+so. An imported receipt is a pre-screen, and this act's standing rule is that a pre-screen is a
+claim: coordinator screens were wrong 4 times out of 4, and one lane report said 0 peer hits
+where re-verification found 2.
+
+**`SUB_fanout` caveat.** A raw subsystem count can be mostly provider fan-out — lego reported
+`SUB=262` that was almost entirely per-provider directories, which would have inflated the survey
+sizing in §2. If the receipt does not separate distinct subsystems from fan-out, count them
+yourself.
 
 ## 1. Stage 0 — compose the lens before surveying
 
@@ -122,6 +156,26 @@ executes prompt fragments (one agent got 2.5 KB of `command not found`). Keep Co
 via the backgrounded pty wrapper; the Bash tool caps at 600s.
 
 ## 4. Card contents — every field is mandatory
+
+### 4.0 The three probe fields — `A3` and `probe-lint.py` REQUIRE these verbatim
+
+`STATUS: LIVE`. Without them `A3` GATE 5 cannot run and `probe-lint.py` fails the card outright.
+Write them as literal labelled lines, one card per file:
+
+```
+CONSTRAINT:  <the requirement, worded exactly as instruction.md would word it>
+DESIRED:     <the target design — the shape you believe is hard to reach>
+NON-DESIRED: <the plausible shapes you expect instead; one per line or ';'-separated>
+```
+
+**Direction is fixed HERE, before anything is probed, and is never read off the probe outputs
+afterwards.** Two of four kills on 2026-09-22 were invalid because the probe prompt omitted the
+`CONSTRAINT` and one then read the mapping backwards — a 9-of-10 strong fork was recorded as a
+kill. The fields exist so that cannot happen again.
+
+`CONSTRAINT` must be complete. frostdb's card required "both uploads start before serialization
+completes"; the probe dropped that clause and measured nothing.
+
 
 | Field | Requirement |
 |---|---|
@@ -242,6 +296,26 @@ its return value or a boolean flag it collapses to an inline computation and one
 **cross-cycle** or **per-source** behaviour instead. `STATUS: LIVE`
 
 ## 7. The self-audit each card carries
+
+> **Vocabulary, and why it has three values not two.** `STATUS: LIVE`, two reviewers.
+> The old set was `PASS` / `FAIL` / `N-A`, with a rule that every card must carry a non-PASS row
+> **and** that any `FAIL` must be repaired or discarded. Those cannot both hold, so cards either
+> laundered a real `FAIL` into `PASS` or carried a decorative one.
+>
+> | value | meaning | advances? |
+> |---|---|---|
+> | `PASS` | the row holds, with evidence | yes |
+> | `RISK` | a real weakness, stated, that does not by itself disqualify | **yes — and `A3` must probe it first** |
+> | `FAIL` | disqualifying | no — repair or discard the card |
+> | `N-A` | the row does not apply, with one line saying why | yes |
+>
+> Every card must carry at least one `RISK` or `FAIL`. A card of all `PASS`/`N-A` has not been
+> audited, it has been advertised.
+>
+> **The rubric IDs below are defined in `B-build/B5-preflight-push.md` §agentic-reviewer precheck.
+> Use those exact dimension names.** Two runs invented their own dimensions and produced evidenced
+> self-audits of things that do not exist, which satisfied the anti-all-PASS rule and was worthless.
+
 
 Thirteen Agentic Full-Task Review items are judgeable from a card before any code exists: **R01 R02
 R04 R05 R06 R07 R08 R09 R11 N01 N02 N03 N04**. R10, R12, R13 need a build; R03 needs rollouts. List

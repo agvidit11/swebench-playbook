@@ -1,0 +1,11 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2592805/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Checking the current `GetOCSP` flow to ground the fallback approach.
+I've mapped the file layout — now I'll examine the GetOCSP implementation to plan the retry approach.
+Replace the first-element fetches with ordered loops over all issuing-certificate URLs and then over all OCSP responder URLs, where each issuer attempt validates transport success with context cancellation, successful HTTP status, bounded body read, certificate decoding, and that the fetched certificate actually issued the leaf, continuing to the next URL and recording the cause on any failure. Each OCSP attempt then sends the request to the next responder and validates transport success, successful HTTP status, body readability, response parsing against the resolved issuer, and successful responder status, continuing on any failure. When every candidate in either phase is exhausted, return a combined lookup-failed error that lists every URL tried with its failure reason, keeping the caller's initial bundle decoding error separate so exhaustion never surfaces as a complaint about the input certificate.

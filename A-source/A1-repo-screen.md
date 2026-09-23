@@ -242,6 +242,31 @@ compiler task as security to game the table.**
 AI-authorship % (method) | LOC / subsystems | name-free hosting: YES/NO + the entry point | graded-path
 seconds, MEASURED | rank | why-not (for rejects)`
 
+## 9b. Two gate corrections from the 2026-09-22 runs
+
+**G2's agentic-artifact check must be CONTENT-based, not presence-based.** `STATUS: LIVE`.
+As written, the mere presence of `AGENTS.md` is a hard kill. oxigraph's is an ordinary 49-line
+human contribution guide; the shortlist recorded the kill condition and waived it in the same
+cell, and a full run was spent on a repo the gate had already killed. Neither the silent waiver
+nor the literal kill was right.
+
+| What you find | Verdict |
+|---|---|
+| `.claude/`, `CLAUDE.md`, `claude-code-action` in CI, or merged `claude/*`\|`codex/*` branches | **KILL** — agentic authorship in the repo's own history |
+| `AGENTS.md` that is human-written contributor guidance, no agent artifacts elsewhere | **PASS with a recorded note** — paste the first 15 lines as evidence |
+| Ambiguous | `Owner: human`. Do not waive it yourself and do not kill it yourself. |
+
+**Tracker discovery is part of G4, before you count anything.** `STATUS: LIVE`. `gh issue list`
+returns zero on a repo whose tracker is JIRA — which reads as "clean" and is really "looked in the
+wrong place". santuario read 12 issues and actually had 33, with an OPEN ticket proposing the
+remedy for one of our own hypotheses.
+
+```bash
+gh api repos/<slug> --jq '{has_issues, homepage}'      # has_issues:false => the tracker is elsewhere
+```
+Find the real tracker, record which one it is in the HANDOFF, and sweep **that**. `A3` GATE 3
+inherits the tracker you name here.
+
 ## 10. THE REPO-FINDING CHECKLIST
 
 Run top to bottom, per candidate repo, in this order. Tick each line with the output that proves

@@ -1,0 +1,12 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2592808/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Triage failover gaps — hunting the issuer and status lookups that quit after one failure.
+Biggrep doesn't cover this fixture — I'll inspect the local tree directly.
+Failover never tried the backup mirror or responder — now mapping those code paths.
+Change the issuer retrieval and status query to iterate over every issuer URL and every responder named by the certificate instead of using only the first entry of each list. Consider an endpoint failed and move to the next one when it refuses connection, times out, returns a transport or read or non-success status error, or returns bytes that do not decode as the expected issuer or status response, collecting each attempt's error. When all candidates are exhausted return a single lookup-failed error that lists what endpoints were tried and why each failed, wrapping any downstream decoding failure as a fetch failure so the error never reports the caller's certificate as malformed.

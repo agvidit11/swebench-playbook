@@ -1,0 +1,10 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2592800/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Three-sentence failover plan — checking the current GetOCSP flow first.
+Change issuer resolution to iterate over every issuer URL advertised by the leaf in order, attempting fetch and validation for each and continuing to the next on failure while remembering what failed. Change status checking to iterate over every responder URL advertised by the leaf in order, sending the request built from leaf and resolved issuer to each and continuing to the next when the request fails, the server refuses or times out, the response cannot be read or parsed, or the responder reports an unsuccessful status. When all issuer locations or all responders have been exhausted without success, return a combined lookup-failed error that lists the locations tried and their causes rather than returning a certificate-decoding error for the caller-supplied bundle, which remains only an early validation before any network work.

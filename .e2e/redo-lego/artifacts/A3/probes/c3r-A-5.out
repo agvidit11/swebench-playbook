@@ -1,0 +1,12 @@
+Warning: cleanup_old_launcher_logs: failed to remove /home/agvidit/.config/metacode/meta/logs/launcher/metacode_invocation_b1a5082d-5a18-47aa-a1b7-5583651bff8c.log: No such file or directory (os error 2)
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2592796/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Describing the resilient lookup in 3 sentences — first checking the current implementation.
+I've mapped the file structure — now examining the current GetOCSP logic.
+Loop over every issuer location when the issuer must be fetched instead of using only the first, treating refusal, timeout, transport or request failure, non-successful response, unreadable body, unparsable result, and a result that is not the actual issuer as a failed attempt that continues to the next location. Loop over every responder location when asking about status instead of using only the first, treating refusal, timeout, transport failure, non-successful response, unparsable answer, and an answer carrying a failure status as a failed attempt that continues to the next responder. If every issuer or responder location fails, return a lookup-failed error that names what was tried with its per-location causes while keeping initial caller-certificate decoding separate so exhaustion is never reported as a decoding complaint about the passed-in certificate.

@@ -13,17 +13,27 @@ You measure claims; you do not generate replacements. A candidate that dies here
 
 Novelty runs **before** scoring: on the spire run C4 scored highest of five and was then killed by two open issues, making the entire scoring pass waste. Probes run at stage 0, **not** after scoring: ten cheap calls invalidate candidates that otherwise consume hollow-premise, novelty, grounding and a seven-axis pass. Budget **~6 minutes per candidate** through GATE 0–3; still ambiguous → kill. `STATUS: LIVE`
 
-| Gate | Kills | Cost |
-|---|---|---|
-| **0** | grader needs a name absent at `base_commit` | free |
-| **1** | the fork is zero by construction, or the difference is unobservable | free |
-| **2** | the premise is already true at HEAD | one file read |
-| **3** | the direction is public | a few searches |
-| **4** | no outcome variance | 5 calls, no Docker |
-| **5** | the model already prefers the desired path | 10 calls |
-| **6** | ungradeable / nondeterministic / trivial seam | free |
-| **7** | the cascade is decorative | free |
-| **8** | scoring and ranking — **survivors only** | a Codex pass |
+**The canonical order is `0 → 1 → 2 → 3 → 6 → 7 → 4 → 5 → 8`.** `STATUS: LIVE`, two reviewers.
+Gates 6 and 7 are **free** and were previously listed after the two probe gates, which cost 15
+model calls before a free check could kill the card. Where the prose elsewhere implies a different
+order, this table wins. A killed card terminates its row immediately — do not run later gates on it.
+
+One language-sensitive exception: GATE 2 is priced "one file read" but mandates execution at
+`base_commit`. In a compiled language that is a build — curator spent ~12 minutes compiling before
+a ~7-minute GATE 5 probe killed the card. **In compiled languages, take any cheap kill available
+from GATE 3, 6 or 7 before paying for the GATE 2 build.**
+
+| Gate | Kills | Cost | Run at |
+|---|---|---|---|
+| **0** | grader needs a name absent at `base_commit` | free | 1st |
+| **1** | the fork is zero by construction, or the difference is unobservable | free | 2nd |
+| **2** | the premise is already true at HEAD | one file read — **a BUILD in compiled languages** | 3rd |
+| **3** | the direction is public | a few searches | 4th |
+| **4** | no outcome variance — **PRIMARY** | 5 calls | **7th** |
+| **5** | the model already prefers the desired path | 10 calls | **8th** |
+| **6** | ungradeable / nondeterministic / trivial seam | free | **5th** |
+| **7** | the cascade is decorative | free | **6th** |
+| **8** | scoring and ranking — **survivors only** | a Codex pass | last |
 
 ## GATE 0 — can the graded assertion be written using only names that exist at `base_commit`?
 
@@ -371,6 +381,42 @@ Only candidates past GATE 0–7 reach scoring, and a **different** model scores 
 **Read the per-axis scores, never the total — veto axes cannot be outvoted.** A bc-java candidate was dispatched as a multi-turn build off its **30/35 headline**; the same report's step table said in plain text `| C5 ITS snapshots | single-turn | unchanged (not probed) |` — Cascade **2**, never probed, realism flagged two paragraphs later. A full cycle was spent rediscovering a written-down verdict. **A high total with Cascade ≤2 is a single-turn candidate at best.**
 
 **Calibration target, easy to get backwards.** In-band on Avocado is **1–3 of 5 and LOWER IS BETTER**: 1/5 ideal, 3/5 ceiling, 4/5 over it; a step reading 1/5 is a success, leave it alone. **Avocado 0/5 is NOT a failure** — the server says *too hard* only when no model passed (`avocado 0, opus 0, gpt 0`), so read Opus and GPT first; 1–3/5 is a stricter operational target, not the server's validation condition. Corollary: **harder is cheap, easier is expensive.** Decode → `reference/R1-field-authority.md`; is the number real → `reference/R2-signal-integrity.md`.
+
+## NO SURVIVOR — the bounded terminal
+
+`STATUS: LIVE`. **Every one of five reviewers flagged this as blocking**, and every run tonight
+had to invent its own stopping rule from its dispatch brief rather than from the playbook. As
+written, `no survivor → A2` was an unbounded loop with no exhaustion state.
+
+```
+RESURVEY_BUDGET: 2      # A2 rounds per repo, including the first
+```
+
+**Write exactly one of these as your `EXIT:` line — the router reads it and nothing else:**
+
+| `EXIT:` | When | Routes to |
+|---|---|---|
+| `EXIT: SURVIVOR` | ≥1 candidate carrying a MEASURED fork **and** a GATE-4 A3-LOCAL result in band | `B1` |
+| `EXIT: NO SURVIVOR — RESURVEY` | budget remains **and** an untried lens/axis exists — name it | `A2`, round n+1 |
+| `EXIT: NO SURVIVOR — REPO EXHAUSTED` | budget spent, **or** the kill is repo-scoped | `A1`, next shortlist entry |
+
+**Go straight to `REPO EXHAUSTED`, skipping any remaining budget, when the kill is a property of
+the repo rather than of the card.** Measured tonight — each of these retired a whole repo:
+
+- the repo is a **compatibility/reimplementation** library (a reference is importable)
+- it **implements a published spec** and what the spec leaves open is only error reporting
+- the discriminating property is **not expressible over the interface the grader can see**
+  (GATE 1 pre-filter 4) — an adversarial audit confirmed no re-cut helps
+- **upstream churn** in the target subsystem is high enough that premises expire
+
+A resurvey against a repo-scoped kill hits the same wall with different words. Say so and move on.
+
+### The kill ledger — mandatory on any NO SURVIVOR
+
+Write `<run>/kill-ledger.md`, one row per candidate: `card | gate | fact-or-reading | evidence
+line | reversible-if`. `reversible-if` names the rule or measurement that would have to change.
+`GATE 0` changed once tonight and nothing recorded which kills it invalidated; two kills turned
+out to rest on a broken probe and were only caught because a reviewer re-read them by hand.
 
 ## KILL AUDIT — no GATE 5 kill is final until this runs
 
