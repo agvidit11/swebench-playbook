@@ -14,6 +14,12 @@ You measure claims; you do not generate replacements. A candidate that dies here
 Novelty runs **before** scoring: on the spire run C4 scored highest of five and was then killed by two open issues, making the entire scoring pass waste. Probes run at stage 0, **not** after scoring: ten cheap calls invalidate candidates that otherwise consume hollow-premise, novelty, grounding and a seven-axis pass. Budget **~6 minutes per candidate** through GATE 0–3; still ambiguous → kill. `STATUS: LIVE`
 
 **The canonical order is `0 → 1 → 2 → 3 → 6 → 7 → 4 → 5 → 8`.** `STATUS: LIVE`, two reviewers.
+
+> **Why the PRIMARY gate runs seventh.** "Primary" means *most decisive*, not *first*. GATE 4 is
+> the gate whose verdict you should trust above the others — and it is also the most expensive, so
+> it runs after every free and cheap gate has had its chance to kill the card first. Order is
+> economy; primacy is authority. Do not reorder GATE 4 earlier, and do not downgrade its verdict
+> because it ran late.
 Gates 6 and 7 are **free** and were previously listed after the two probe gates, which cost 15
 model calls before a free check could kill the card. Where the prose elsewhere implies a different
 order, this table wins. A killed card terminates its row immediately — do not run later gates on it.
@@ -307,7 +313,13 @@ The probe also reveals **which assertion carries the task**: impl-1's 9 failures
 > | Result | Meaning |
 > |---|---|
 > | ≥4 of 5 produce **DESIRED** | fork ~1 — candidate DEAD |
-> | ≥4 of 5 produce **NON-DESIRED** | **STRONG FORK — candidate LIVES.** This is not a kill. |
+> | ≥4 of 5 produce **NON-DESIRED** | **STRONG FORK — the candidate SURVIVES GATE 5.** This is not a kill. |
+>
+> **"Survives GATE 5" is not "is a good task."** A strong fork only means models build different
+> things; it says nothing about whether your grader can tell those things apart. frostdb C1
+> measured **9 of 10 NON-DESIRED — a genuinely strong fork — and then died at GATE 4 with 0 of 5
+> outcome variance**, because every implementation was observationally identical through the
+> interface the grader could see. Fork is necessary, not sufficient. GATE 4 decides.
 >
 > frostdb C1's five implementations were all the card's own *wrong-path* shape. That is the
 > second row. It was recorded as "10/10 desired" and killed.

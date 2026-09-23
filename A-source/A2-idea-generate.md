@@ -9,7 +9,27 @@
 
 Nothing here is verified. Every card is a claim; `A3-idea-gate.md` measures them. Do not run gates
 here — cards that are pre-filtered by their own author lose the weak-fork surfaces that merge
-usefully into a cascade later.
+usefully into a cascade later (§4b).
+
+> ### "No ideas" is a verdict about this act, not about the repo
+>
+> `STATUS: LIVE`. A survey returning nothing almost never means a real codebase has no hard task
+> in it. It usually means the survey looked at one axis. **Existing-behaviour axes — fix a bug,
+> tighten an invariant, extend a feature — are bounded by what the repo already does. Net-new
+> capability is not.** A capability the repo does not have yet can be specified to be arbitrarily
+> demanding, and its difficulty comes from building to a standard rather than from finding a gap.
+>
+> So before you may write "no candidates", you must have tried **all four** of these and said what
+> each produced:
+>
+> 1. **Existing behaviour is wrong** — a real defect with an observable consequence (`semantic_bugs`, **7 passed / 7** corpus-wide — the best category there is).
+> 2. **Existing behaviour is under-constrained** — correct on the happy path, wrong under fault, concurrency, reentry, ordering or resource pressure.
+> 3. **Net-new capability graded on a QUALITY property**, never on "did you build it" — robustness, edge-condition correctness, resource behaviour, interaction with an existing subsystem.
+> 4. **A merge of two thin surfaces** into a causally dependent cascade (§4b).
+>
+> A "no candidates" report that has not exhausted all four is a report about the ideation, and
+> `A3` will treat it as one. **This does not license backfilling** — an honest zero after four
+> genuine axes is still zero, and inventing a fifth weak card is worse than reporting it.
 
 **Provenance — read `→ 00-ROUTER.md` §5 before writing anything.** This act's owner is Avocado
 (MetaCode), which *is* an authorised author for contract prose. **Anyone else running any part of
@@ -91,7 +111,7 @@ Composing beats surveying: one grep per layer, and it inherits a grading shape t
 | 60k – 150k | **15–20** | |
 | > 150k | 20–25, or split the ask by subsystem | |
 
-**Step 2 — cards.** Expect **15–20 surfaces to collapse to 2–4 real candidates**; that ratio is the point, not a loss. So the ≥8 dispatch target is reachable only on a 60k+ LOC repo with many subsystems, and only by running the survey in subsystem passes. **On a smaller repo, report the real number and the derivation.** Zero is a valid and expected outcome, and a round that discards every premise with quoted evidence is a *successful* round. **Never backfill** — both source pipelines agree on this and both were burned by ignoring it.
+**Step 2 — cards.** Expect **15–20 surfaces to collapse to 2–4 real candidates**; that ratio is the point, not a loss. **There is no card-count target.** A 60k+ LOC repo with many subsystems, surveyed in subsystem passes, may yield 8; a smaller one may yield 2. Report the real number and the derivation that produced it. Zero is a valid and expected outcome, and a round that discards every premise with quoted evidence is a *successful* round. **Never backfill** — both source pipelines agree on this and both were burned by ignoring it.
 
 A *surface* at survey time is: an invariant or behaviour area, the files it lives in, its candidate fork, rough net-line size, and whether asserting it needs real network / wall-clock / concurrency. It is **not** a task — cheap to produce, cheap to discard. Do not filter weak forks at survey time; label them and keep them.
 
@@ -192,6 +212,30 @@ completes"; the probe dropped that clause and measured nothing.
 | **Inter-step file overlap** | which files each step touches, and whether step 2 is *incremental on step 1* or *cumulative from base*. **Two tasks broke on patch composition because both steps rewrote the same file from the same base.** Heavy overlap is a yellow flag, not a disqualifier — it tells the scaffolder step 2 must be a delta. Barely-overlapping file sets are a legitimate tiebreak |
 | **Size estimate** | files, ~lines, primitives reused. Target **80–150 net lines across 2–4 files** |
 | **Rubric self-audit** | §7 |
+
+## 4b. MERGING — a surface too small for a task is not a dead surface
+
+`STATUS: LIVE`. Most surfaces die for being *thin*, not for being wrong: one behaviour, one file,
+no second step. Thin surfaces are raw material. **Before discarding any surface for size, try to
+merge it.**
+
+A merge is legitimate only when the steps are **causally dependent** — step 2's requirement must
+be unsatisfiable against step 1's natural shape. Two behaviours that merely live near each other
+are a **decorative cascade**, which `GATE 7` kills.
+
+| Merge shape | The dependency | Test it |
+|---|---|---|
+| **Extend-and-invalidate** | step 1 builds a mechanism; step 2 adds a requirement the obvious step-1 shape cannot meet, forcing a restructure | can step 1's signature express step 2's requirement? If **yes**, there is no cascade |
+| **Capability then fault** | step 1 adds behaviour; step 2 demands it survive partial failure, crash, reentry or concurrent access | would a step-1 solution that ignored faults still pass step 2? If yes, decorative |
+| **Two constraints that conflict** | step 2 introduces a requirement that pulls against step 1's, so the solver must choose what to sacrifice | is the trade-off specific to *this* codebase, or a textbook answer? |
+| **Behaviour then accountability** | step 1 performs an action; step 2 requires the action be observable/auditable **through an existing surface** | does step 2 need a new name? If yes → GATE 0 |
+
+**The two mechanical tests, run at card time, not at `A3`:**
+1. **HEAD counterfactual** — if step 2's requirement were already true at HEAD, would step 1 still be needed?
+2. **Parallel-API test** — can step 2 be satisfied by adding a *sibling* API alongside step 1's, leaving step 1 intact? If yes, the cascade is decorative.
+
+Record every merge you attempt in the merge table, including the ones that fail these tests, with
+which test failed. A failed merge attempt is evidence the surface is genuinely thin.
 
 ## 5. Observable Schema — six levels, when the deliverable is records
 
@@ -354,7 +398,7 @@ waive it with a reason.
 | 9 | Apply the §6 auto-rejects | one line per rejected premise naming the rule that killed it — including the three-word recall test and the existing-vocabulary test |
 | 10 | Write one card per survivor | every §4 field present; §5 Observable Schema present whenever the deliverable is records; continue card numbering from the highest existing card, **never reuse a number** |
 | 11 | Self-audit each card | §7 table, 13 card-stage items + 4 deferred, **≥1 non-PASS row or one named residual risk** per card |
-| 12 | Confirm the count honestly | cards written vs the ≥8 target, with the derivation. If under, say why; **do not backfill** |
+| 12 | Confirm the count honestly | cards written, with the §2 derivation that produced that number. There is **no target** to fall short of; **never backfill** |
 | 13 | Emit the HANDOFF | block below, `CHECKLIST: n of m` filled in |
 
 ```

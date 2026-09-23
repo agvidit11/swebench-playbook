@@ -1,0 +1,225 @@
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolver.java
+index c0091bcc..a932fcd0 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolver.java
+@@ -80,6 +80,7 @@ public class KeyResolver {
+     public static final X509Certificate getX509Certificate(
+         Element element, String baseURI, StorageResolver storage, boolean secureValidation
+     ) throws KeyResolverException {
++        List<String> trail = new ArrayList<>();
+         for (KeyResolverSpi resolver : resolverList) {
+             if (resolver == null) {
+                 Object[] exArgs = {
+@@ -92,18 +93,36 @@ public class KeyResolver {
+             }
+             LOG.log(Level.DEBUG, "check resolvability by class {0}", resolver.getClass());
+ 
+-            X509Certificate cert = resolver.engineLookupResolveX509Certificate(element, baseURI, storage, secureValidation);
++            boolean canResolve;
++            try {
++                canResolve = resolver.engineCanResolve(element, baseURI, storage);
++            } catch (RuntimeException e) {
++                trail.add(resolverName(resolver) + " accepted element but rejected its material");
++                throw newResolutionFailure(element, baseURI, trail, e);
++            }
++            if (!canResolve) {
++                trail.add(resolverName(resolver) + " declined element");
++                continue;
++            }
++
++            X509Certificate cert;
++            try {
++                cert = resolver.engineResolveX509Certificate(element, baseURI, storage, secureValidation);
++            } catch (KeyResolverException e) {
++                trail.add(resolverName(resolver) + " accepted element but rejected its material");
++                throw newResolutionFailure(element, baseURI, trail, e);
++            } catch (RuntimeException e) {
++                trail.add(resolverName(resolver) + " accepted element but rejected its material");
++                throw newResolutionFailure(element, baseURI, trail, e);
++            }
+             if (cert != null) {
+                 return cert;
+             }
++            trail.add(resolverName(resolver) + " accepted element but rejected its material");
++            throw newResolutionFailure(element, baseURI, trail, null);
+         }
+ 
+-        Object[] exArgs = {
+-                element != null && element.getNodeType() == Node.ELEMENT_NODE
+-                        ? element.getTagName() : "null"
+-        };
+-
+-        throw new KeyResolverException("utils.resolver.noClass", exArgs);
++        throw newResolutionFailure(element, baseURI, trail, null);
+     }
+ 
+     /**
+@@ -120,6 +139,7 @@ public class KeyResolver {
+     public static final PublicKey getPublicKey(
+         Element element, String baseURI, StorageResolver storage, boolean secureValidation
+     ) throws KeyResolverException {
++        List<String> trail = new ArrayList<>();
+         for (KeyResolverSpi resolver : resolverList) {
+             if (resolver == null) {
+                 Object[] exArgs = {
+@@ -132,18 +152,63 @@ public class KeyResolver {
+             }
+             LOG.log(Level.DEBUG, "check resolvability by class {0}", resolver.getClass());
+ 
+-            PublicKey cert = resolver.engineLookupAndResolvePublicKey(element, baseURI, storage, secureValidation);
++            boolean canResolve;
++            try {
++                canResolve = resolver.engineCanResolve(element, baseURI, storage);
++            } catch (RuntimeException e) {
++                trail.add(resolverName(resolver) + " accepted element but rejected its material");
++                throw newResolutionFailure(element, baseURI, trail, e);
++            }
++            if (!canResolve) {
++                trail.add(resolverName(resolver) + " declined element");
++                continue;
++            }
++
++            PublicKey cert;
++            try {
++                cert = resolver.engineResolvePublicKey(element, baseURI, storage, secureValidation);
++            } catch (KeyResolverException e) {
++                trail.add(resolverName(resolver) + " accepted element but rejected its material");
++                throw newResolutionFailure(element, baseURI, trail, e);
++            } catch (RuntimeException e) {
++                trail.add(resolverName(resolver) + " accepted element but rejected its material");
++                throw newResolutionFailure(element, baseURI, trail, e);
++            }
+             if (cert != null) {
+                 return cert;
+             }
++            trail.add(resolverName(resolver) + " accepted element but rejected its material");
++            throw newResolutionFailure(element, baseURI, trail, null);
+         }
+ 
+-        Object[] exArgs = {
+-                element != null && element.getNodeType() == Node.ELEMENT_NODE
+-                        ? element.getTagName() : "null"
+-        };
++        throw newResolutionFailure(element, baseURI, trail, null);
++    }
++
++    private static String resolverName(KeyResolverSpi resolver) {
++        String simple = resolver.getClass().getSimpleName();
++        if (simple == null || simple.isEmpty()) {
++            return resolver.getClass().getName();
++        }
++        return simple;
++    }
+ 
+-        throw new KeyResolverException("utils.resolver.noClass", exArgs);
++    private static KeyResolverException newResolutionFailure(
++        Element element, String baseURI, List<String> trail, Exception cause
++    ) {
++        String tag = element != null && element.getNodeType() == Node.ELEMENT_NODE
++                ? element.getTagName() : "null";
++        StringBuilder ledger = new StringBuilder(tag);
++        ledger.append("; resolvers consulted in order: ");
++        if (trail.isEmpty()) {
++            ledger.append("none");
++        } else {
++            ledger.append(String.join(", ", trail));
++        }
++        Object[] exArgs = { ledger.toString(), baseURI };
++        if (cause != null) {
++            return new KeyResolverException(cause, "utils.resolver.noClass", exArgs);
++        }
++        return new KeyResolverException("utils.resolver.noClass", exArgs);
+     }
+ 
+     /**
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DSAKeyValueResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DSAKeyValueResolver.java
+index 354eebc7..c6f3383f 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DSAKeyValueResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DSAKeyValueResolver.java
+@@ -39,8 +39,13 @@ public class DSAKeyValueResolver extends KeyResolverSpi {
+     /** {@inheritDoc} */
+     @Override
+     protected boolean engineCanResolve(Element element, String baseURI, StorageResolver storage) {
+-        return XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)
+-            || XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_DSAKEYVALUE);
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_DSAKEYVALUE)) {
++            return true;
++        }
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE) && element != null) {
++            return XMLUtils.selectDsNode(element.getFirstChild(), Constants._TAG_DSAKEYVALUE, 0) != null;
++        }
++        return false;
+     }
+ 
+     /** {@inheritDoc} */
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/ECKeyValueResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/ECKeyValueResolver.java
+index 8aa430a8..b3b98c5f 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/ECKeyValueResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/ECKeyValueResolver.java
+@@ -39,8 +39,13 @@ public class ECKeyValueResolver extends KeyResolverSpi {
+     /** {@inheritDoc} */
+     @Override
+     protected boolean engineCanResolve(Element element, String baseURI, StorageResolver storage) {
+-        return XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)
+-            || XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_ECKEYVALUE);
++        if (XMLUtils.elementIsInSignature11Space(element, Constants._TAG_ECKEYVALUE)) {
++            return true;
++        }
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE) && element != null) {
++            return XMLUtils.selectDs11Node(element.getFirstChild(), Constants._TAG_ECKEYVALUE, 0) != null;
++        }
++        return false;
+     }
+ 
+     /** {@inheritDoc} */
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RSAKeyValueResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RSAKeyValueResolver.java
+index fcbb3388..88daa9b5 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RSAKeyValueResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RSAKeyValueResolver.java
+@@ -39,8 +39,13 @@ public class RSAKeyValueResolver extends KeyResolverSpi {
+     /** {@inheritDoc} */
+     @Override
+     protected boolean engineCanResolve(Element element, String baseURI, StorageResolver storage) {
+-        return XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)
+-            || XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_RSAKEYVALUE);
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_RSAKEYVALUE)) {
++            return true;
++        }
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE) && element != null) {
++            return XMLUtils.selectDsNode(element.getFirstChild(), Constants._TAG_RSAKEYVALUE, 0) != null;
++        }
++        return false;
+     }
+ 
+     /** {@inheritDoc} */
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509CertificateResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509CertificateResolver.java
+index b530153b..c9dbe778 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509CertificateResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509CertificateResolver.java
+@@ -45,7 +45,25 @@ public class X509CertificateResolver extends KeyResolverSpi {
+     /** {@inheritDoc} */
+     @Override
+     protected boolean engineCanResolve(Element element, String baseURI, StorageResolver storage) {
+-        return Constants.SignatureSpecNS.equals(element.getNamespaceURI());
++        if (element == null) {
++            return false;
++        }
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_X509CERTIFICATE)) {
++            return true;
++        }
++        try {
++            org.w3c.dom.Node firstChild = element.getFirstChild();
++            if (firstChild != null) {
++                Element[] els =
++                    XMLUtils.selectDsNodes(firstChild, Constants._TAG_X509CERTIFICATE);
++                if (els != null && els.length > 0) {
++                    return true;
++                }
++            }
++        } catch (RuntimeException e) {
++            return false;
++        }
++        return false;
+     }
+ 
+     /** {@inheritDoc} */

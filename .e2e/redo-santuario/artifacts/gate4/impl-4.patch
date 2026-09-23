@@ -1,0 +1,1516 @@
+diff --git a/src/main/java/org/apache/xml/security/keys/KeyInfo.java b/src/main/java/org/apache/xml/security/keys/KeyInfo.java
+index d1e90dec..9bc5ab99 100644
+--- a/src/main/java/org/apache/xml/security/keys/KeyInfo.java
++++ b/src/main/java/org/apache/xml/security/keys/KeyInfo.java
+@@ -24,8 +24,11 @@ import java.security.PrivateKey;
+ import java.security.PublicKey;
+ import java.security.cert.X509Certificate;
+ import java.util.ArrayList;
++import java.util.Collections;
++import java.util.IdentityHashMap;
+ import java.util.Iterator;
+ import java.util.List;
++import java.util.Set;
+ 
+ import javax.crypto.SecretKey;
+ 
+@@ -849,28 +852,11 @@ public class KeyInfo extends ElementProxy {
+      * @throws KeyResolverException
+      */
+     PublicKey getPublicKeyFromStaticResolvers() throws KeyResolverException {
+-        Iterator<KeyResolverSpi> it = KeyResolver.iterator();
+-        while (it.hasNext()) {
+-            KeyResolverSpi keyResolver = it.next();
+-            Node currentChild = getFirstChild();
+-            String uri = this.getBaseURI();
+-            while (currentChild != null) {
+-                if (currentChild.getNodeType() == Node.ELEMENT_NODE) {
+-                    for (StorageResolver storage : storageResolvers) {
+-                        PublicKey pk =
+-                            keyResolver.engineLookupAndResolvePublicKey(
+-                                (Element) currentChild, uri, storage, secureValidation
+-                            );
+-
+-                        if (pk != null) {
+-                            return pk;
+-                        }
+-                    }
+-                }
+-                currentChild = currentChild.getNextSibling();
+-            }
++        List<KeyResolverSpi> resolvers = new ArrayList<>();
++        for (Iterator<KeyResolverSpi> it = KeyResolver.iterator(); it.hasNext();) {
++            resolvers.add(it.next());
+         }
+-        return null;
++        return resolvePublicKeyWithChain(resolvers);
+     }
+ 
+     /**
+@@ -880,27 +866,57 @@ public class KeyInfo extends ElementProxy {
+      * @throws KeyResolverException
+      */
+     PublicKey getPublicKeyFromInternalResolvers() throws KeyResolverException {
+-        for (KeyResolverSpi keyResolver : internalKeyResolvers) {
++        return resolvePublicKeyWithChain(internalKeyResolvers);
++    }
++
++    /**
++     * Scans a resolver chain for a public key. A resolver that declines an
++     * element (not its business) never stops the scan. A resolver that accepts
++     * an element and then rejects its material stops the scan for that element:
++     * no later resolver is consulted for it. On total failure with at least one
++     * rejection, throws reporting the consulted resolvers in order, each with
++     * its own outcome; when every consulted resolver declined, returns null.
++     * A successful resolution returns the key unchanged.
++     */
++    private PublicKey resolvePublicKeyWithChain(List<KeyResolverSpi> resolvers) throws KeyResolverException {
++        List<KeyResolverException.ResolverReport> trace = new ArrayList<>();
++        Set<Node> rejectedElements = Collections.newSetFromMap(new IdentityHashMap<Node, Boolean>());
++        Exception firstRejectCause = null;
++        for (KeyResolverSpi keyResolver : resolvers) {
+             LOG.log(Level.DEBUG, "Try {0}", keyResolver.getClass().getName());
+             Node currentChild = getFirstChild();
+             String uri = this.getBaseURI();
+-            while (currentChild != null)      {
+-                if (currentChild.getNodeType() == Node.ELEMENT_NODE) {
++            while (currentChild != null) {
++                if (currentChild.getNodeType() == Node.ELEMENT_NODE
++                    && !rejectedElements.contains(currentChild)) {
+                     for (StorageResolver storage : storageResolvers) {
+-                        PublicKey pk =
+-                            keyResolver.engineLookupAndResolvePublicKey(
+-                                (Element) currentChild, uri, storage, secureValidation
+-                            );
+-
++                        int before = trace.size();
++                        PublicKey pk;
++                        try {
++                            pk = keyResolver.engineLookupAndResolvePublicKey(
++                                (Element) currentChild, uri, storage, secureValidation, trace);
++                        } catch (KeyResolverException e) {
++                            rejectedElements.add(currentChild);
++                            if (firstRejectCause == null) {
++                                firstRejectCause = e;
++                            }
++                            break;
++                        }
+                         if (pk != null) {
+                             return pk;
+                         }
++                        if (KeyResolver.stoppedByRejection(trace, before)) {
++                            rejectedElements.add(currentChild);
++                            break;
++                        }
+                     }
+                 }
+                 currentChild = currentChild.getNextSibling();
+             }
+         }
+-
++        if (!rejectedElements.isEmpty()) {
++            throw KeyResolver.newKeyResolutionFailure(getElement(), trace, firstRejectCause);
++        }
+         return null;
+     }
+ 
+@@ -947,37 +963,54 @@ public class KeyInfo extends ElementProxy {
+         LOG.log(Level.DEBUG,
+             "Start getX509CertificateFromStaticResolvers() with {0} resolvers", KeyResolver.length()
+         );
+-        String uri = this.getBaseURI();
+-        Iterator<KeyResolverSpi> it = KeyResolver.iterator();
+-        while (it.hasNext()) {
+-            KeyResolverSpi keyResolver = it.next();
+-            X509Certificate cert = applyCurrentResolver(uri, keyResolver);
+-            if (cert != null) {
+-                return cert;
+-            }
++        List<KeyResolverSpi> resolvers = new ArrayList<>();
++        for (Iterator<KeyResolverSpi> it = KeyResolver.iterator(); it.hasNext();) {
++            resolvers.add(it.next());
+         }
+-        return null;
++        return resolveX509CertificateWithChain(resolvers);
+     }
+ 
+     private X509Certificate applyCurrentResolver(
+         String uri, KeyResolverSpi keyResolver
+     ) throws KeyResolverException {
++        List<KeyResolverSpi> single = new ArrayList<>(1);
++        single.add(keyResolver);
++        String savedUri = uri;
++        // Resolve using the single-resolver chain against the current base URI.
++        List<KeyResolverException.ResolverReport> trace = new ArrayList<>();
++        Set<Node> rejectedElements = Collections.newSetFromMap(new IdentityHashMap<Node, Boolean>());
++        Exception firstRejectCause = null;
+         Node currentChild = getFirstChild();
+-        while (currentChild != null)      {
+-            if (currentChild.getNodeType() == Node.ELEMENT_NODE) {
++        while (currentChild != null) {
++            if (currentChild.getNodeType() == Node.ELEMENT_NODE
++                && !rejectedElements.contains(currentChild)) {
+                 for (StorageResolver storage : storageResolvers) {
+-                    X509Certificate cert =
+-                        keyResolver.engineLookupResolveX509Certificate(
+-                            (Element) currentChild, uri, storage, secureValidation
+-                        );
+-
++                    int before = trace.size();
++                    X509Certificate cert;
++                    try {
++                        cert = keyResolver.engineLookupResolveX509Certificate(
++                            (Element) currentChild, savedUri, storage, secureValidation, trace);
++                    } catch (KeyResolverException e) {
++                        rejectedElements.add(currentChild);
++                        if (firstRejectCause == null) {
++                            firstRejectCause = e;
++                        }
++                        break;
++                    }
+                     if (cert != null) {
+                         return cert;
+                     }
++                    if (KeyResolver.stoppedByRejection(trace, before)) {
++                        rejectedElements.add(currentChild);
++                        break;
++                    }
+                 }
+             }
+             currentChild = currentChild.getNextSibling();
+         }
++        if (!rejectedElements.isEmpty()) {
++            throw KeyResolver.newKeyResolutionFailure(getElement(), trace, firstRejectCause);
++        }
+         return null;
+     }
+ 
+@@ -993,15 +1026,56 @@ public class KeyInfo extends ElementProxy {
+             "Start getX509CertificateFromInternalResolvers() with {0} resolvers",
+             + this.lengthInternalKeyResolver()
+         );
++        return resolveX509CertificateWithChain(internalKeyResolvers);
++    }
++
++    /**
++     * Scans a resolver chain for a certificate. Declining resolvers never stop
++     * the scan; a resolver that accepts an element and rejects its material
++     * stops the scan for that element. On total failure with at least one
++     * rejection, throws reporting the consulted resolvers in order, each with
++     * its own outcome; when every consulted resolver declined, returns null.
++     */
++    private X509Certificate resolveX509CertificateWithChain(List<KeyResolverSpi> resolvers)
++        throws KeyResolverException {
++        List<KeyResolverException.ResolverReport> trace = new ArrayList<>();
++        Set<Node> rejectedElements = Collections.newSetFromMap(new IdentityHashMap<Node, Boolean>());
++        Exception firstRejectCause = null;
+         String uri = this.getBaseURI();
+-        for (KeyResolverSpi keyResolver : internalKeyResolvers) {
++        for (KeyResolverSpi keyResolver : resolvers) {
+             LOG.log(Level.DEBUG, "Try {0}", keyResolver.getClass().getName());
+-            X509Certificate cert = applyCurrentResolver(uri, keyResolver);
+-            if (cert != null) {
+-                return cert;
++            Node currentChild = getFirstChild();
++            while (currentChild != null) {
++                if (currentChild.getNodeType() == Node.ELEMENT_NODE
++                    && !rejectedElements.contains(currentChild)) {
++                    for (StorageResolver storage : storageResolvers) {
++                        int before = trace.size();
++                        X509Certificate cert;
++                        try {
++                            cert = keyResolver.engineLookupResolveX509Certificate(
++                                (Element) currentChild, uri, storage, secureValidation, trace);
++                        } catch (KeyResolverException e) {
++                            rejectedElements.add(currentChild);
++                            if (firstRejectCause == null) {
++                                firstRejectCause = e;
++                            }
++                            break;
++                        }
++                        if (cert != null) {
++                            return cert;
++                        }
++                        if (KeyResolver.stoppedByRejection(trace, before)) {
++                            rejectedElements.add(currentChild);
++                            break;
++                        }
++                    }
++                }
++                currentChild = currentChild.getNextSibling();
+             }
+         }
+-
++        if (!rejectedElements.isEmpty()) {
++            throw KeyResolver.newKeyResolutionFailure(getElement(), trace, firstRejectCause);
++        }
+         return null;
+     }
+ 
+@@ -1039,29 +1113,11 @@ public class KeyInfo extends ElementProxy {
+      * @throws KeyResolverException
+      */
+     SecretKey getSecretKeyFromStaticResolvers() throws KeyResolverException {
+-        Iterator<KeyResolverSpi> it = KeyResolver.iterator();
+-        while (it.hasNext()) {
+-            KeyResolverSpi keyResolver = it.next();
+-
+-            Node currentChild = getFirstChild();
+-            String uri = this.getBaseURI();
+-            while (currentChild != null)      {
+-                if (currentChild.getNodeType() == Node.ELEMENT_NODE) {
+-                    for (StorageResolver storage : storageResolvers) {
+-                        SecretKey sk =
+-                            keyResolver.engineLookupAndResolveSecretKey(
+-                                (Element) currentChild, uri, storage, secureValidation
+-                            );
+-
+-                        if (sk != null) {
+-                            return sk;
+-                        }
+-                    }
+-                }
+-                currentChild = currentChild.getNextSibling();
+-            }
++        List<KeyResolverSpi> resolvers = new ArrayList<>();
++        for (Iterator<KeyResolverSpi> it = KeyResolver.iterator(); it.hasNext();) {
++            resolvers.add(it.next());
+         }
+-        return null;
++        return resolveSecretKeyWithChain(resolvers);
+     }
+ 
+     /**
+@@ -1072,27 +1128,55 @@ public class KeyInfo extends ElementProxy {
+      */
+ 
+     SecretKey getSecretKeyFromInternalResolvers() throws KeyResolverException {
+-        for (KeyResolverSpi keyResolver : internalKeyResolvers) {
++        return resolveSecretKeyWithChain(internalKeyResolvers);
++    }
++
++    /**
++     * Scans a resolver chain for a secret key. Declining resolvers never stop
++     * the scan; a resolver that accepts an element and rejects its material
++     * stops the scan for that element. On total failure with at least one
++     * rejection, throws reporting the consulted resolvers in order, each with
++     * its own outcome; when every consulted resolver declined, returns null.
++     */
++    private SecretKey resolveSecretKeyWithChain(List<KeyResolverSpi> resolvers) throws KeyResolverException {
++        List<KeyResolverException.ResolverReport> trace = new ArrayList<>();
++        Set<Node> rejectedElements = Collections.newSetFromMap(new IdentityHashMap<Node, Boolean>());
++        Exception firstRejectCause = null;
++        for (KeyResolverSpi keyResolver : resolvers) {
+             LOG.log(Level.DEBUG, "Try {0}", keyResolver.getClass().getName());
+             Node currentChild = getFirstChild();
+             String uri = this.getBaseURI();
+-            while (currentChild != null)      {
+-                if (currentChild.getNodeType() == Node.ELEMENT_NODE) {
++            while (currentChild != null) {
++                if (currentChild.getNodeType() == Node.ELEMENT_NODE
++                    && !rejectedElements.contains(currentChild)) {
+                     for (StorageResolver storage : storageResolvers) {
+-                        SecretKey sk =
+-                            keyResolver.engineLookupAndResolveSecretKey(
+-                                (Element) currentChild, uri, storage, secureValidation
+-                            );
+-
++                        int before = trace.size();
++                        SecretKey sk;
++                        try {
++                            sk = keyResolver.engineLookupAndResolveSecretKey(
++                                (Element) currentChild, uri, storage, secureValidation, trace);
++                        } catch (KeyResolverException e) {
++                            rejectedElements.add(currentChild);
++                            if (firstRejectCause == null) {
++                                firstRejectCause = e;
++                            }
++                            break;
++                        }
+                         if (sk != null) {
+                             return sk;
+                         }
++                        if (KeyResolver.stoppedByRejection(trace, before)) {
++                            rejectedElements.add(currentChild);
++                            break;
++                        }
+                     }
+                 }
+                 currentChild = currentChild.getNextSibling();
+             }
+         }
+-
++        if (!rejectedElements.isEmpty()) {
++            throw KeyResolver.newKeyResolutionFailure(getElement(), trace, firstRejectCause);
++        }
+         return null;
+     }
+ 
+@@ -1127,29 +1211,11 @@ public class KeyInfo extends ElementProxy {
+      * @throws KeyResolverException
+      */
+     PrivateKey getPrivateKeyFromStaticResolvers() throws KeyResolverException {
+-        Iterator<KeyResolverSpi> it = KeyResolver.iterator();
+-        while (it.hasNext()) {
+-            KeyResolverSpi keyResolver = it.next();
+-
+-            Node currentChild = getFirstChild();
+-            String uri = this.getBaseURI();
+-            while (currentChild != null)      {
+-                if (currentChild.getNodeType() == Node.ELEMENT_NODE) {
+-                    // not using StorageResolvers at the moment
+-                    // since they cannot return private keys
+-                    PrivateKey pk =
+-                        keyResolver.engineLookupAndResolvePrivateKey(
+-                            (Element) currentChild, uri, null, secureValidation
+-                        );
+-
+-                    if (pk != null) {
+-                        return pk;
+-                    }
+-                }
+-                currentChild = currentChild.getNextSibling();
+-            }
++        List<KeyResolverSpi> resolvers = new ArrayList<>();
++        for (Iterator<KeyResolverSpi> it = KeyResolver.iterator(); it.hasNext();) {
++            resolvers.add(it.next());
+         }
+-        return null;
++        return resolvePrivateKeyWithChain(resolvers);
+     }
+ 
+     /**
+@@ -1159,27 +1225,55 @@ public class KeyInfo extends ElementProxy {
+      * @throws KeyResolverException
+      */
+     PrivateKey getPrivateKeyFromInternalResolvers() throws KeyResolverException {
+-        for (KeyResolverSpi keyResolver : internalKeyResolvers) {
++        return resolvePrivateKeyWithChain(internalKeyResolvers);
++    }
++
++    /**
++     * Scans a resolver chain for a private key. Declining resolvers never stop
++     * the scan; a resolver that accepts an element and rejects its material
++     * stops the scan for that element. On total failure with at least one
++     * rejection, throws reporting the consulted resolvers in order, each with
++     * its own outcome; when every consulted resolver declined, returns null.
++     */
++    private PrivateKey resolvePrivateKeyWithChain(List<KeyResolverSpi> resolvers) throws KeyResolverException {
++        List<KeyResolverException.ResolverReport> trace = new ArrayList<>();
++        Set<Node> rejectedElements = Collections.newSetFromMap(new IdentityHashMap<Node, Boolean>());
++        Exception firstRejectCause = null;
++        for (KeyResolverSpi keyResolver : resolvers) {
+             LOG.log(Level.DEBUG, "Try {0}", keyResolver.getClass().getName());
+             Node currentChild = getFirstChild();
+             String uri = this.getBaseURI();
+             while (currentChild != null) {
+-                if (currentChild.getNodeType() == Node.ELEMENT_NODE) {
++                if (currentChild.getNodeType() == Node.ELEMENT_NODE
++                    && !rejectedElements.contains(currentChild)) {
+                     // not using StorageResolvers at the moment
+                     // since they cannot return private keys
+-                    PrivateKey pk =
+-                        keyResolver.engineLookupAndResolvePrivateKey(
+-                            (Element) currentChild, uri, null, secureValidation
+-                        );
+-
++                    int before = trace.size();
++                    PrivateKey pk;
++                    try {
++                        pk = keyResolver.engineLookupAndResolvePrivateKey(
++                            (Element) currentChild, uri, null, secureValidation, trace);
++                    } catch (KeyResolverException e) {
++                        rejectedElements.add(currentChild);
++                        if (firstRejectCause == null) {
++                            firstRejectCause = e;
++                        }
++                        currentChild = currentChild.getNextSibling();
++                        continue;
++                    }
+                     if (pk != null) {
+                         return pk;
+                     }
++                    if (KeyResolver.stoppedByRejection(trace, before)) {
++                        rejectedElements.add(currentChild);
++                    }
+                 }
+                 currentChild = currentChild.getNextSibling();
+             }
+         }
+-
++        if (!rejectedElements.isEmpty()) {
++            throw KeyResolver.newKeyResolutionFailure(getElement(), trace, firstRejectCause);
++        }
+         return null;
+     }
+ 
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolver.java
+index c0091bcc..ffbda957 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolver.java
+@@ -80,6 +80,7 @@ public class KeyResolver {
+     public static final X509Certificate getX509Certificate(
+         Element element, String baseURI, StorageResolver storage, boolean secureValidation
+     ) throws KeyResolverException {
++        List<KeyResolverException.ResolverReport> trace = new ArrayList<>();
+         for (KeyResolverSpi resolver : resolverList) {
+             if (resolver == null) {
+                 Object[] exArgs = {
+@@ -92,18 +93,25 @@ public class KeyResolver {
+             }
+             LOG.log(Level.DEBUG, "check resolvability by class {0}", resolver.getClass());
+ 
+-            X509Certificate cert = resolver.engineLookupResolveX509Certificate(element, baseURI, storage, secureValidation);
++            int traceSizeBefore = trace.size();
++            X509Certificate cert;
++            try {
++                cert = resolver.engineLookupResolveX509Certificate(
++                    element, baseURI, storage, secureValidation, trace);
++            } catch (KeyResolverException e) {
++                // The resolver accepted the element and rejected its material:
++                // stop the scan and report the consulted resolvers in order.
++                throw newKeyResolutionFailure(element, trace, e);
++            }
+             if (cert != null) {
+                 return cert;
+             }
++            if (stoppedByRejection(trace, traceSizeBefore)) {
++                throw newKeyResolutionFailure(element, trace, null);
++            }
+         }
+ 
+-        Object[] exArgs = {
+-                element != null && element.getNodeType() == Node.ELEMENT_NODE
+-                        ? element.getTagName() : "null"
+-        };
+-
+-        throw new KeyResolverException("utils.resolver.noClass", exArgs);
++        throw newKeyResolutionFailure(element, trace, null);
+     }
+ 
+     /**
+@@ -120,6 +128,7 @@ public class KeyResolver {
+     public static final PublicKey getPublicKey(
+         Element element, String baseURI, StorageResolver storage, boolean secureValidation
+     ) throws KeyResolverException {
++        List<KeyResolverException.ResolverReport> trace = new ArrayList<>();
+         for (KeyResolverSpi resolver : resolverList) {
+             if (resolver == null) {
+                 Object[] exArgs = {
+@@ -132,18 +141,72 @@ public class KeyResolver {
+             }
+             LOG.log(Level.DEBUG, "check resolvability by class {0}", resolver.getClass());
+ 
+-            PublicKey cert = resolver.engineLookupAndResolvePublicKey(element, baseURI, storage, secureValidation);
++            int traceSizeBefore = trace.size();
++            PublicKey cert;
++            try {
++                cert = resolver.engineLookupAndResolvePublicKey(
++                    element, baseURI, storage, secureValidation, trace);
++            } catch (KeyResolverException e) {
++                // The resolver accepted the element and rejected its material:
++                // stop the scan and report the consulted resolvers in order.
++                throw newKeyResolutionFailure(element, trace, e);
++            }
+             if (cert != null) {
+                 return cert;
+             }
++            if (stoppedByRejection(trace, traceSizeBefore)) {
++                throw newKeyResolutionFailure(element, trace, null);
++            }
+         }
+ 
+-        Object[] exArgs = {
+-                element != null && element.getNodeType() == Node.ELEMENT_NODE
+-                        ? element.getTagName() : "null"
+-        };
++        throw newKeyResolutionFailure(element, trace, null);
++    }
++
++    /**
++     * Whether the scan must stop because a resolver accepted the element and
++     * then rejected its material. A resolver that declines the element (not
++     * its business) never stops the scan.
++     */
++    public static boolean stoppedByRejection(
++        List<KeyResolverException.ResolverReport> trace, int traceSizeBefore
++    ) {
++        for (int i = traceSizeBefore; i < trace.size(); i++) {
++            if (trace.get(i).getOutcome() == KeyResolverException.Outcome.REJECTED) {
++                return true;
++            }
++        }
++        return false;
++    }
+ 
+-        throw new KeyResolverException("utils.resolver.noClass", exArgs);
++    /**
++     * Builds the failure for a scan that ended in total failure, reporting the
++     * consulted resolvers in the order they ran, each with its own outcome.
++     */
++    public static KeyResolverException newKeyResolutionFailure(
++        Element element, List<KeyResolverException.ResolverReport> trace, Exception cause
++    ) {
++        String tagName =
++            element != null && element.getNodeType() == Node.ELEMENT_NODE
++                ? element.getTagName() : "null";
++        StringBuilder sb = new StringBuilder();
++        for (int i = 0; i < trace.size(); i++) {
++            if (i > 0) {
++                sb.append(", ");
++            }
++            sb.append(trace.get(i).toString());
++        }
++        Object[] exArgs = { tagName, sb.toString() };
++        if (cause instanceof KeyResolverException
++            && ((KeyResolverException) cause).getResolverReports().isEmpty()) {
++            // Preserve the rejecting resolver's own exception text in the detail
++            // while reporting the full ordered scan.
++            return new KeyResolverException(
++                (Exception) cause, "KeyResolver.noResolverForElement", exArgs, trace);
++        }
++        if (cause != null) {
++            return new KeyResolverException(cause, "KeyResolver.noResolverForElement", exArgs, trace);
++        }
++        return new KeyResolverException("KeyResolver.noResolverForElement", exArgs, trace);
+     }
+ 
+     /**
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolverException.java b/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolverException.java
+index 7ed3ab4a..858b3901 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolverException.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolverException.java
+@@ -18,6 +18,10 @@
+  */
+ package org.apache.xml.security.keys.keyresolver;
+ 
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.List;
++
+ import org.apache.xml.security.exceptions.XMLSecurityException;
+ 
+ public class KeyResolverException extends XMLSecurityException {
+@@ -27,16 +31,83 @@ public class KeyResolverException extends XMLSecurityException {
+      */
+     private static final long serialVersionUID = 1L;
+ 
++    /**
++     * Per-resolver outcome for a key-resolution scan over the registered
++     * resolver chain.
++     */
++    public enum Outcome {
++        /** The resolver declined the element: it was not its business. */
++        DECLINED,
++        /** The resolver accepted the element and then rejected its material. */
++        REJECTED
++    }
++
++    /**
++     * Report for a single consulted resolver, in the order it ran.
++     */
++    public static final class ResolverReport {
++        private final String resolverClassName;
++        private final Outcome outcome;
++        private final String detail;
++        private final Exception cause;
++
++        public ResolverReport(String resolverClassName, Outcome outcome, String detail, Exception cause) {
++            this.resolverClassName = resolverClassName;
++            this.outcome = outcome;
++            this.detail = detail;
++            this.cause = cause;
++        }
++
++        public String getResolverClassName() {
++            return resolverClassName;
++        }
++
++        public Outcome getOutcome() {
++            return outcome;
++        }
++
++        public String getDetail() {
++            return detail;
++        }
++
++        public Exception getCause() {
++            return cause;
++        }
++
++        public boolean isDeclined() {
++            return outcome == Outcome.DECLINED;
++        }
++
++        public boolean isRejected() {
++            return outcome == Outcome.REJECTED;
++        }
++
++        @Override
++        public String toString() {
++            StringBuilder sb = new StringBuilder();
++            sb.append(resolverClassName).append(": ").append(outcome);
++            if (detail != null && !detail.isEmpty()) {
++                sb.append(" (").append(detail).append(')');
++            }
++            return sb.toString();
++        }
++    }
++
++    /** Ordered per-resolver outcomes for a total resolution failure. May be null. */
++    private final List<ResolverReport> resolverReports;
++
+     /**
+      * Constructor KeyResolverException
+      *
+      */
+     public KeyResolverException() {
+         super();
++        this.resolverReports = null;
+     }
+ 
+     public KeyResolverException(Exception ex) {
+         super(ex);
++        this.resolverReports = null;
+     }
+ 
+     /**
+@@ -46,6 +117,7 @@ public class KeyResolverException extends XMLSecurityException {
+      */
+     public KeyResolverException(String msgID) {
+         super(msgID);
++        this.resolverReports = null;
+     }
+ 
+     /**
+@@ -56,6 +128,7 @@ public class KeyResolverException extends XMLSecurityException {
+      */
+     public KeyResolverException(String msgID, Object[] exArgs) {
+         super(msgID, exArgs);
++        this.resolverReports = null;
+     }
+ 
+     /**
+@@ -66,6 +139,7 @@ public class KeyResolverException extends XMLSecurityException {
+      */
+     public KeyResolverException(Exception originalException, String msgID) {
+         super(originalException, msgID);
++        this.resolverReports = null;
+     }
+ 
+     @Deprecated
+@@ -82,10 +156,79 @@ public class KeyResolverException extends XMLSecurityException {
+      */
+     public KeyResolverException(Exception originalException, String msgID, Object[] exArgs) {
+         super(originalException, msgID, exArgs);
++        this.resolverReports = null;
+     }
+ 
+     @Deprecated
+     public KeyResolverException(String msgID, Object[] exArgs, Exception originalException) {
+         this(originalException, msgID, exArgs);
+     }
++
++    /**
++     * Constructor carrying the ordered per-resolver outcomes for a total
++     * resolution failure.
++     *
++     * @param msgID
++     * @param exArgs
++     * @param resolverReports consulted resolvers in the order they ran
++     */
++    public KeyResolverException(String msgID, Object[] exArgs, List<ResolverReport> resolverReports) {
++        super(msgID, exArgs);
++        this.resolverReports = copyReports(resolverReports);
++    }
++
++    /**
++     * Constructor carrying the ordered per-resolver outcomes for a total
++     * resolution failure, chained to the rejecting resolver's exception.
++     *
++     * @param originalException the rejecting resolver's exception, may be null
++     * @param msgID
++     * @param exArgs
++     * @param resolverReports consulted resolvers in the order they ran
++     */
++    public KeyResolverException(
++        Exception originalException, String msgID, Object[] exArgs, List<ResolverReport> resolverReports
++    ) {
++        super(originalException, msgID, exArgs);
++        this.resolverReports = copyReports(resolverReports);
++    }
++
++    private static List<ResolverReport> copyReports(List<ResolverReport> reports) {
++        if (reports == null) {
++            return null;
++        }
++        return Collections.unmodifiableList(new ArrayList<>(reports));
++    }
++
++    /**
++     * @return the consulted resolvers in the order they ran, each with its own
++     * outcome; empty when this exception carries no scan trace.
++     */
++    public List<ResolverReport> getResolverReports() {
++        if (resolverReports == null) {
++            return Collections.emptyList();
++        }
++        return resolverReports;
++    }
++
++    /**
++     * Alias for {@link #getResolverReports()}.
++     *
++     * @return the consulted resolvers in the order they ran
++     */
++    public List<ResolverReport> getResolverOutcomes() {
++        return getResolverReports();
++    }
++
++    /**
++     * @return the class names of the consulted resolvers, in the order they ran.
++     */
++    public List<String> getConsultedResolvers() {
++        List<ResolverReport> reports = getResolverReports();
++        List<String> names = new ArrayList<>(reports.size());
++        for (ResolverReport report : reports) {
++            names.add(report.getResolverClassName());
++        }
++        return Collections.unmodifiableList(names);
++    }
+ }
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolverSpi.java b/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolverSpi.java
+index 656f5257..932708a6 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolverSpi.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/KeyResolverSpi.java
+@@ -24,6 +24,7 @@ import java.io.InputStream;
+ import java.security.PrivateKey;
+ import java.security.PublicKey;
+ import java.security.cert.X509Certificate;
++import java.util.List;
+ 
+ import javax.crypto.SecretKey;
+ 
+@@ -197,6 +198,273 @@ public abstract class KeyResolverSpi {
+         return engineResolvePrivateKey(element, baseURI, storage, secureValidation);
+     }
+ 
++    /**
++     * Public wrapper around {@link #engineCanResolve(Element, String, StorageResolver)}
++     * so callers outside this package can distinguish a resolver that declines
++     * an element from one that accepts it.
++     *
++     * @param element
++     * @param baseURI
++     * @param storage
++     * @return whether this resolver accepts the element.
++     */
++    public boolean canResolve(Element element, String baseURI, StorageResolver storage) {
++        return engineCanResolve(element, baseURI, storage);
++    }
++
++    /**
++     * Whether this resolver can resolve public keys at all. Resolvers that
++     * only serve other key types decline public-key lookups instead of
++     * accepting the element and rejecting it.
++     *
++     * @return true by default; resolvers without public-key support return false.
++     */
++    protected boolean engineSupportsPublicKey() {
++        return true;
++    }
++
++    /**
++     * Whether this resolver can resolve X.509 certificates at all.
++     *
++     * @return true by default; resolvers without certificate support return false.
++     */
++    protected boolean engineSupportsX509Certificate() {
++        return true;
++    }
++
++    /**
++     * Whether this resolver can resolve secret keys at all.
++     *
++     * @return true by default; resolvers without secret-key support return false.
++     */
++    protected boolean engineSupportsSecretKey() {
++        return true;
++    }
++
++    /**
++     * Whether this resolver can resolve private keys at all.
++     *
++     * @return true by default; resolvers without private-key support return false.
++     */
++    protected boolean engineSupportsPrivateKey() {
++        return true;
++    }
++
++    /**
++     * Traced variant of {@link #engineLookupAndResolvePublicKey(Element, String, StorageResolver, boolean)}.
++     * A resolver that declines the element (it is not its business) appends a
++     * {@code DECLINED} report and returns {@code null} so the scan continues.
++     * A resolver that accepts the element but rejects its material appends a
++     * {@code REJECTED} report and either returns {@code null} or throws, in
++     * both cases signalling the scan to stop for that element. A successful
++     * resolution returns the key without appending a report.
++     *
++     * @param trace ordered reports of consulted resolvers, may be null
++     * @return the resolved key, or null when declined or rejected without exception
++     * @throws KeyResolverException when the accepting resolver rejects with an exception
++     */
++    public final PublicKey engineLookupAndResolvePublicKey(
++        Element element, String baseURI, StorageResolver storage, boolean secureValidation,
++        List<KeyResolverException.ResolverReport> trace
++    ) throws KeyResolverException {
++        String resolverName = this.getClass().getName();
++        boolean accepted;
++        try {
++            accepted = engineCanResolve(element, baseURI, storage);
++        } catch (RuntimeException e) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw in canResolve: " + e, e);
++            throw new KeyResolverException(e);
++        }
++        if (!accepted) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.DECLINED,
++                "declined: element not accepted - not applicable to this resolver", null);
++            return null;
++        }
++        if (!engineSupportsPublicKey()) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.DECLINED,
++                "declined: public-key resolution not supported by this resolver - not applicable to this lookup", null);
++            return null;
++        }
++        try {
++            PublicKey key = engineResolvePublicKey(element, baseURI, storage, secureValidation);
++            if (key != null) {
++                return key;
++            }
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - returned null", null);
++            return null;
++        } catch (KeyResolverException e) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw: " + e, e);
++            throw e;
++        } catch (RuntimeException e) {
++            KeyResolverException kre = new KeyResolverException(e);
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw: " + e, kre);
++            throw kre;
++        }
++    }
++
++    /**
++     * Traced variant of {@link #engineLookupResolveX509Certificate(Element, String, StorageResolver, boolean)}.
++     *
++     * @param trace ordered reports of consulted resolvers, may be null
++     * @return the resolved certificate, or null when declined or rejected without exception
++     * @throws KeyResolverException when the accepting resolver rejects with an exception
++     */
++    public final X509Certificate engineLookupResolveX509Certificate(
++        Element element, String baseURI, StorageResolver storage, boolean secureValidation,
++        List<KeyResolverException.ResolverReport> trace
++    ) throws KeyResolverException {
++        String resolverName = this.getClass().getName();
++        boolean accepted;
++        try {
++            accepted = engineCanResolve(element, baseURI, storage);
++        } catch (RuntimeException e) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw in canResolve: " + e, e);
++            throw new KeyResolverException(e);
++        }
++        if (!accepted) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.DECLINED,
++                "declined: element not accepted - not applicable to this resolver", null);
++            return null;
++        }
++        if (!engineSupportsX509Certificate()) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.DECLINED,
++                "declined: certificate resolution not supported by this resolver - not applicable to this lookup", null);
++            return null;
++        }
++        try {
++            X509Certificate cert = engineResolveX509Certificate(element, baseURI, storage, secureValidation);
++            if (cert != null) {
++                return cert;
++            }
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - returned null", null);
++            return null;
++        } catch (KeyResolverException e) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw: " + e, e);
++            throw e;
++        } catch (RuntimeException e) {
++            KeyResolverException kre = new KeyResolverException(e);
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw: " + e, kre);
++            throw kre;
++        }
++    }
++
++    /**
++     * Traced variant of {@link #engineLookupAndResolveSecretKey(Element, String, StorageResolver, boolean)}.
++     *
++     * @param trace ordered reports of consulted resolvers, may be null
++     * @return the resolved key, or null when declined or rejected without exception
++     * @throws KeyResolverException when the accepting resolver rejects with an exception
++     */
++    public final SecretKey engineLookupAndResolveSecretKey(
++        Element element, String baseURI, StorageResolver storage, boolean secureValidation,
++        List<KeyResolverException.ResolverReport> trace
++    ) throws KeyResolverException {
++        String resolverName = this.getClass().getName();
++        boolean accepted;
++        try {
++            accepted = engineCanResolve(element, baseURI, storage);
++        } catch (RuntimeException e) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw in canResolve: " + e, e);
++            throw new KeyResolverException(e);
++        }
++        if (!accepted) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.DECLINED,
++                "declined: element not accepted - not applicable to this resolver", null);
++            return null;
++        }
++        if (!engineSupportsSecretKey()) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.DECLINED,
++                "declined: secret-key resolution not supported by this resolver - not applicable to this lookup", null);
++            return null;
++        }
++        try {
++            SecretKey key = engineResolveSecretKey(element, baseURI, storage, secureValidation);
++            if (key != null) {
++                return key;
++            }
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - returned null", null);
++            return null;
++        } catch (KeyResolverException e) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw: " + e, e);
++            throw e;
++        } catch (RuntimeException e) {
++            KeyResolverException kre = new KeyResolverException(e);
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw: " + e, kre);
++            throw kre;
++        }
++    }
++
++    /**
++     * Traced variant of {@link #engineLookupAndResolvePrivateKey(Element, String, StorageResolver, boolean)}.
++     *
++     * @param trace ordered reports of consulted resolvers, may be null
++     * @return the resolved key, or null when declined or rejected without exception
++     * @throws KeyResolverException when the accepting resolver rejects with an exception
++     */
++    public final PrivateKey engineLookupAndResolvePrivateKey(
++        Element element, String baseURI, StorageResolver storage, boolean secureValidation,
++        List<KeyResolverException.ResolverReport> trace
++    ) throws KeyResolverException {
++        String resolverName = this.getClass().getName();
++        boolean accepted;
++        try {
++            accepted = engineCanResolve(element, baseURI, storage);
++        } catch (RuntimeException e) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw in canResolve: " + e, e);
++            throw new KeyResolverException(e);
++        }
++        if (!accepted) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.DECLINED,
++                "declined: element not accepted - not applicable to this resolver", null);
++            return null;
++        }
++        if (!engineSupportsPrivateKey()) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.DECLINED,
++                "declined: private-key resolution not supported by this resolver - not applicable to this lookup", null);
++            return null;
++        }
++        try {
++            PrivateKey key = engineResolvePrivateKey(element, baseURI, storage, secureValidation);
++            if (key != null) {
++                return key;
++            }
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - returned null", null);
++            return null;
++        } catch (KeyResolverException e) {
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw: " + e, e);
++            throw e;
++        } catch (RuntimeException e) {
++            KeyResolverException kre = new KeyResolverException(e);
++            addReport(trace, resolverName, KeyResolverException.Outcome.REJECTED,
++                "rejected/failed: accepted element but rejected material - threw: " + e, kre);
++            throw kre;
++        }
++    }
++
++    private static void addReport(
++        List<KeyResolverException.ResolverReport> trace, String resolverName,
++        KeyResolverException.Outcome outcome, String detail, Exception cause
++    ) {
++        if (trace != null) {
++            trace.add(new KeyResolverException.ResolverReport(resolverName, outcome, detail, cause));
++        }
++    }
++
+     /**
+      * Parses a byte array and returns the parsed Element.
+      *
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DEREncodedKeyValueResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DEREncodedKeyValueResolver.java
+index 4ee2b508..7b5913f0 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DEREncodedKeyValueResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DEREncodedKeyValueResolver.java
+@@ -71,6 +71,22 @@ public class DEREncodedKeyValueResolver extends KeyResolverSpi {
+         return null;
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsX509Certificate() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected SecretKey engineResolveSecretKey(Element element, String baseURI, StorageResolver storage, boolean secureValidation)
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DSAKeyValueResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DSAKeyValueResolver.java
+index 354eebc7..139b580b 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DSAKeyValueResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/DSAKeyValueResolver.java
+@@ -39,8 +39,17 @@ public class DSAKeyValueResolver extends KeyResolverSpi {
+     /** {@inheritDoc} */
+     @Override
+     protected boolean engineCanResolve(Element element, String baseURI, StorageResolver storage) {
+-        return XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)
+-            || XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_DSAKEYVALUE);
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_DSAKEYVALUE)) {
++            return true;
++        }
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)) {
++            // Only claim KeyValue elements that actually carry DSA material, so an
++            // RSA/EC KeyValue declines here instead of accepting and rejecting.
++            Element dsaKeyElement =
++                XMLUtils.selectDsNode(element.getFirstChild(), Constants._TAG_DSAKEYVALUE, 0);
++            return dsaKeyElement != null;
++        }
++        return false;
+     }
+ 
+     /** {@inheritDoc} */
+@@ -89,6 +98,22 @@ public class DSAKeyValueResolver extends KeyResolverSpi {
+         return null;
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsX509Certificate() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected javax.crypto.SecretKey engineResolveSecretKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/ECKeyValueResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/ECKeyValueResolver.java
+index 8aa430a8..33ae7ef2 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/ECKeyValueResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/ECKeyValueResolver.java
+@@ -39,8 +39,18 @@ public class ECKeyValueResolver extends KeyResolverSpi {
+     /** {@inheritDoc} */
+     @Override
+     protected boolean engineCanResolve(Element element, String baseURI, StorageResolver storage) {
+-        return XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)
+-            || XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_ECKEYVALUE);
++        if (XMLUtils.elementIsInSignature11Space(element, Constants._TAG_ECKEYVALUE)
++            || XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_ECKEYVALUE)) {
++            return true;
++        }
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)) {
++            // Only claim KeyValue elements that actually carry EC material, so an
++            // RSA/DSA KeyValue declines here instead of accepting and rejecting.
++            Element ecKeyElement =
++                XMLUtils.selectDs11Node(element.getFirstChild(), Constants._TAG_ECKEYVALUE, 0);
++            return ecKeyElement != null;
++        }
++        return false;
+     }
+ 
+     /** {@inheritDoc} */
+@@ -87,6 +97,22 @@ public class ECKeyValueResolver extends KeyResolverSpi {
+         return null;
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsX509Certificate() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected javax.crypto.SecretKey engineResolveSecretKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/EncryptedKeyResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/EncryptedKeyResolver.java
+index 4e35e42f..8e8cf44a 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/EncryptedKeyResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/EncryptedKeyResolver.java
+@@ -91,6 +91,22 @@ public class EncryptedKeyResolver extends KeyResolverSpi {
+     }
+ 
+ 
++    /** This resolver only unwraps secret keys. */
++    @Override
++    protected boolean engineSupportsPublicKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsX509Certificate() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected PublicKey engineResolvePublicKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/PrivateKeyResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/PrivateKeyResolver.java
+index 0acc3a59..9239da0c 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/PrivateKeyResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/PrivateKeyResolver.java
+@@ -73,6 +73,22 @@ public class PrivateKeyResolver extends KeyResolverSpi {
+             || XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYNAME);
+     }
+ 
++    /** This resolver only resolves private keys. */
++    @Override
++    protected boolean engineSupportsPublicKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsX509Certificate() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected PublicKey engineResolvePublicKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RSAKeyValueResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RSAKeyValueResolver.java
+index fcbb3388..f0eb7820 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RSAKeyValueResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RSAKeyValueResolver.java
+@@ -39,8 +39,17 @@ public class RSAKeyValueResolver extends KeyResolverSpi {
+     /** {@inheritDoc} */
+     @Override
+     protected boolean engineCanResolve(Element element, String baseURI, StorageResolver storage) {
+-        return XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)
+-            || XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_RSAKEYVALUE);
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_RSAKEYVALUE)) {
++            return true;
++        }
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYVALUE)) {
++            // Only claim KeyValue elements that actually carry RSA material, so a
++            // DSA/EC KeyValue declines here instead of accepting and rejecting.
++            Element rsaKeyElement =
++                XMLUtils.selectDsNode(element.getFirstChild(), Constants._TAG_RSAKEYVALUE, 0);
++            return rsaKeyElement != null;
++        }
++        return false;
+     }
+ 
+     /** {@inheritDoc} */
+@@ -88,6 +97,22 @@ public class RSAKeyValueResolver extends KeyResolverSpi {
+         return null;
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsX509Certificate() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected javax.crypto.SecretKey engineResolveSecretKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RetrievalMethodResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RetrievalMethodResolver.java
+index 7ed81bf6..f78cf928 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RetrievalMethodResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/RetrievalMethodResolver.java
+@@ -269,6 +269,17 @@ public class RetrievalMethodResolver extends KeyResolverSpi {
+         throw new ResourceResolverException("utils.resolver.noClass", exArgs, uriToResolve, baseURI);
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     public javax.crypto.SecretKey engineResolveSecretKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/SecretKeyResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/SecretKeyResolver.java
+index 6ccd84fc..24ecb9d3 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/SecretKeyResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/SecretKeyResolver.java
+@@ -60,6 +60,22 @@ public class SecretKeyResolver extends KeyResolverSpi
+         return XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYNAME);
+     }
+ 
++    /** This resolver only resolves secret keys. */
++    @Override
++    protected boolean engineSupportsPublicKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsX509Certificate() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected PublicKey engineResolvePublicKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/SingleKeyResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/SingleKeyResolver.java
+index 7a5e6c28..71ef2ede 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/SingleKeyResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/SingleKeyResolver.java
+@@ -83,6 +83,27 @@ public class SingleKeyResolver extends KeyResolverSpi {
+         return XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_KEYNAME);
+     }
+ 
++    /** This resolver only serves the key types it was constructed with. */
++    @Override
++    protected boolean engineSupportsPublicKey() {
++        return publicKey != null;
++    }
++
++    @Override
++    protected boolean engineSupportsX509Certificate() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return secretKey != null;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return privateKey != null;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected PublicKey engineResolvePublicKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509CertificateResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509CertificateResolver.java
+index b530153b..d7283bfb 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509CertificateResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509CertificateResolver.java
+@@ -45,7 +45,21 @@ public class X509CertificateResolver extends KeyResolverSpi {
+     /** {@inheritDoc} */
+     @Override
+     protected boolean engineCanResolve(Element element, String baseURI, StorageResolver storage) {
+-        return Constants.SignatureSpecNS.equals(element.getNamespaceURI());
++        if (element == null) {
++            return false;
++        }
++        // Only claim elements that actually carry X.509 certificate material, so
++        // unrelated elements (KeyValue, RetrievalMethod, ...) decline here
++        // instead of accepting and rejecting them.
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_X509CERTIFICATE)) {
++            return true;
++        }
++        if (XMLUtils.elementIsInSignatureSpace(element, Constants._TAG_X509DATA)) {
++            Element[] certNodes =
++                XMLUtils.selectDsNodes(element.getFirstChild(), Constants._TAG_X509CERTIFICATE);
++            return certNodes != null && certNodes.length > 0;
++        }
++        return false;
+     }
+ 
+     /** {@inheritDoc} */
+@@ -97,6 +111,17 @@ public class X509CertificateResolver extends KeyResolverSpi {
+         }
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected javax.crypto.SecretKey engineResolveSecretKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509DigestResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509DigestResolver.java
+index 8835d2e4..2aa1310c 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509DigestResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509DigestResolver.java
+@@ -91,6 +91,17 @@ public class X509DigestResolver extends KeyResolverSpi {
+         return null;
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected SecretKey engineResolveSecretKey(Element element, String baseURI, StorageResolver storage, boolean secureValidation)
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509IssuerSerialResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509IssuerSerialResolver.java
+index 2c5f948f..acbd5976 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509IssuerSerialResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509IssuerSerialResolver.java
+@@ -129,6 +129,17 @@ public class X509IssuerSerialResolver extends KeyResolverSpi {
+         }
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected javax.crypto.SecretKey engineResolveSecretKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509SKIResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509SKIResolver.java
+index 5d3207ac..fbce8b3b 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509SKIResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509SKIResolver.java
+@@ -113,6 +113,17 @@ public class X509SKIResolver extends KeyResolverSpi {
+         return null;
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected javax.crypto.SecretKey engineResolveSecretKey(
+diff --git a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509SubjectNameResolver.java b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509SubjectNameResolver.java
+index 438f1566..d4ca3959 100644
+--- a/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509SubjectNameResolver.java
++++ b/src/main/java/org/apache/xml/security/keys/keyresolver/implementations/X509SubjectNameResolver.java
+@@ -119,6 +119,17 @@ public class X509SubjectNameResolver extends KeyResolverSpi {
+         }
+     }
+ 
++    /** Supports only the key types this resolver can serve. */
++    @Override
++    protected boolean engineSupportsSecretKey() {
++        return false;
++    }
++
++    @Override
++    protected boolean engineSupportsPrivateKey() {
++        return false;
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     protected javax.crypto.SecretKey engineResolveSecretKey(
+diff --git a/src/main/java/org/apache/xml/security/resource/xmlsecurity_en.properties b/src/main/java/org/apache/xml/security/resource/xmlsecurity_en.properties
+index 74e8c150..d842ef1c 100644
+--- a/src/main/java/org/apache/xml/security/resource/xmlsecurity_en.properties
++++ b/src/main/java/org/apache/xml/security/resource/xmlsecurity_en.properties
+@@ -96,6 +96,7 @@ KeyInfo.wrongNumberOfObject = Need {0} keyObjects
+ KeyInfo.wrongUse = This object was made for getting {0}
+ keyResolver.alreadyRegistered = {1} class has already been registered for {0}
+ KeyResolver.needStorageResolver = Need a StorageResolver to retrieve a Certificate from a {0}
++KeyResolver.noResolverForElement = Could not resolve key for element {0}. Consulted resolvers in order: {1}
+ KeyResoverSpiImpl.cannotGetCert = Cannot get the Certificate that include or in {1} in implement class {0}
+ KeyResoverSpiImpl.elementGeneration = Cannot make {1} element in implement class {0}
+ KeyResoverSpiImpl.getPoublicKey = Cannot get the public key from implement class {0}

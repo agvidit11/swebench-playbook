@@ -1,0 +1,161 @@
+=== impl-2 ===
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< org.apache.santuario:xmlsec >---------------------
+[INFO] Building Apache XML Security for Java 4.0.5-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] -------------------------------[ bundle ]-------------------------------
+[INFO] 
+[INFO] --- enforcer:3.6.3:enforce (enforce-maven-version) @ xmlsec ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireMavenVersion passed
+[INFO] 
+[INFO] --- enforcer:3.6.3:enforce (enforce-java-version) @ xmlsec ---
+[INFO] Rule 0: org.apache.maven.enforcer.rules.version.RequireJavaVersion passed
+[INFO] Rule 1: org.apache.maven.enforcer.rules.version.RequireMavenVersion passed
+[INFO] 
+[INFO] --- jacoco:0.8.15:prepare-agent (jacoco-agent-for-unit-tests) @ xmlsec ---
+[INFO] argLine set to -javaagent:/root/.m2/repository/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar=destfile=/work/target/jacoco.exec,includes=org/apache/xml/security/**:org/apache/jcp/xml/dsig/internal/**
+[INFO] 
+[INFO] --- jaxb30:0.16.0:generate (generate-jaxb-sources) @ xmlsec ---
+[INFO] Latest timestamp of the source resources is [2026-09-23 00:14:00.370], earliest timestamp of the target resources is [2026-09-22 21:27:34.673].
+[INFO] Sources are not up-to-date, XJC will be executed.
+[INFO] Episode file [/work/target/generated-sources/xjc/META-INF/sun-jaxb.episode] was augmented with if-exists="true" attributes.
+[INFO] 
+[INFO] --- replacer:1.5.3:replace (bindings-workaround-sun-jaxb) @ xmlsec ---
+[INFO] Replacement run on 1 file.
+[INFO] 
+[INFO] --- replacer:1.5.3:replace (types-workaround-xmldsig) @ xmlsec ---
+[INFO] Replacement run on 1 file.
+[INFO] 
+[INFO] --- remote-resources:3.3.0:process (process-resource-bundles) @ xmlsec ---
+[INFO] Preparing remote bundle org.apache.apache.resources:apache-jar-resource-bundle:1.8
+[INFO] Copying 3 resources from 1 bundle.
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ xmlsec ---
+[INFO] Copying 23 resources from src/main/resources to target/classes
+[INFO] Copying 9 resources from src/main/java to target/classes
+[INFO] Copying 1 resource from target/generated-sources/xjc to target/classes
+[INFO] Copying 3 resources from target/maven-shared-archive-resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ xmlsec ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 492 source files with javac [debug deprecation release 11 module-path] to target/classes
+[WARNING] /work/src/main/java/org/apache/xml/security/stax/config/XIncludeHandler.java:[158,43] org.xml.sax.helpers.XMLReaderFactory in org.xml.sax.helpers has been deprecated
+[INFO] /work/src/main/java/org/apache/xml/security/stax/impl/XMLSecurityStreamWriter.java: Some input files use unchecked or unsafe operations.
+[INFO] /work/src/main/java/org/apache/xml/security/stax/impl/XMLSecurityStreamWriter.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ xmlsec ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] Copying 1197 resources from src/test/resources to target/test-classes
+[INFO] Copying 1 resource from src/test/java to target/test-classes
+[INFO] Copying 3 resources from target/maven-shared-archive-resources to target/test-classes
+[INFO] The encoding used to copy filtered properties files has not been set. This means that the same encoding will be used to copy filtered properties files as when copying other filtered resources. This might not be what you want! Run your build with --debug to see which files might be affected. Read more at https://maven.apache.org/plugins/maven-resources-plugin/examples/filtering-properties-files.html
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ xmlsec ---
+[WARNING] Can't extract module name from xalan-2.7.3.jar: Provider class org.apache.bsf.BSFManager not in module
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 265 source files with javac [debug deprecation release 11 module-path] to target/test-classes
+[WARNING] /work/src/test/java/org/apache/xml/security/test/dom/providers/TestCustomSignatureSpi.java:[92,22] engineGetParameter(java.lang.String) in java.security.SignatureSpi has been deprecated
+[WARNING] /work/src/test/java/org/apache/xml/security/test/dom/providers/TestCustomSignatureSpi.java:[87,20] engineSetParameter(java.lang.String,java.lang.Object) in java.security.SignatureSpi has been deprecated
+[INFO] /work/src/test/java/org/apache/xml/security/test/dom/InitTest.java: Some input files use unchecked or unsafe operations.
+[INFO] /work/src/test/java/org/apache/xml/security/test/dom/InitTest.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ xmlsec ---
+[WARNING]  Parameter 'skipExec' (user property 'maven.test.skip.exec') is deprecated: use skipTests instead
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running org.apache.xml.security.test.dom.keys.keyresolver.ChainTraversalSketchTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.382 s -- in org.apache.xml.security.test.dom.keys.keyresolver.ChainTraversalSketchTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- surefire:3.5.6:test (formatting-ignore-line-breaks) @ xmlsec ---
+[WARNING]  Parameter 'skipExec' (user property 'maven.test.skip.exec') is deprecated: use skipTests instead
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- surefire:3.5.6:test (formatting-ignore-line-breaks-override) @ xmlsec ---
+[WARNING]  Parameter 'skipExec' (user property 'maven.test.skip.exec') is deprecated: use skipTests instead
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- surefire:3.5.6:test (formatting-ignore-base64-line-breaks) @ xmlsec ---
+[WARNING]  Parameter 'skipExec' (user property 'maven.test.skip.exec') is deprecated: use skipTests instead
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- surefire:3.5.6:test (formatting-ignore-base64-line-breaks-override) @ xmlsec ---
+[WARNING]  Parameter 'skipExec' (user property 'maven.test.skip.exec') is deprecated: use skipTests instead
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- surefire:3.5.6:test (formatting-base64-custom-formatting) @ xmlsec ---
+[WARNING]  Parameter 'skipExec' (user property 'maven.test.skip.exec') is deprecated: use skipTests instead
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- surefire:3.5.6:test (formatting-illegal) @ xmlsec ---
+[WARNING]  Parameter 'skipExec' (user property 'maven.test.skip.exec') is deprecated: use skipTests instead
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  12.074 s
+[INFO] Finished at: 2026-09-23T00:43:32Z
+[INFO] ------------------------------------------------------------------------
+MVN_EXIT=0
