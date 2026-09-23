@@ -388,7 +388,38 @@ Only candidates past GATE 0–7 reach scoring, and a **different** model scores 
 | **Cascade** | steps are independent chunks | step 2 is impossible without step 1 |
 | **Scope** | <20 net lines | 80–150 net lines across 2–4 files |
 
-**Threshold: build only at ≥28/40, and never with Fork strength ≤2, Observability ≤2, or Realism/fit ≤2.** Three veto axes. Score Fork from GATE 5's measurement (≥4/5 wrong path = 5; ≥4/5 desired path = 1, do not build; even split = 3). Observability is a veto because it eliminated half the algorithm catalogue — asymptotically better but behaviourally identical cannot be graded at all. Realism/fit exists because the rubric contradicted the library: a bc-java candidate scored **29** proposing a write-ahead log inside `bcmls`, a protocol codec **with no I/O layer at all**. Score Harness-ability from the GRADING path → `A1-repo-screen.md` §8.
+**Threshold: build only at ≥28/40, and never with Observability ≤2 or Realism/fit ≤2.**
+
+> ### The Fork veto is CONDITIONAL on GATE 4, and GATE 4 wins. `STATUS: LIVE`
+>
+> This act called GATE 4 **PRIMARY** and GATE 5 **SECONDARY**, then gave the secondary gate an
+> absolute veto over the primary one and never said which won. A run hit the contradiction
+> head-on and had to improvise; that was a defect, not its error.
+>
+> **Fork strength ≤2 is a veto ONLY when GATE 4 was not measured in band.**
+>
+> | Fork (GATE 5) | Outcome variance (GATE 4 A3-LOCAL) | Verdict |
+> |---|---|---|
+> | any | **not measured / waived** | Fork ≤2 **vetoes**. The proxy is all you have. |
+> | ≤2 | **1–3 of 5, validated three ways** | **BUILD.** Record it as a quality-variance task and name the discriminator. |
+> | ≥4 | 0/5 or 5/5 | **DEAD** — a strong fork does not rescue zero outcome variance (frostdb C1: 9/10 fork, 0/5 outcome). |
+>
+> **Why.** The fork veto is a *proxy* for "this will one-shot and come back 5/5". GATE 4 measures
+> that property **directly, on real patches** rather than on three-sentence plans. When the proxy
+> and the direct measurement disagree, the measurement wins — that is what PRIMARY means.
+>
+> This act's own variance taxonomy already permits it: of SEARCH, QUALITY and DESIGN, **QUALITY —
+> "the artifact exists either way; the standard varies"** — is a legitimate carrier. A fork-1
+> candidate where 2 of 5 competent implementations miss a required behaviour is a *quality*-variance
+> task, not a broken one. The Fork axis only measures DESIGN divergence.
+>
+> **Two obligations when you build on this exception:**
+> 1. **Name the discriminator in one sentence** — the specific behaviour the failing implementations
+>    missed. If you cannot name it, you have not measured outcome variance, you have measured noise.
+> 2. **Record it in the handoff as a fork-1 build**, so that if the server returns 4/5 or 5/5 the
+>    repair is `C3` hardening and nobody re-litigates the decision.
+
+Remaining veto axes: Score Fork from GATE 5's measurement (≥4/5 wrong path = 5; ≥4/5 desired path = 1, do not build; even split = 3). Observability is a veto because it eliminated half the algorithm catalogue — asymptotically better but behaviourally identical cannot be graded at all. Realism/fit exists because the rubric contradicted the library: a bc-java candidate scored **29** proposing a write-ahead log inside `bcmls`, a protocol codec **with no I/O layer at all**. Score Harness-ability from the GRADING path → `A1-repo-screen.md` §8.
 
 **Read the per-axis scores, never the total — veto axes cannot be outvoted.** A bc-java candidate was dispatched as a multi-turn build off its **30/35 headline**; the same report's step table said in plain text `| C5 ITS snapshots | single-turn | unchanged (not probed) |` — Cascade **2**, never probed, realism flagged two paragraphs later. A full cycle was spent rediscovering a written-down verdict. **A high total with Cascade ≤2 is a single-turn candidate at best.**
 
