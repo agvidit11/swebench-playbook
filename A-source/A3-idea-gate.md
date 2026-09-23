@@ -238,6 +238,20 @@ grep -rln "<behaviour keyword>" <clone>/src/test | head   # a shipped test = the
 >      shape. If your sketch passes the wrong shape, it does not observe the property.
 >    - it **PASSES on a hand-written `DESIRED` implementation.**
 >
+>    **The affordability problem, and the one legal relaxation.** `STATUS: LIVE`, raised by two
+>    runs. For a **net-new-capability** card the hand-written DESIRED implementation *is the task* —
+>    demanding it before `A3` clears makes the gate cost more than the build, which is why it was
+>    waived on every prior run rather than run badly.
+>
+>    For net-new cards only, substitute a **DESIRED stand-in**: not a full implementation, but the
+>    smallest patch that makes the sketch pass, written against one class from the contract-domain
+>    enumeration rather than all of them. The base and negative-control validations stay mandatory
+>    and unrelaxed — they are cheap, and the negative control is the one that catches a blind
+>    sketch. Record in the handoff that you used a stand-in and which class it covered.
+>
+>    This relaxation does **not** extend to bug-fix or existing-behaviour cards. There the golden
+>    is small and a real DESIRED implementation is affordable, so write it.
+>
 >    All three are required. On frostdb the negative control was decisive: the old buffered
 >    implementation showed "sink b reached the end of its copy, 2,739,919 bytes, while sink a
 >    had consumed nothing."

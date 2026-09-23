@@ -213,6 +213,24 @@ completes"; the probe dropped that clause and measured nothing.
 | **Size estimate** | files, ~lines, primitives reused. Target **80–150 net lines across 2–4 files** |
 | **Rubric self-audit** | §7 |
 
+## 4a. Every surface carries a `HISTORY:` field — ask for it in the survey
+
+`STATUS: LIVE`, measured 2026-09-23. Adding one line to the survey ask — *`git log --oneline` on
+this file, and was this surface the subject of one recent PR?* — **killed 2 of 10 surfaces at
+survey time, in seconds each.** Without it, the same class of defect cost a different repo a full
+cycle: a merged PR had already put a fuzz harness on the surface, *and it was in the tree at base*,
+plus an issue restating the premise verbatim with reproducers and a maintainer refusal closing it
+"not considered a bug".
+
+```
+HISTORY: <git log --oneline -- <file> | head -10>  + one sentence:
+         is this surface the subject of a recent PR, an open issue, or a maintainer decision?
+```
+
+A surface whose history shows recent attention is not automatically dead — but it goes to `A3`
+GATE 3 with the evidence already attached, instead of being discovered there after a scoring pass.
+This is the cheapest shift-left available in this act.
+
 ## 4b. MERGING — a surface too small for a task is not a dead surface
 
 `STATUS: LIVE`. Most surfaces die for being *thin*, not for being wrong: one behaviour, one file,

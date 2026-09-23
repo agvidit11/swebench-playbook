@@ -242,6 +242,34 @@ compiler task as security to game the table.**
 AI-authorship % (method) | LOC / subsystems | name-free hosting: YES/NO + the entry point | graded-path
 seconds, MEASURED | rank | why-not (for rejects)`
 
+## 9. THE PRODUCT GATE — low-churn LOC, not LOC and churn separately
+
+`STATUS: LIVE`, measured 2026-09-23. **G7 screens repo size. CAT-4 screens per-subsystem churn.
+Nothing multiplies them, and the product is what actually decides whether a repo yields.**
+
+`cloudnative-pg` passes both gates individually — 229 real issues, 0 peers, an 8s graded path. But
+the area that satisfies *both* at once is **10,962 LOC across four helper packages**, below `A1`'s
+own 15k floor. The consequence was measured downstream: **12 of 17 surveyed premises died as
+"under-20-line fix"**, because a small quiet area cannot host a task however large the repo is.
+
+```bash
+# for each subsystem you would actually target:
+for d in <candidate subsystems>; do
+  [ -e "$clone/$d" ] || { echo "PATH ABSENT: $d"; continue; }
+  loc=$(find "$clone/$d" -name '*.<ext>' -not -name '*_test.*' | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
+  chn=$(git -C "$clone" log --since=90.days --oneline -- "$d" | wc -l)
+  printf '%-44s loc=%-8s churn90=%s
+' "$d" "$loc" "$chn"
+done
+```
+
+**Sum the LOC of every subsystem whose churn is low enough to target. That sum is the number that
+matters, and it must clear the size floor on its own.** A 400k-LOC repo where all the quiet code
+is 9k LOC of helpers is a small repo for our purposes.
+
+It costs 60 seconds and it runs **before** you commission a survey. Applied as a pre-check to
+`kustomize` (24,469 LOC targetable, near-zero churn) it cleared in under a minute.
+
 ## 9a. Two gates that SILENTLY PASS — assert before you measure
 
 `STATUS: LIVE`, both measured 2026-09-23. Each produces a clean-looking result from a check that
