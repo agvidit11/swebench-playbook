@@ -159,6 +159,34 @@ Read the function. If the precedence / ordering / guard the candidate proposes i
 
 ## GATE 3 — public and peer disclosure, per candidate
 
+> ### Disclosure is not one thing. Split it by WHAT is disclosed.
+>
+> `STATUS: LIVE`, 2026-09-23. A *diagnosed but unfixed* bug — the `semantic_bugs` shape — is **by
+> definition** an open issue with a public thread. Read literally, GATE 3 kills every SEARCH
+> candidate that exists, which made the SEARCH mandate self-contradictory.
+>
+> | what the public thread contains | verdict |
+> |---|---|
+> | the **symptom** — a user reporting wrong output, a failing case, a confusing behaviour | **allowed.** The symptom is what your contract states anyway. |
+> | the **cause** — a comment or PR naming the faulty line, the mechanism, or the metadata the fix needs | **KILL.** The search is over before the solver starts. |
+> | the **remedy** — a merged or open PR implementing it | **KILL**, unconditionally. |
+>
+> Apply the strict reading when in doubt, and record which reading you used. Every kill made under
+> this split on 2026-09-23 survives *both* readings, so the split has not yet been load-bearing —
+> but it is what makes the SEARCH lane coherent.
+>
+> **Measure the supply before you survey.** Two `gh api` calls give the fraction of open bug issues
+> that are still broken at base *and* carry no public cause or remedy:
+>
+> | repo | undisclosed bug supply |
+> |---|---|
+> | **concourse/concourse** | **12 of 17 — 71%** |
+> | cloudnative-pg | 49 of 75 |
+> | crossplane | 13 of 29 |
+> | kustomize | 19 of 42 — and 8 of the 12 still-broken bugs already carry a PR or root-cause comment |
+>
+> A repo whose tracker is already mined is a dead SEARCH lane however healthy its issue count looks.
+
 > **Run these four FIRST. Each one killed a candidate on 2026-09-22 that had already cleared
 > earlier gates.** `STATUS: LIVE`
 >

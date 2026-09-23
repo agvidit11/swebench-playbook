@@ -216,6 +216,11 @@ tests.** That task shipped **127 p2p entries, 10 of them timing- or concurrency-
 (`TestAwaitResponseRespectsContext`, `TestConcurrentStreams`, `TestConnectEncodeTimeout`,
 `TestGRPCParseTimeout`, …).
 
+**Screen in the tree the verifier will actually use.** Measured on kustomize: **five plugin tests
+fail in a `git worktree` but pass in the primary clone at the same commit.** The playbook mandates
+worktrees for isolation, so a p2p set screened only in the primary clone can still flake in the
+run. Two more fail everywhere — seven total from one package.
+
 ```bash
 # 1. name the hazards
 python3 - <<'PY'

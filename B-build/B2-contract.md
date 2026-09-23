@@ -219,6 +219,25 @@ script implements the pre-D1 absolute never-name policy, so it will FAIL on a sy
 headings, >4 emphasis markers, >350 words) and contract coverage; severity rules →
 `B5-preflight-push.md §1`. `STATUS: LIVE`
 
+## 6b. Vagueness does not create difficulty — measured, twice
+
+`STATUS: LIVE`. The temptation this act exists to resist is to make a contract vaguer when a
+candidate looks too easy. It does not work, and we now have a direct experiment rather than an
+argument.
+
+A candidate measured fork 1 and 5/5. It was **re-cut with the mechanism stripped out of the
+contract entirely** — no extension names, no verbs naming the operation — and re-measured:
+**fork 1 again, 5/5 again.** De-specifying changed nothing, because the solver reads the
+repository, not only your prose. Where the answer sits three lines from the defect in an in-code
+comment, no amount of contract vagueness hides it. → `A-source/A2-idea-generate.md` §3a.
+
+The source pipeline reached the same conclusion from the opposite direction and deleted its own
+"you can make these requirements a bit more vague" line, because it produced the defect that
+failed every task built under it.
+
+**Difficulty comes from the graded set's branch count, not from what the prose withholds.**
+→ `B-build/B3-grader.md` §④.
+
 ## 7. Contract-change re-audit
 
 `SCOPED-TO: any run where instruction.md is CHANGED rather than first written` — Avocado hardened

@@ -213,6 +213,26 @@ completes"; the probe dropped that clause and measured nothing.
 | **Size estimate** | files, ~lines, primitives reused. Target **80–150 net lines across 2–4 files** |
 | **Rubric self-audit** | §7 |
 
+## 3a. THE TODO PARADOX — an in-code admission is a premise receipt AND a difficulty destroyer
+
+`STATUS: LIVE`, measured 2026-09-23. This act calls an in-code admission (`TODO`, `FIXME`,
+`not supported`) the strongest premise receipt there is, and that is true — it proves the gap is
+real and the maintainers know it. **It is also, for a SEARCH candidate, fatal.**
+
+Measured: a `TODO` sitting three lines from the defect, naming the exact metadata the fix needs.
+The candidate measured fork 1 and 5/5. A re-cut that **stripped the mechanism out of the contract
+entirely** — no extension names, no verbs — measured **fork 1 and 5/5 again**. Hiding it in the
+prose does nothing, because the solver reads the code, not just your contract.
+
+| you are pitching | an in-code admission is |
+|---|---|
+| **SEARCH** — difficulty is locating the defect | **disqualifying.** The comment is the answer. |
+| **QUALITY** — difficulty is completeness over a domain | fine, and still a good receipt |
+
+So keep using admissions as evidence the premise is real. **Do not use one as the premise itself
+on a SEARCH card**, and never think you can neutralise it by being vaguer in the contract — that
+was tried and measured.
+
 ## 3b. STEP STRUCTURE IS THE ONLY LEVER THAT MEASURABLY WORKS
 
 `STATUS: LIVE` — n=23,524, `.e2e/avocado-study/FINDINGS.md`. Read this before you shape a card.
