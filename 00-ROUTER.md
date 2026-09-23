@@ -291,6 +291,38 @@ HANDOFF <act-id>
 No act begins without the prior HANDOFF in hand. An act that cannot meet its exit condition
 emits the HANDOFF anyway with `EXIT: NOT MET` and a reason — it does not improvise forward.
 
+## 8a. The runbook is the contract. Deviations are defects in the runbook.
+
+`STATUS: LIVE`
+
+**Follow this playbook precisely.** If an act tells you to do something that seems wrong, do it,
+and log the friction. Improvising a better local process destroys the only signal that tells us
+which rule is broken — a run that quietly worked around three defects looks identical to a run
+that had none.
+
+**When the resulting task is not good enough, the runbook is what changes.** Not the standard, not
+the gate, not this run's interpretation of a rule. The loop is:
+
+```
+follow precisely -> the task fails (locally or on the server)
+                 -> find which act let it through
+                 -> change THAT act, with the measurement attached
+                 -> the next run is bound by the new text
+```
+
+Both directions of that loop are load-bearing. Three worked examples, all from 2026-09-22/23:
+
+| the task failed on | the act that let it through | what changed |
+|---|---|---|
+| `avocado 5/5` too easy after a fork-1 override | `A3` GATE 8 let a `GATE 4` reading beat the fork veto | the exception was **falsified and reverted**; fork ≤2 is absolute again |
+| `BAD_GRADING_WEAK` (R06/R07/R12) | `B3` never asked whether the golden satisfies the **contract**, only whether it passed our tests | three new `B3` gates |
+| `Oracle 2/3` from a flaky inherited `p2p` test | `B5` screened `f2p` against base but never screened `p2p` for stability | the p2p flake screen |
+
+**Rejecting an idea is cheap and correct; abandoning an idea shape is not.** A kill tells you this
+candidate is dead. It does not tell you the *class* is dead — and the reason a kill is worth
+writing down properly (`A3` kill ledger, `reversible-if`) is so the class can be re-entered when a
+rule changes. Two kills on 2026-09-22 were later shown to rest on a broken probe.
+
 ## 8b. Two obligations that cross several acts
 
 **Replay before you believe a change worked.** Any change to a graded artifact — a grading
