@@ -113,3 +113,35 @@ dies here goes back to `A2`, it is not repaired here").
 **Cost of the measurement:** 10 MetaCode calls, ~7 minutes wall, zero Docker. Against the ~45
 minutes of design reasoning that argued Fork 5. This is the twelfth consecutive time argued fork
 strength has been wrong (`A3` GATE 5: "Argued fork strength has been wrong 11 times out of 11").
+
+---
+
+# Probe results — card C2, `CircuitBreakingConnectionStateListener` close-time reconciliation
+
+Phrasing: LEADING / constraint-stated, per `A3` GATE 5 rule 3. One phrasing only — a second was
+not run because the first returned a unanimous desired-path result, and GATE 5's kill condition
+(≥4/5 desired) is already met. Prompt `/tmp/curator-run/probe-C2.txt`; raw outputs
+`/tmp/curator-run/probeC2-{1..5}.out`.
+
+The desired path: make `closeCircuit()` stop suppressing the notification when
+`circuitLastState == circuitInitialState`, so the managed listener converges to current
+connectivity at every close.
+
+| probe | diagnosed `closeCircuit()`'s null-when-equal suppression | proposed "always forward on close" | named the shield-vs-accuracy trade-off | verdict |
+|---|---|---|---|---|
+| 1 | ✅ | ✅ + replay the swallowed recovery | ✅ | desired |
+| 2 | ✅ | ✅ + resolve truth from the live client | ✅ | desired |
+| 3 | ✅ | ✅ | ✅ | desired |
+| 4 | ✅ | ✅ + live connectivity check, synthesize `RECONNECTED` | ✅ | desired (most sophisticated) |
+| 5 | ✅ | ✅ | ✅ | desired |
+
+**5 of 5 on the desired path.** Representative, probe 5:
+
+> *"The fix is to make `closeCircuit()` a reconciliation point: always forward `circuitLastState`,
+> the freshest observed state, on close — including when it equals `circuitInitialState`."*
+
+Every probe also volunteered the trade-off the card had reserved as its difficulty — that the
+listener now receives a redundant duplicate — and every probe made the same call (accept the
+duplicate; a stale down-view is a liveness bug). There is no divergence to grade.
+
+`A3` GATE 5: **≥4/5 take the desired path → no fork. Do not build.** **C2 killed.**

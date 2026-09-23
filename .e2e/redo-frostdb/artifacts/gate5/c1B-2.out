@@ -1,0 +1,9 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2342030/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Serialize the block once into a single shared byte buffer and reuse that buffer for all configured object stores instead of re-encoding per destination. Fan the bytes out through a barrier-synchronized broadcast reader that withholds EOF from any destination until all destinations have started reading, keeping the persist call pending while any reader is at zero bytes. Upload concurrently to each store, and on partial failure return an error naming the failed store while deleting its partial object through that same store without affecting the completed uploads to healthy stores.

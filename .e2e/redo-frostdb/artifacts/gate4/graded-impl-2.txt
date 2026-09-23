@@ -1,0 +1,11 @@
+=== RUN   TestS1AllSinksCompleteBlock
+    g4redo_assert_test.go:205: S1: serialized block size = 2739919 bytes
+--- PASS: TestS1AllSinksCompleteBlock (0.26s)
+=== RUN   TestS2NoSinkReachesEndWhileAnotherHasConsumedNothing
+--- PASS: TestS2NoSinkReachesEndWhileAnotherHasConsumedNothing (5.25s)
+=== RUN   TestS3MidStreamFailureIsolation
+--- PASS: TestS3MidStreamFailureIsolation (0.25s)
+=== RUN   TestS4ZeroAndSingleSinkRegression
+--- PASS: TestS4ZeroAndSingleSinkRegression (0.36s)
+PASS
+ok  	github.com/polarsignals/frostdb	6.135s

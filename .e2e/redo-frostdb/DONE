@@ -1,0 +1,28 @@
+DONE — redo-frostdb, 2026-09-22
+
+Stopped at: A3, EXIT NO SURVIVOR (evidenced). Did not enter B1.
+
+The prior kill of C1 WAS invalid — the reviewer was right on both grounds. Corrected:
+  GATE 5, lint-PASSed prompts, mapping applied in the declared direction:
+    phrasing A 4/5 NON-DESIRED, phrasing B 5/5 NON-DESIRED = 9 of 10 = STRONG FORK.
+
+C1 still dies, on a better-evidenced gate:
+  GATE 4 A3-LOCAL (PRIMARY, run not waived) = 5 of 5 pass an assertion that was validated
+  at base_commit AND against a negative control (plain buffered fan-out fails it) AND a
+  positive control (streaming tee passes it).
+  All 5 kept the whole-block buffer and satisfied the constraint by withholding EOF.
+
+Killing fact, confirmed by an adversarial Codex audit instructed to argue the opposite:
+  the discriminating property is not expressible as a predicate over the DataSink
+  interface. A materialised buffer behind a gated reader is observationally equivalent to
+  a live stream at Upload(ctx, name, io.Reader). No wording forces the buffer out.
+
+Second, independent kill: merged commit 6169cce on the same function,
+  "Fix: memory spikes during persistence writes -- use an io.pipe instead of buffer".
+
+C2 remains dead on the prior run's GATE 3 facts (PR #307 body + shipped logic-test fixture).
+
+No task directory. No commit. No push. No instruction.md written, drafted or suggested.
+
+Artifacts: handoffs/01-A3.md (full HANDOFF + checklist), handoffs/00-A3-interim.md (with
+its own in-place correction), friction.md (11 entries), artifacts/, probes/, cards/.

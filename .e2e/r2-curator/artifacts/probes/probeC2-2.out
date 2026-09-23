@@ -1,0 +1,12 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/1048824/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Reading the shield to trace the stale-view path.
+Outline done — now pulling full source for both files.
+I've mapped the current open/close and swallow logic — now examining the circuit-breaker timing to pin the fix.
+Change `closeCircuit()` so closing the circuit is always authoritative: forward the latest connectivity state unconditionally instead of sending nothing when `circuitLastState` equals `circuitInitialState`. When the close state is the same disconnected state the circuit opened on, still re-deliver that state rather than staying silent, since a `RECONNECTED` swallowed mid-window would otherwise leave the listener believing nothing changed after it already tore down on the opening event. If no state arrived while open, resolve present truth from the last observation or the live client instead of assuming the opening state is still current, collapsing all flaps into at most one reconciling event on close. Keep the shielding while the circuit is open. This sacrifices a little shielding — the listener accepts one potentially redundant duplicate — for accuracy, because a duplicate notification is idempotent churn whereas a stale "still down" view never self-heals and strands recipes while operations succeed.

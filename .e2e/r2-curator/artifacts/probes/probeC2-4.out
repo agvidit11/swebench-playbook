@@ -1,0 +1,15 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/1048822/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Reading the shield to trace the stale-view.
+Got the outline — now reading the circuit logic and its collaborator.
+Found the suppress-on-close path — now checking the breaker timing to pin down the stale case.
+I've mapped the swallow-and-suppress logic — now I'll check the tests to confirm the expected close behavior.
+Search backend unavailable — trying local lookup instead.
+Test patterns show the gap — now checking what live state I can reconcile against.
+The staleness comes from closeCircuit suppressing the close notification whenever the last swallowed state equals the state the circuit opened on, on the theory that the listener already knows it. Change closeCircuit to reconcile connectivity rather than compare endpoints: remember what was last actually forwarded to the managed listener and compare its connected flag against ground truth at close time, using the live client connectivity together with the last swallowed state. Specifically, when the close state is the same disconnected state as the open state, forward nothing only if a live check still reports disconnected, but if the client reports connected while the listener last heard suspended or lost, synthesize a single reconnected notification even though the endpoints match. Endpoint equality alone cannot prove nothing was missed because an intervening reconnected can be swallowed and then overwritten by a later suspended, and a swallowed reconnected is never re-emitted, so the live check is the only way to avoid stranding the listener. That sacrifices shielding for accuracy by accepting an occasional duplicate or spurious wakeup on close, which is cheap and idempotent for recipes, whereas a permanently stale down view is fatal because the recipe never resumes work despite a healthy client.

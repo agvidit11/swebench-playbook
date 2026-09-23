@@ -1,0 +1,18 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/577158/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Digging into your down-instance rotation fault — tracing how error state survives restarts and updates.
+Your isolated test passes but production fails — now examining the provider internals to find the reset.
+I've pinpointed the likely culprit — now gathering the last details to shape the fix.
+What is happening and fix approach:
+
+DownInstanceManager keeps error counts in a map keyed by the full ServiceInstance value, whose equality includes the frequently changing payload plus registration time and other descriptive fields. In production the ServiceCache deserializes a fresh ServiceInstance on every ZooKeeper child update, so each few-second status-payload refresh, each deploy re-registration that deletes and recreates the node, and each reconnect-driven rebuild yields an object unequal to the one originally passed to noteError. The next getInstance filter lookup with that fresh object therefore misses, sees zero errors, and readmits the still-failing backend immediately rather than after the configured five-minute timeout, while an isolated test with one immutable object never triggers the mismatch. The fix is to rekey that down-state by stable identity, namely the service name plus instance id, for both recording errors and filtering, so volatile fields no longer create a new logical entry. Expiry should then depend only on the existing error threshold and timeout purge, not on whether the payload or registration metadata happened to change.
+
+Identity-change risk:
+
+Once identity is id-only, a genuinely new backend that reuses an old id looks like the same instance, for example a container rescheduled with a configured static id such as api-1 but on a different address and port after the old ephemeral node expired. If the old holder was marked down, the healthy replacement would inherit its error count and be wrongly hidden from rotation until the timeout expires, temporarily reducing capacity. I would accept that trade-off because ids are contractually unique and default to random UUIDs where such reuse should not happen, and the harm is bounded to one timeout window, whereas the current bug disables down-tracking for the entire fleet.

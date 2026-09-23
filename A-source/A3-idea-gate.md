@@ -16,7 +16,7 @@ Novelty runs **before** scoring: on the spire run C4 scored highest of five and 
 | Gate | Kills | Cost |
 |---|---|---|
 | **0** | grader needs a name absent at `base_commit` | free |
-| **1** | the fork is zero by construction | free |
+| **1** | the fork is zero by construction, or the difference is unobservable | free |
 | **2** | the premise is already true at HEAD | one file read |
 | **3** | the direction is public | a few searches |
 | **4** | no outcome variance | 5 calls, no Docker |
@@ -75,7 +75,36 @@ Mechanical proxy once tests exist: `check-symbol-reachability.py <task_dir> --re
 
 Two consequences to accept: this makes most `expose_interface` tasks unwritable (**1 passed / 13 failed** corpus-wide, so the trade is worth taking — prefer candidates where existing behaviour becomes correct, observable or safe); and it **subsumes the coined-observability auto-reject** (`→ A2-idea-generate.md §6`), since a ledger whose invented field names carry the contract fails at step 3 every time. What the contract may still state later is `B2`'s business, not this gate's.
 
-## GATE 1 — the three free pre-filters
+## GATE 1 — the four free pre-filters
+
+**4. OBSERVATIONAL EQUIVALENCE — can a NON-DESIRED implementation be made indistinguishable from
+DESIRED through the interface the grader can actually see?** If yes, outcome variance is **zero by
+construction** and no amount of fork saves the candidate. `STATUS: LIVE`
+
+This is the sharpest of the four and it is *not* the same as pre-filter 2. A candidate can pass
+2 completely — behavioural observable, zero coined tokens, no data structure named — and still
+die here.
+
+**Measured, frostdb C1, 2026-09-22.** The constraint was "both sink uploads begin before
+serialization completes". Design divergence was real and large: **9 of 10** cold implementations
+produced a NON-DESIRED shape, a genuinely strong fork. Outcome divergence was **0 of 5** — every
+one passed. The reason: `Upload(ctx, name, io.Reader)` is the entire surface a grader can observe,
+and **a materialised buffer behind a gated reader replays every byte, block, EOF, error and
+cleanup that a live stream produces.** All five satisfied the constraint by withholding EOF while
+keeping the whole-block buffer. The property was not expressible as a predicate over the
+interface, so it could not be graded, so there was nothing to measure.
+
+An adversarial audit briefed to argue the candidate was ALIVE reached the same impossibility
+independently. **That retires the surface, not just the card** — no re-cut of the constraint helps,
+so do not spend an `A2` round on it.
+
+**The check, in one question:** write down the interface the grader can call. Can you name a
+sequence of observations through *only* that interface which a `NON-DESIRED` implementation cannot
+reproduce? If you cannot, stop here.
+
+### The original three
+
+
 
 Run before any probe. They killed candidates that had already cleared hollow premise, novelty, grounding **and** a full scoring pass. `STATUS: LIVE`
 
@@ -186,8 +215,17 @@ grep -rln "<behaviour keyword>" <clone>/src/test | head   # a shipped test = the
 >    scratch file, never in `<task>/tests/`. They must **observe the discriminating behaviour**,
 >    not a proxy for it. frostdb's assertion never observed serialization completion, which is
 >    why its 5/5 meant nothing.
-> 3. Validate the sketch at `base_commit` **before** using it: the current code must FAIL it. An
->    assertion that already passes measures nothing.
+>    3. **Validate the sketch THREE ways before you trust it.** One check is not enough — the
+>    frostdb redo showed a sketch can fail at base and still be blind to the real property.
+>    - it **FAILS at `base_commit`** (an assertion that already passes measures nothing)
+>    - it **FAILS on a negative control** — a hand-written implementation of a `NON-DESIRED`
+>      shape. If your sketch passes the wrong shape, it does not observe the property.
+>    - it **PASSES on a hand-written `DESIRED` implementation.**
+>
+>    All three are required. On frostdb the negative control was decisive: the old buffered
+>    implementation showed "sink b reached the end of its copy, 2,739,919 bytes, while sink a
+>    had consumed nothing."
+
 > 4. Generate n=5 cold implementations from `CONSTRAINT` alone and run the sketch against them.
 > 5. Want **1–3 of 5**. 0/5 or 5/5 kills the candidate — *and 5/5 after step 3 passed is a real
 >    kill, unlike a GATE 5 convergence reading.*

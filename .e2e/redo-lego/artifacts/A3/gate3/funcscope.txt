@@ -1,0 +1,67 @@
+### git log -L '/^func (s \*ProviderServer) CleanUp/,/^}/:challenge/tlsalpn01/tls_alpn_challenge_server.go'
+8013d0fb 2026-01-21 17:17:07 +0100 feat: add support for context (challenges) (#2805)
+38f23c8c 2020-10-27 12:01:05 +0100 chore: update linter. (#1278)
+42941cce 2018-12-06 22:50:17 +0100 Refactor the core of the lib (#700)
+d457f70a 2018-06-14 01:20:56 +0200 TLS-ALPN-01 Challenge (#572)
+
+### git log -L '/^func (s \*ProviderServer) Present/,/^}/:challenge/tlsalpn01/tls_alpn_challenge_server.go'
+ff774dc2 2026-05-13 12:39:08 +0200 fix: propagate context to server listeners (#3082)
+930c5d4a 2026-04-22 13:35:58 +0200 chore: minor changes (#2998)
+edd764f7 2026-03-25 13:17:26 +0100 refactor: improve some log and error messages (#2926)
+e26d5cee 2026-01-21 18:00:54 +0100 chore: use slog Attr (#2809)
+8013d0fb 2026-01-21 17:17:07 +0100 feat: add support for context (challenges) (#2805)
+2f2f587b 2026-01-19 19:11:24 +0100 feat: new HTTP-01 and TLS-ALPN-01 servers constructors (#2801)
+218ec2c1 2026-01-19 18:06:42 +0100 feat: new logger (slog) (#2800)
+60ae6e6d 2021-10-22 19:26:08 +0000 chore: migrate RFC links (#1513)
+f3e067df 2020-03-20 22:53:09 +0100 feat: use colon instead a arrow. (#1090)
+2da1ce06 2020-02-27 19:14:45 +0100 chore: wrap errors. (#1070)
+fa5555d3 2019-11-05 17:58:30 +0100 Update ACME RFC links from draft to RFC8555. (#1004)
+42941cce 2018-12-06 22:50:17 +0100 Refactor the core of the lib (#700)
+ad20bf90 2018-09-24 19:07:20 +0000 Migrate to golangci-lint (#644)
+57782ac3 2018-06-18 15:44:18 +0200 tls-alpn: add a function to return PEM blocks. (#579)
+d457f70a 2018-06-14 01:20:56 +0200 TLS-ALPN-01 Challenge (#572)
+
+### git log -L '/^func (c \*Challenge) Solve/,/^}/:challenge/tlsalpn01/tls_alpn_challenge.go'
+d335d451 2026-05-10 19:06:50 +0200 chore: improve logs and error messages (#3056)
+edd764f7 2026-03-25 13:17:26 +0100 refactor: improve some log and error messages (#2926)
+e26d5cee 2026-01-21 18:00:54 +0100 chore: use slog Attr (#2809)
+8013d0fb 2026-01-21 17:17:07 +0100 feat: add support for context (challenges) (#2805)
+218ec2c1 2026-01-19 18:06:42 +0100 feat: new logger (slog) (#2800)
+8d13f8d0 2026-01-17 15:20:18 +0100 feat: add support for context (#2799)
+81e0f2b4 2025-10-30 13:02:35 +0100 chore: update linter (#2699)
+24a46d0c 2025-03-27 12:04:02 +0000 feat: add delay option for TLSALPN challenge (#2499)
+e01131f2 2020-03-09 18:10:40 +0100 fix: Improve cleanup log messages. (#1076)
+2da1ce06 2020-02-27 19:14:45 +0100 chore: wrap errors. (#1070)
+42941cce 2018-12-06 22:50:17 +0100 Refactor the core of the lib (#700)
+
+### git log -L '/^func (s \*ProviderServer) CleanUp/,/^}/:challenge/http01/http_challenge_server.go'
+8013d0fb 2026-01-21 17:17:07 +0100 feat: add support for context (challenges) (#2805)
+11929c9c 2024-11-11 18:45:08 +0100 fix: HTTP server IPv6 matching (#2345)
+42941cce 2018-12-06 22:50:17 +0100 Refactor the core of the lib (#700)
+7475e7f9 2016-02-14 16:56:14 +0100 Move the HTTP-01 and TLS-SNI-01 default solvers to a more unified layout. Made the solvers exported and added New... functions to them.
+617dd4d3 2016-01-24 16:10:50 -0500 Refactor challenge providers to new ChallengeProvider interface
+
+### git log -L '/^func (c \*Challenge) Solve/,/^}/:challenge/http01/http_challenge.go'
+d335d451 2026-05-10 19:06:50 +0200 chore: improve logs and error messages (#3056)
+edd764f7 2026-03-25 13:17:26 +0100 refactor: improve some log and error messages (#2926)
+e26d5cee 2026-01-21 18:00:54 +0100 chore: use slog Attr (#2809)
+8013d0fb 2026-01-21 17:17:07 +0100 feat: add support for context (challenges) (#2805)
+218ec2c1 2026-01-19 18:06:42 +0100 feat: new logger (slog) (#2800)
+8d13f8d0 2026-01-17 15:20:18 +0100 feat: add support for context (#2799)
+81e0f2b4 2025-10-30 13:02:35 +0100 chore: update linter (#2699)
+e644196b 2025-02-05 23:52:48 +0100 feat: add delay option for HTTP challenge (#2422)
+e01131f2 2020-03-09 18:10:40 +0100 fix: Improve cleanup log messages. (#1076)
+2da1ce06 2020-02-27 19:14:45 +0100 chore: wrap errors. (#1070)
+68568b7d 2019-01-26 01:11:45 +0100 Log wildcard domain correctly in validation (#773)
+42941cce 2018-12-06 22:50:17 +0100 Refactor the core of the lib (#700)
+
+### git log -L '/^func cleanUp/,/^}/:challenge/resolver/prober.go'
+a3b4aac4 2026-05-19 11:59:11 +0200 chore: improve challenge resolver logs (#3105)
+d335d451 2026-05-10 19:06:50 +0200 chore: improve logs and error messages (#3056)
+e26d5cee 2026-01-21 18:00:54 +0100 chore: use slog Attr (#2809)
+8013d0fb 2026-01-21 17:17:07 +0100 feat: add support for context (challenges) (#2805)
+218ec2c1 2026-01-19 18:06:42 +0100 feat: new logger (slog) (#2800)
+81e0f2b4 2025-10-30 13:02:35 +0100 chore: update linter (#2699)
+e01131f2 2020-03-09 18:10:40 +0100 fix: Improve cleanup log messages. (#1076)
+42941cce 2018-12-06 22:50:17 +0100 Refactor the core of the lib (#700)
+

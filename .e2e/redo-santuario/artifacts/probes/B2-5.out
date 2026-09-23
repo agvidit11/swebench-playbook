@@ -1,0 +1,10 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2371854/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Meeting your three-sentence constraint — first checking the settled scope and resolver chain.
+I will keep successful resolution behavior unchanged while distinguishing resolvers that decline an element as out of scope from resolvers that accept the element and then reject its key material. I will let a decline continue the chain to the next resolver while making an accept then reject decision terminal so no later resolver is consulted for that element. I will attach to the total failure the ordered record of consulted resolvers with each resolver outcome preserved for operator diagnosis.

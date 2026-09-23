@@ -1,0 +1,14 @@
+In this Go repo (go-acme/lego), `Certifier.GetOCSP` in `certificate/certificates.go` resolves a
+certificate's issuer and then asks a responder about that certificate's status.
+
+Requirement, quoted from the issue report:
+
+  When a certificate names more than one place to fetch its issuer from, or more than one
+  responder to ask about its status, the lookup must not give up at the first place that fails.
+  A place that refuses, times out, answers with a failure status, or hands over something other
+  than what was asked for has failed, and the next place must be tried. Once every place has
+  been tried and none of them worked, the error given back must say the lookup failed and what
+  was tried, and must never be a decoding complaint about the certificate the caller passed in.
+
+Describe in 3 sentences how you would implement this requirement in this repo. Approach only, no
+code.

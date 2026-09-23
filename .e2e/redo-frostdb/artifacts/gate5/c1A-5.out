@@ -1,0 +1,9 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2342027/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Serialize the table block once per persist into a single shared in-memory buffer that all sink uploads reuse without reserializing. Serve each sink a separate reader over that buffer that withholds end of stream until every reader has consumed at least one byte, keeping the persist call blocked while any sink has not started. Upload to all sinks concurrently while capturing per-sink failures, removing the partial object through the same failing sink and letting healthy sinks run to completion before returning an error that names the failed sink.

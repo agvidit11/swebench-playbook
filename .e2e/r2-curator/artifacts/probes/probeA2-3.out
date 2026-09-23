@@ -1,0 +1,14 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/577156/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Digging into your ServiceProvider report — tracing why errored instances keep slipping back into rotation.
+That fleet-wide search didn't cover this checkout, so I'll map the discovery module directly.
+I've pinpointed the likely culprit — now I'll confirm how cache refreshes turn it into a production-only failure.
+`DownInstanceManager` keys its down-state map by full `ServiceInstance` equality, which folds in volatile fields such as the frequently refreshed status payload and registration metadata. Each payload refresh, redeploy re-registration, or ZooKeeper reconnect causes `ServiceCache` to deserialize a fresh `ServiceInstance` object that is no longer equal to the object previously passed to `noteError`. The subsequent filter lookup therefore misses, is treated as a never-seen healthy instance, and is returned by `getInstance` immediately without waiting for the five-minute timeout to expire. This explains why isolated tests pass while production fails, since tests reuse the identical object with no intervening cache update. The fix is to key down state by stable identity, namely service name plus instance id, so error counts and timestamps survive re-deserialization and ignore changes to payload and other volatile fields.
+
+On identity change: if the fleet uses stable deterministic ids such as host plus port, a redeploy or container replacement can start a healthy process that reuses the same service name and id with a new address and registration time. The id-only rule would then wrongly keep the healthy replacement out of rotation for the remainder of the old timeout window. I would design around this rather than accept it, by resetting the down record when a new incarnation is detected, since brief over-exclusion is safe but repeatedly sidelining fresh deploys is not.

@@ -1,0 +1,189 @@
+diff --git a/store.go b/store.go
+index c3bc6df..e727eee 100644
+--- a/store.go
++++ b/store.go
+@@ -2,9 +2,11 @@ package frostdb
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"path/filepath"
++	"sync"
+ 
+ 	"go.opentelemetry.io/otel/trace/noop"
+ 
+@@ -32,10 +34,8 @@ func (t *TableBlock) Persist() error {
+ 		return nil
+ 	}
+ 
+-	for i, sink := range t.table.db.sinks {
+-		if i > 0 {
+-			return fmt.Errorf("multiple sinks not supported")
+-		}
++	if len(t.table.db.sinks) == 1 {
++		sink := t.table.db.sinks[0]
+ 		r, w := io.Pipe()
+ 		var err error
+ 		go func() {
+@@ -55,12 +55,159 @@ func (t *TableBlock) Persist() error {
+ 			}
+ 			return fmt.Errorf("failed to serialize block: %w", err)
+ 		}
++
++		t.table.metrics.blockPersisted.Inc()
++		return nil
++	}
++
++	return t.persistToMultipleSinks()
++}
++
++// persistToMultipleSinks serializes the block exactly once and delivers the
++// identical byte stream to every configured sink concurrently.
++func (t *TableBlock) persistToMultipleSinks() error {
++	sinks := t.table.db.sinks
++	fileName := filepath.Join(t.table.db.name, t.table.name, t.ulid.String(), "data.parquet")
++
++	b := &blockBroadcast{}
++	b.cond = sync.NewCond(&b.mu)
++	readers := make([]*broadcastReader, len(sinks))
++	for i := range sinks {
++		readers[i] = &broadcastReader{b: b}
++		b.readers = append(b.readers, readers[i])
++	}
++
++	prodDone := make(chan struct{})
++	var serializeErr error
++	go func() {
++		defer close(prodDone)
++		serializeErr = t.Serialize(b)
++		b.mu.Lock()
++		b.done = true
++		b.serializeErr = serializeErr
++		b.mu.Unlock()
++		b.cond.Broadcast()
++	}()
++
++	uploadErrs := make([]error, len(sinks))
++	var wg sync.WaitGroup
++	for i, sink := range sinks {
++		wg.Add(1)
++		go func(i int, sink DataSink) {
++			defer wg.Done()
++			defer func() {
++				b.mu.Lock()
++				readers[i].finished = true
++				b.mu.Unlock()
++				b.cond.Broadcast()
++			}()
++			if err := sink.Upload(context.Background(), fileName, readers[i]); err != nil {
++				uploadErrs[i] = err
++			}
++		}(i, sink)
++	}
++	wg.Wait()
++	<-prodDone
++
++	if serializeErr != nil {
++		var errs []error
++		for i, sink := range sinks {
++			if uploadErrs[i] != nil {
++				errs = append(errs, fmt.Errorf("failed to upload block to sink %s: %w", sink.String(), uploadErrs[i]))
++			}
++			if deleteErr := sink.Delete(context.Background(), fileName); deleteErr != nil {
++				errs = append(errs, fmt.Errorf("failed to delete partial block on sink %s: %w", sink.String(), deleteErr))
++			}
++		}
++		serializeWrap := fmt.Errorf("failed to serialize block: %w", serializeErr)
++		if len(errs) == 0 {
++			return serializeWrap
++		}
++		errs = append([]error{serializeWrap}, errs...)
++		return errors.Join(errs...)
++	}
++
++	var errs []error
++	for i, sink := range sinks {
++		if uploadErrs[i] != nil {
++			if deleteErr := sink.Delete(context.Background(), fileName); deleteErr != nil {
++				errs = append(errs, fmt.Errorf("failed to upload block to sink %s: %v; failed to delete partial: %w", sink.String(), uploadErrs[i], deleteErr))
++			} else {
++				errs = append(errs, fmt.Errorf("failed to upload block to sink %s: %w", sink.String(), uploadErrs[i]))
++			}
++		}
++	}
++	if len(errs) > 0 {
++		return errors.Join(errs...)
+ 	}
+ 
+ 	t.table.metrics.blockPersisted.Inc()
+ 	return nil
+ }
+ 
++// blockBroadcast is a single-producer, multi-consumer byte stream. The
++// producer (a single Serialize call) appends via Write; each sink consumes
++// the identical bytes through its own broadcastReader. End of stream is
++// withheld from every reader until all readers have begun consuming.
++type blockBroadcast struct {
++	mu           sync.Mutex
++	cond         *sync.Cond
++	buf          []byte
++	done         bool
++	serializeErr error
++	readers      []*broadcastReader
++}
++
++func (b *blockBroadcast) Write(p []byte) (int, error) {
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	b.buf = append(b.buf, p...)
++	b.cond.Broadcast()
++	return len(p), nil
++}
++
++type broadcastReader struct {
++	b        *blockBroadcast
++	off      int
++	started  bool
++	finished bool
++}
++
++func (r *broadcastReader) Read(p []byte) (int, error) {
++	b := r.b
++	b.mu.Lock()
++	defer b.mu.Unlock()
++	if !r.started {
++		r.started = true
++		b.cond.Broadcast()
++	}
++	if len(p) == 0 {
++		return 0, nil
++	}
++	for {
++		if r.off < len(b.buf) {
++			n := copy(p, b.buf[r.off:])
++			r.off += n
++			return n, nil
++		}
++		if b.done {
++			allBegun := true
++			for _, other := range b.readers {
++				if !other.started && !other.finished {
++					allBegun = false
++					break
++				}
++			}
++			if allBegun {
++				return 0, io.EOF
++			}
++			b.cond.Wait()
++			continue
++		}
++		b.cond.Wait()
++	}
++}
++
+ // DefaultObjstoreBucket is the default implementation of the DataSource and DataSink interface.
+ type DefaultObjstoreBucket struct {
+ 	storage.Bucket

@@ -21,9 +21,15 @@ were spent repairing a field that was lying.
 ls <task-dir>/steps/*/tests/config.json 2>/dev/null   # exists -> S5 or later
 ls <task-dir>/steps/*/instruction.md    2>/dev/null   # exists -> S5
 ls -d <task-dir>                        2>/dev/null   # exists -> S4
-ls .e2e/*/handoffs/*A3*                 2>/dev/null   # a survivor card -> S3
+grep -l 'EXIT:.*SURVIVOR' .e2e/*/handoffs/*A3* 2>/dev/null   # a SURVIVOR -> S3
+grep -l 'EXIT:.*NO SURVIVOR' .e2e/*/handoffs/*A3* 2>/dev/null  # -> back to A2, NOT B1
 ls .e2e/*/handoffs/*A2*                 2>/dev/null   # cards, unprobed  -> S2
 # a repo chosen but no cards -> S1 ;  nothing at all -> S0
+#
+# NEVER route on filename existence. An A3 handoff exists whether or not a
+# candidate survived; treating its presence as "a survivor card" sends the next
+# agent into B1 to build a task that does not exist. Read the EXIT line.
+# A3 must write exactly one of `EXIT: SURVIVOR` or `EXIT: NO SURVIVOR`.
 # task name in hand:
 codimango task show <task> --json
 ```

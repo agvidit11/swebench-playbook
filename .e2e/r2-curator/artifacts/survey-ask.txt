@@ -1,0 +1,141 @@
+# Survey ask — apache/curator at HEAD 88dee99a85921bd0f20955e1d7efbaf896fc17f3
+
+You are surveying the repository checked out in the working directory
+(/tmp/curator-run/curator, apache/curator, Java, Apache-2.0, 53k non-test LOC, 13 modules).
+
+Your job is to return **10 to 12 SURFACES**. A surface is NOT a task. It is an invariant or
+behaviour area, the files it lives in, its candidate fork, a rough net-line size, and whether
+asserting it needs real network / wall-clock / concurrency. Surfaces are cheap to produce and
+cheap to discard. Do NOT pre-filter weak ones — label them weak and keep them.
+
+## THE LENS (drive most of the survey from this)
+
+**Search axis: failure-atomic behaviour and error classification under injected fault.**
+**Fork shape: partial-failure atomicity + revert-and-redo.**
+
+I am hunting for places where CURATOR'S OWN RECOVERY SEMANTICS are the design choice — not
+where the ZooKeeper wire protocol determines the answer. The ZK protocol is a published spec and
+anything it determines is recallable from training data and therefore useless to me. What I want
+is the space the spec does NOT determine:
+
+- connection loss / session expiry arriving MIDWAY through a multi-step recipe operation
+- what a registered listener/callback observes, in what ORDER, and HOW MANY TIMES, after a flap
+- partial recipe state left behind when step k of n fails: is it rolled back, retried, leaked,
+  or reported
+- retry-vs-fail-vs-surface classification: which failures Curator decides are recoverable
+- an operation that mutates several znodes or several in-memory structures and dies in the middle
+- cleanup / close / teardown racing with an in-flight background operation
+
+Concretely, the areas I believe are richest (verify or refute each, do not assume):
+- `curator-framework/src/main/java/org/apache/curator/framework/state/` — ConnectionStateManager,
+  the two ConnectionStateErrorPolicy implementations, CircuitBreaker /
+  CircuitBreakingConnectionStateListener / CircuitBreakingManager
+- `curator-x-discovery/` — ServiceDiscoveryImpl register/unregister/update and its
+  re-registration on reconnect, ServiceCacheImpl, DownInstanceManager + DownInstancePolicy,
+  ServiceProviderImpl, the ProviderStrategy implementations
+- `curator-recipes/.../cache/` — CuratorCacheImpl, StandardCuratorCacheStorage,
+  CompatibleCuratorCacheBridge, the listener wrappers, RefreshOperation / GetDataOperation /
+  EventOperation / OutstandingOps
+- `curator-recipes/.../nodes/` — PersistentNode, PersistentTtlNode, GroupMember
+- `curator-recipes/.../atomic/` — DistributedAtomicValue / DistributedAtomicLong / PromotedToLock
+- `curator-recipes/.../queue/` — DistributedQueue, ErrorMode, QueueSharder, QueueSafety
+- `curator-recipes/.../barriers/`, `curator-recipes/.../shared/`, `curator-recipes/.../watch/`
+- `curator-framework/.../imps/` — the background operation / retry machinery, CuratorFrameworkImpl,
+  NamespaceFacade, the transaction implementations
+
+**HARD EXCLUSION — do not return any surface in
+`curator-recipes/src/main/java/org/apache/curator/framework/recipes/locks/` or
+`.../recipes/leader/`.** Those are already mined by peer benchmark tasks (distributed mutex,
+lock extension, stale lock ownership, leader election). Anything whose core noun is "lock",
+"mutex", "semaphore", "lease" or "leader election" is dead on arrival.
+
+Also return **2 UNLENSED CONTROL SURFACES** — anywhere in the repo, chosen however you like,
+ignoring the lens entirely. Label them CONTROL. This protects me if my lens is the wrong one.
+
+## MANDATORY per surface — a surface with any of these missing is worthless to me
+
+1. **HEAD citation.** State what HEAD does TODAY for this behaviour, with a `path/File.java:LINE`
+   citation. Then state explicitly whether the behaviour I am describing is ALREADY FULLY
+   IMPLEMENTED there. If it is, say so plainly and KEEP THE SURFACE IN THE LIST ANYWAY, marked
+   `ALREADY-IMPLEMENTED`. I would much rather have an honest "this already works" than a
+   plausible-sounding gap. I will verify every citation by hand and a wrong one is worse to me
+   than no surface at all.
+
+2. **Nearest presence.** You cannot cite an absence. So quote VERBATIM the closest existing thing
+   to whatever you claim is missing, and say which case it fails to cover.
+
+3. **The fork, as two concrete implementations.** Name TWO materially different implementations
+   that a competent Java engineer could plausibly write, and say how they DIVERGE OBSERVABLY.
+   If you can only name one implementation family, say "FORK ZERO" and keep the surface labelled
+   as such. Do not invent a second family to fill the field.
+
+4. **The fault to inject, and the observable invariant under it.** Name the exact fault (session
+   expiry between op A and op B; connection SUSPENDED during a background refresh; the process
+   closing while N callbacks are queued; a znode deleted by a third party mid-operation). Then
+   state, as ONE sentence, what must remain TRUE after that fault. State the invariant, never the
+   API to add.
+
+5. **The tension, if there is one.** Two requirements that pull AGAINST each other in this same
+   area — e.g. "notify every listener" vs "do not block the event thread"; "retry until the
+   session is definitely gone" vs "fail fast so the caller can shed load". One sentence. If there
+   is no real tension here, say "no tension" rather than manufacturing one.
+
+6. **Determinism seam.** Can this be asserted deterministically? Name the actual injection point
+   that exists in the repo today — an injectable clock, a `TestingServer` restart / session kill,
+   a `ConnectionStateListener` you can drive by hand, an executor you can replace with a
+   same-thread one, a latch. If asserting it requires a `Thread.sleep` or a timing threshold,
+   SAY SO — that makes it much less useful and I need to know.
+
+7. **Vocabulary check.** List every noun your observable contract needs, and mark each as
+   ALREADY-IN-REPO (give the grep) or COINED-BY-YOU. Surfaces whose contract is mostly coined
+   vocabulary are near-worthless to me, so prefer contracts expressed through classes, methods
+   and enum constants that ALREADY EXIST at this commit.
+
+8. **Size.** Rough net lines and file count for a fix/feature here. My target band is 80-150 net
+   lines across 2-4 files. Say if it is far outside.
+
+## SHAPE DIVERSITY — I will reject a flat list
+
+Left alone, a survey returns almost entirely "here is an existing bug" surfaces. I need:
+- at least a THIRD of the surfaces to be NET-NEW CAPABILITY whose observable is a BEHAVIOUR
+  under adversarial conditions, not a new API to call. State what must remain true under crash /
+  concurrency / interleaving / ordering / reentrancy — never "add a method that returns X".
+- at least TWO surfaces that are REVERT-AND-REDO shaped: there is an obvious, naive, eager
+  implementation that a competent engineer writes first, and a second requirement that makes that
+  first implementation UNTENABLE so it must be torn out rather than extended. For these two, say
+  explicitly what the naive first implementation is and why a second requirement kills it.
+
+## AUTO-REJECT — do not return these, they waste both our time
+
+- Anything whose hard part I can name in three words or fewer (circuit breaker, LRU eviction,
+  exponential backoff, leader election, connection pool, retry with jitter). If it has a
+  three-word name the model recalls it from training data.
+- Anything determined by the ZooKeeper protocol itself, or by ZooKeeper's own documented
+  guarantees (watch-once semantics, sequential znode ordering, the session expiry algorithm).
+- Anything whose deliverable is a newly invented record/report/ledger/audit-trail/metrics-schema
+  whose field names would BE the task.
+- Anything under `locks/` or `leader/` (see hard exclusion above).
+- A fix under ~20 lines, or one that just composes two functions the repo already ships.
+- Split / extract / rename / move a large class.
+- Anything requiring a real external ZooKeeper ensemble or real network. `curator-test`'s
+  in-process `TestingServer` / `TestingCluster` IS available and IS fine.
+
+## Admissions found already — verify these against HEAD before using them
+
+- `curator-framework/.../state/ConnectionStateManager.java:264` — comment: this "hack" fixes it by
+  forcing the state to "RECONNECTED"
+- `curator-recipes/.../cache/NodeCache.java:169` — bare TODO
+- `curator-recipes/.../cache/TreeCache.java:375` — TODO consider doing update of cversion, pzxid,
+  numChildren only
+- `curator-recipes/.../cache/PathChildrenCache.java:396` — bare TODO
+
+An in-code admission is the strongest evidence of a real gap there is. Read each one in context,
+say what it actually concedes, and say whether it is still true at HEAD. Also grep for more
+admissions yourself in the modules above — I only grepped four directories.
+
+## OUTPUT FORMAT
+
+Plain markdown. One `## SURFACE n — <short title>` heading per surface, then the eight mandatory
+fields as labelled subsections. Put the CONTROL surfaces last. No preamble, no summary, no
+recommendations about which to pick — I do the picking. Be concrete and cite lines. If you run
+short of time, return FEWER surfaces with COMPLETE fields rather than more with thin ones.

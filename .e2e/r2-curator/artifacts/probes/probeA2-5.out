@@ -1,0 +1,16 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/577159/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Fleet downing keeps slipping — tracing why bad hosts snap back.
+Your downed backends keep resurfacing — I'm digging into how Curator tracks them.
+That search backend didn't cover this checkout — switching to local lookup.
+I've pinpointed the identity mismatch — now checking how routine updates trigger it.
+I found a reproduction case tied to this report — reading it to confirm the mechanism.
+The down list is keyed by the whole ServiceInstance value, whose equality covers payload, registration time, enabled flag and other mutable fields. In isolation that key stays stable, so error counting and the five-minute purge behave as tested. In production every status-payload refresh, redeploy re-registration, or ZooKeeper reconnect and cache rebuild deserializes a fresh instance object that is logically the same backend but no longer equal to the key stored by noteError. The filter lookup then misses and the supposedly downed backend passes filtering again within seconds, long before the timeout expires. The fix is to key down state by stable logical identity, namely service name plus instance id, so only metadata changes preserve the error count and timeout while removals can be evicted.
+
+The new rule treats any two records with the same service name and id as the same instance even if address, port, or registration time changed. It is wrong during a rolling deploy or container recycle that reuses an id for a healthy replacement on a new host, where the old backend's error history would unfairly keep the replacement out of rotation until the timeout expires. I would accept that brief fail-closed penalty as the safer default for a short window, but design around frequent id reuse by clearing the down entry when the instance is removed or when its endpoint or registration time changes while still ignoring payload-only updates.

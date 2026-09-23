@@ -1,0 +1,11 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/2371740/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+I'll read the resolver chain and threat model to shape a three-sentence approach.
+I’ve mapped the resolver scan; now I’ll sample implementations to finalize the approach.
+I would separate the existing two-phase check so the chain records whether each consulted resolver declined via can-resolve versus accepted the element and then failed to produce material. I would change the total-failure path to abort the scan at the first accept-then-reject, collect the ordered per-resolver outcomes consulted so far, and surface them in the thrown failure while leaving the first-successful-key return path untouched. I would preserve current resolver implementations by treating their existing null returns and resolve-time exceptions as accept-then-reject signals and adding the new halt-and-report logic only in the orchestrating scan.

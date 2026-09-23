@@ -1,0 +1,13 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/165125/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Fixing the ghost-instance comeback — inspecting the error-tracking to nail the identity rule.
+Both required files read — now checking ServiceInstance equality to pin down the identity fix.
+I see the outline — now pulling the full definition to confirm the equality logic.
+I've confirmed the bug — full-object equality lets payload updates slip past the filter. Now I'll verify the remaining edge cases to finalize the identity rule.
+The problem is that DownInstanceManager keys its statuses map by the whole ServiceInstance, whose equals and hashCode fold in payload plus registrationTimeUTC, enabled and uriSpec, so a payload re-publish or a freshly deserialized copy after a reconnect no longer equals the key stored by noteError and the filter misses. I would define same-instance as same service name, instance id, address and port/sslPort, deliberately ignoring payload, registrationTimeUTC, uriSpec and enabled, and normalize both the error-recording path and the filter path through that projection. Explicitly, I would stop using ServiceInstance itself as the ConcurrentMap key and replace it with a small immutable identity key derived from only those endpoint fields, so both sides always hash to the same entry across re-publishes and object rebuilds. That keeps a payload-updated or rebuilt bad endpoint down while letting the rolling-deploy replacement with the same id but a different host and port hash differently, so old errors neither penalize nor exclude it. The trade-off I accept is penalizing a true restart that reuses the same id on the same address and port, which will inherit the remainder of the down window; with no generation epoch to distinguish re-publish from replacement, failing closed for one short policy timeout is safer than letting a still-broken address flap back into rotation.

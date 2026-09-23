@@ -1,0 +1,2 @@
+  [33mWARN[0m  probeC3-B.txt: 89% constraint coverage, missing ['successful', 'tell', 'unchanged', 'whether']
+  [32mPASS[0m  probe states the constraint, does not leak the design, two distinct phrasings

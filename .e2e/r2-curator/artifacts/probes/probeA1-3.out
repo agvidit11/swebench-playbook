@@ -1,0 +1,12 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/165129/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Fixing your flapping down-instance problem — first inspecting how errors are tracked.
+I've confirmed the error map keys on full instance equality — now checking what defines instance identity.
+I've pinpointed the flaw — payload changes break error tracking. Now I'm verifying the fix handles rolling deploys correctly.
+The miss happens because DownInstanceManager keys its statuses map by the whole ServiceInstance, whose equals and hashCode mix stable endpoint identity with mutable metadata like payload, so any payload republish looks like a new key and the error count is lost, as does any logically identical but newly deserialized object that differs in those volatile fields. I would define sameness as the stable process endpoint, namely service name plus instance id plus address plus port plus sslPort, deliberately ignoring payload, registrationTimeUTC, enabled, uriSpec and serviceType noise. I would stop using ServiceInstance itself as the ConcurrentMap key and instead key statuses by that derived endpoint identity, converting to the key in both noteError recording and filter lookup so the two paths always agree. Then a payload update or cache rebuild maps to the same key and stays filtered until the policy timeout, while a rolling replacement sharing only the id but with a different host or port maps to a different key and starts clean. The trade-off is that a genuinely new process that reuses the same id on the same host and port inherits the old error count until expiry rather than getting an instant clean slate, which I sacrifice because the penalty is time-bounded by the existing purge while letting a bad instance escape by republishing would immediately return traffic to a known failure.

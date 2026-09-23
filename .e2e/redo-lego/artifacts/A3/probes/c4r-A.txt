@@ -1,0 +1,14 @@
+In this Go repo (go-acme/lego), `challenge/tlsalpn01` and `challenge/http01` each expose a
+`ProviderServer` type with `Present` and `CleanUp` methods. `Present` brings up a listener that
+answers one ACME challenge; `CleanUp` is meant to take it away again.
+
+Requirement, quoted from the issue report:
+
+  A nil result from a challenge server's CleanUp must mean the challenge server really is gone:
+  nothing it accepted before teardown may still be usable afterwards, and its address must be
+  free. If the challenge server could not be shut down, CleanUp must give back an error
+  describing that failure instead of reporting success. CleanUp must always finish promptly; it
+  must never block waiting for something that will never happen.
+
+Describe in 3 sentences how you would implement this requirement in this repo. Approach only, no
+code.

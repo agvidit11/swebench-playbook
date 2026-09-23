@@ -44,10 +44,21 @@ def content_tokens(s):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    outdir = None
-    if "--outputs" in sys.argv:
-        outdir = sys.argv[sys.argv.index("--outputs") + 1]
+    # Parse properly. The old form stripped "--outputs" but NOT its value, so the
+    # directory landed in probes[] and open() raised IsADirectoryError -- killing the
+    # one branch that prints the direction reminder, i.e. the exact guard against the
+    # inverted mapping this tool exists to prevent. Found on the frostdb redo.
+    argv, args, outdir = sys.argv[1:], [], None
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--outputs":
+            if i + 1 >= len(argv):
+                print("  FAIL  --outputs needs a directory")
+                return 2
+            outdir = argv[i + 1]; i += 2; continue
+        if argv[i].startswith("--"):
+            i += 1; continue
+        args.append(argv[i]); i += 1
     if len(args) < 3:
         print(__doc__)
         return 2

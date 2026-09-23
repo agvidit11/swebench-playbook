@@ -1,0 +1,13 @@
+MetaCode at Meta (https://fburl.com/metacode)
+Using AI Gateway (Meta Model API upstream)
+[metacode] using AI inference gateway (Model API): https://metacode-modelapi.ai-gateway.fbinfra.net/v1
+Warning: Failed to mount .arcrc: Mount failed '/tmp/phabricator_cats/metacode_agvidit/1048827/arcrc' to '/home/agvidit/.arcrc': ENOENT: No such file or directory
+[93mWARNING: 11 skill(s) in /home/agvidit/.claude/ not available for MetaCode.[0m
+MetaCode reads skills from ~/.agents/skills/ and .metacode/skills/, not from .claude/.
+Run `metacode migrate-from-claude` to copy them to ~/.agents/skills/, or `agent-market skill <name> install --agent metacode`, or open MetaCode TUI and run `/legacy-skills` to see the list.
+
+Fixing the permanently-stale view — now tracing the swallow logic to plan the reconciliation.
+I see the suspect — the same-state close suppresses the update. Now I'll verify the exact stale sequence.
+Search isn't available here — I'll look up the tests directly.
+Let me check the `ConnectionState` semantics and the repo state to pin down the exact stale sequence.
+The wedge comes from `closeCircuit()`'s dedup: when the last state recorded while open equals the state that opened the circuit, it forwards `null` — nothing — on the theory the managed listener already heard that state at open time and a repeat would just be noise. But inside the window the listener missed everything in between, typically the `RECONNECTED` that restored connectivity, and a flap that settles back on the opening state (e.g. `SUSPENDED…RECONNECTED…SUSPENDED`, all but the first swallowed) makes the close emit nothing, so the listener's last-heard state stays disconnected. Since connection states are edge-triggered, a now-healthy connection emits no further events, so nothing ever repairs the listener and the recipe sits parked in "down" forever while operations succeed. The fix is to make `closeCircuit()` a reconciliation point: always forward `circuitLastState`, the freshest observed state, on close — including when it equals `circuitInitialState` — so the managed listener converges to current connectivity at every close. The trade-off is sacrificed shielding in favor of accuracy: a same-state close now delivers a redundant duplicate (e.g. a second `SUSPENDED`) and may trigger one extra round of recipe reset work, but a duplicate down-notification is cheap and effectively idempotent while a swallowed recovery is a fatal liveness bug — and debouncing still applies fully while the circuit is open, so the flap itself stays shielded.

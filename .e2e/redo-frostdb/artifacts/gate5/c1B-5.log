@@ -1,0 +1,2 @@
+mc.sh: sending 1226 bytes sha=1080ebf73767 from probes/c1-step2-B.txt
+mc.sh: exit=0 bytes=1260 -> artifacts/gate5/c1B-5.out

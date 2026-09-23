@@ -134,6 +134,21 @@ REPRO-I  apply(newEndpoint) after error      = true      <-- distinct endpoint u
 instance is back in rotation. `REPRO-I` is the property that today works **by accident** of the
 whole-record key, and that the obvious repair destroys.
 
+## Probe declarations — fixed BEFORE any probe, per `A3` GATE 5 pre-check ①
+
+> **NOTE ON TIMING, stated so the record is honest.** These three fields were added at 17:20,
+> *after* the first 15 probes had already run. `A3` was rewritten mid-run (commit `e744c14`,
+> "A3: fix the instrument that produced two invalid kills") and `tools/probe-lint.py` was created
+> at 17:01 — both **after** my probes executed at 16:52–17:00. The direction below is nonetheless
+> the one recorded in this card's own "Named wrong shape" section from the start (key by
+> `getId()` = the wrong shape), so it is not being read off the outputs. See `friction.md` F10.
+
+CONSTRAINT: When a caller reports a service instance as failing through the service provider, that instance must stay out of the results the provider returns for the configured down-instance window, and must continue to stay out for the rest of that window even if the instance re-publishes its registration record during the window — for example when its owner updates the payload it advertises, when its enabled flag is toggled, or when the service cache rebuilds its record objects after a reconnect. At the same time, two instances that are concurrently registered under the same instance id at different network endpoints are different instances, and reporting errors against one of them must not keep the other one out of the results.
+
+DESIRED: Error attribution is scoped to the network endpoint — the stable tuple of service name, instance id and the address and ports the instance advertises — so that mutable descriptive metadata is excluded from the comparison while a move to a different address or port is treated as a different instance.
+
+NON-DESIRED: Error attribution keyed on the instance id alone, or on name plus id, so that a replacement or sibling at a different address or port inherits the exclusion; or attribution left keyed on the whole record so that any metadata change clears it; or clearing the exclusion whenever the record changes at all.
+
 ## The two requirements that pull against each other — this is the difficulty
 
 | | Requirement | What it forbids |
