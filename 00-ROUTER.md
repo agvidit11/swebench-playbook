@@ -110,6 +110,24 @@ A review verdict is **bound to a commit SHA**. Re-running validation on the same
 the cached verdict — `task rerun` will look like it did nothing. A new commit is the trigger.
 `rerun` is correct only when the prior run was infrastructure. Rerun budget: 3 per model.
 
+**The rerun budget is NOT a limit on pushing.** It caps `task rerun` against an *unchanged* SHA.
+A new commit is always a fresh trigger and always free. Do not ration pushes against it — that
+was a misreading, and it argued for exactly the hoarding posture `A3` §0a now rejects.
+
+### Ship early, repair on the server
+
+`STATUS: LIVE`. The local instruments do not predict the band (`A3` §0a), the server does, and
+`C1`–`C6` exist to repair a task from real trial data. So:
+
+- **A task that clears the factual vetoes and has branch count ≥3 should be pushed, not polished.**
+  The first server verdict is worth more than another local round.
+- **Push the first version early**, then iterate on evidence. `C3` hardening on a 5/5 return is a
+  normal round, not a failure — you have real trajectories to work from.
+- **Do not wait on one task to finish before starting the next.** `C5` sequences a cohort; the only
+  serial constraints are the Docker mutex and, per task, `B2 → B3 → B4 → B5`.
+- **Unattended is the target.** Every act has a machine-readable `EXIT:` line and a `HANDOFF` so a
+  run can be resumed by a different agent. Checkpoint often; that is what makes hands-free work.
+
 ### S8 — what "wait" actually means
 
 `S8` is a **state, not an act**. There is no act-file; this is the whole procedure.
