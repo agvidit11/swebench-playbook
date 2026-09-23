@@ -396,7 +396,26 @@ Only candidates past GATE 0–7 reach scoring, and a **different** model scores 
 > absolute veto over the primary one and never said which won. A run hit the contradiction
 > head-on and had to improvise; that was a defect, not its error.
 >
-> **Fork strength ≤2 is a veto ONLY when GATE 4 was not measured in band.**
+> ### FALSIFIED ON ITS FIRST TEST — 2026-09-23. Treat the veto as ABSOLUTE again.
+>
+> `connect-go-trailing-metadata-parity` was built on this exception and **failed**:
+> `GATE 5` measured fork 1 and Codex's `GATE 8` said *"Would I build it? No."*;
+> `GATE 4` A3-LOCAL measured **3 of 5, in band**, so under the rule below it was built.
+> The server returned **`avocado 1|1` — 5 of 5 on step 1, over the ceiling** — plus
+> `BAD_GRADING_WEAK`. **Codex was right and the exception was wrong.**
+>
+> The single paired observation we have says a local `GATE 4` 3/5 does **not** predict the
+> server's band on a fork-1 candidate. n=1, but it is the only paired data point, and it went
+> against the rule. So:
+>
+> **Fork ≤2 is an absolute veto. Do not build.** The text below is retained only so the
+> reasoning is legible and so a future paired measurement can reopen it deliberately rather
+> than by someone re-deriving the same argument from scratch.
+>
+> To reopen it you need **paired local-vs-server data on ≥3 fork-1 candidates**, not another
+> argument. Record any such pair in `ledger/RUNS.md`.
+>
+> ~~Fork strength ≤2 is a veto ONLY when GATE 4 was not measured in band.~~ `STATUS: SUPERSEDED`
 >
 > | Fork (GATE 5) | Outcome variance (GATE 4 A3-LOCAL) | Verdict |
 > |---|---|---|
