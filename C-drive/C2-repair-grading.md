@@ -217,10 +217,25 @@ Each rule below was learned by losing a round to it:
 possible cybersecurity risk"* on briefs touching auth, signatures, credentials or trailer/header
 policy. This is blocking, because Codex owns everything under `tests/`.
 
-**The trigger is the CODE-EXECUTION shape, not the vocabulary.** The sharp measurement: a brief
-that died on the filter was re-dispatched on the *same repo and same subject*, **prose-only with
-code execution forbidden**, and completed cleanly. Renaming the concepts does not help and is
-dishonest; removing the execution ask does.
+**Sometimes the trigger is the code-execution shape, and reframing works.** Measured once: a brief
+that died on the filter was re-dispatched on the same repo and subject, **prose-only with code
+execution forbidden**, and completed cleanly.
+
+**But do not count on it.** `STATUS: LIVE`, second measurement 2026-09-23: two dispatches died on
+the same filter costing **~333k tokens and ~40 minutes**, and the second died merely *reading*
+the repository's own generated gomock file. There was no execution ask to remove. Renaming the
+concepts does not help and is dishonest.
+
+**The worst part is that you cannot see it happen.** On a filter kill `--output-last-message` is
+**never created**, which is exactly the signal the polling method uses for "finished" — so a
+filtered dispatch is indistinguishable from one still running, and you wait out the full timeout.
+Poll the **log file's mtime** as well as the output file, and treat a long stall with no log growth
+as a probable filter kill rather than slow work.
+
+**Know the bias this introduces.** The filter fires hardest on security-adjacent and
+storage/recovery material — partial-write recovery, crash consistency, credential handling. Those
+are among the richest sources of genuine difficulty, so the tooling is silently steering us away
+from good candidates. Record it when it happens; do not quietly re-aim at an easier subject.
 
 So when it fires:
 

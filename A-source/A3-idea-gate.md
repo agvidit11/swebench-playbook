@@ -348,6 +348,16 @@ The probe also reveals **which assertion carries the task**: impl-1's 9 failures
 > primary label anywhere in the sample.** (The stronger claim "DESIGN 0/51" was withdrawn by its
 > own author as not cleanly separable from the placement category — the weaker claim stands.)
 >
+> **Line 3, a single candidate dissected** (`.e2e/loop-1/`): a card cleared gates 0, 1, 2, 3, 6 and
+> 7 cleanly, then measured fork 10/10 DESIRED across two lint-passing phrasings, and the mandatory
+> adversarial KILL AUDIT upheld it. Its author's root cause is the sharpest statement we have:
+>
+> > *its variance carrier was QUALITY (completeness of a reset), not DESIGN — and the fork axis
+> > only measures DESIGN, so that premise shape **cannot clear GATE 5 by construction**.*
+>
+> That is the whole objection in one sentence. The gate is not mismeasuring those candidates; it
+> is measuring the wrong axis for them, and will reject every QUALITY premise it is shown.
+>
 > **What this gate has cost:** ~17 candidates killed across two nights.
 >
 > **The proposed replacement is `B3`'s BRANCH COUNT** — how many independent ways a competent
@@ -429,6 +439,13 @@ Each is a fail and each is decidable without a build. `STATUS: LIVE (PEER)`
 | **Never grade against a library export** [R05] | If the reference answer is callable from inside the solution — matching a public export's output exactly — the grader leaks the solution |
 | **Anti-overcorrection** [N04] | **Under ~20 lines, or composes two shipped functions → discard.** Verification alone selects trivia: absent *and* substantial. Target 80–150 net lines across 2–4 files |
 | **Normaliser consistency** [R08] | If graded entries are read through a normaliser (`to_h`, a serializer, an accessor), **every** assertion must go through it; one assertion reaching past it re-narrows the contract |
+
+> **A wrong answer that HANGS is ungradeable, and this gate had no row for it.**
+> `STATUS: LIVE`, 2026-09-23. A candidate was killed here because the plausible wrong
+> implementation does not return a wrong *value* — it **deadlocks**. A grader can assert on a
+> wrong value; a hang produces a timeout, which reads as infrastructure, not as a failed
+> assertion, and it burns the trial's whole budget. Add the question: *what does the plausible
+> wrong implementation DO — return something wrong, or fail to return?* If the latter, kill it.
 
 ## GATE 7 — cascade viability
 

@@ -270,7 +270,11 @@ is 9k LOC of helpers is a small repo for our purposes.
 It costs 60 seconds and it runs **before** you commission a survey. Applied as a pre-check to
 `kustomize` (24,469 LOC targetable, near-zero churn) it cleared in under a minute.
 
-## 9a. Two gates that SILENTLY PASS — assert before you measure
+## 9a. FOUR gates that silently lie — assert before you measure
+
+`STATUS: LIVE`. Each produces a confident result from a check that never ran. Two report clean
+when they should kill; two report the opposite. All four were measured, and three of them
+each cost a run.
 
 `STATUS: LIVE`, both measured 2026-09-23. Each produces a clean-looking result from a check that
 never ran, which is worse than a failure because nothing looks wrong.
@@ -285,7 +289,20 @@ gh api repos/<slug> --jq '.full_name' || { echo "SLUG DOES NOT RESOLVE — stop"
 ```
 Resolve the slug **first**, and screen the name the API returns, not the one you typed.
 
-**② The churn gate passes paths that do not exist.** A first churn table read `atc/algorithm 0`
+**② A `gh api` presence probe reports EVERY path as present.** The inverse of ①, and it fails
+*closed* rather than open: `gh api` writes the 404 JSON body to **stdout**, so a naive
+`gh api .../contents/<path> | grep -q .` is true for every repo. One G2 sweep "killed" all 17
+candidates on this. Branch on the exit status, never on output:
+
+```bash
+gh api "repos/$slug/contents/$path" >/dev/null 2>&1 && echo PRESENT || echo ABSENT
+```
+
+**③ The `SUB=` subsystem one-liner returns 0 on every repo** — the inner `ls` output is discarded,
+so the count is always empty. Any subsystem figure produced by it is fiction. Count directly and
+print what you counted.
+
+**④ The churn gate passes paths that do not exist.** A first churn table read `atc/algorithm 0`
 and `atc/radar 0`; neither directory is in the repo. A zero from a nonexistent path is
 indistinguishable from a genuinely quiet subsystem.
 
