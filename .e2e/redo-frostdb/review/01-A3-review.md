@@ -2,12 +2,13 @@
 
 ## Verdict: FAIL
 
-The substantive **NO SURVIVOR** conclusion is supportable, but the act fails the review contract because checklist item 7 is ticked without valid evidence of its required discriminating behaviour. The handoff calls the 5/5 result a valid GATE-4 kill (`handoffs/01-A3.md:228-290`), while its own adversarial audit establishes that S2 observes EOF, not serialization or retained memory (`handoffs/01-A3.md:343-350`). Under the review rule that an unsupported tick is a FAIL, the independent GATE-1/GATE-3 reasons that C1 should stay dead do not rescue the act's checklist verdict (`handoffs/01-A3.md:137-143,379-386`; `A-source/A3-idea-gate.md:90-113,185-194`).
+The substantive **NO SURVIVOR** conclusion is supportable, but the act fails the review contract because checklist item 7 is ticked without valid evidence of its required discriminating behaviour and item 1 omits the card's named residual risk. The handoff calls the 5/5 result a valid GATE-4 kill (`handoffs/01-A3.md:228-290`), while its own adversarial audit establishes that S2 observes EOF, not serialization or retained memory (`handoffs/01-A3.md:343-350`); the card's `N03` residual `FAIL` is not carried into the handoff (`cards/C1-multisink-persist.md:94-111`; `handoffs/01-A3.md:180-184`). Under the review rule that an unsupported tick is a FAIL, the independent GATE-1/GATE-3 reasons that C1 should stay dead do not rescue the act's checklist verdict (`handoffs/01-A3.md:137-143,379-386`; `A-source/A3-idea-gate.md:90-113,185-194`).
 
 ## Checklist audit
 
 | Item spot-checked | Result | Evidence |
 |---|---|---|
+| 1 — cards and residual risks | **Fail** | The card records an `N03` residual `FAIL` (`cards/C1-multisink-persist.md:94-111`), but the handoff never lists that residual risk; its only later mention of the card concerns the probe fields (`handoffs/01-A3.md:180-184`). The checklist requires the cards and their residual risks to be listed (`A-source/A3-idea-gate.md:451-454`). |
 | 2 — GATE 0 | Pass, carried evidence | The current handoff inventories the exercised symbols and reports zero coined tokens (`handoffs/01-A3.md:68-76`). The underlying prior handoff contains the token-by-token table and source locations (`.e2e/pair-frostdb/handoffs/02-A3.md:44-71`). This should have been linked explicitly in the current artifact, but it is inspectable evidence at the same base commit. |
 | 5 — GATE 2 | Pass | The saved base run fails S1 with `multiple sinks not supported`, fails S2 because sink B never begins, and fails S3 cleanup, while S4 passes (`artifacts/gate4/base-validation.txt:1-15`). This is an executed reproduction, not a restated example. |
 | 6 — GATE 3 | Pass; independent killing fact | The handoff records function-scoped history and quotes `6169cce`, whose diff replaces `Serialize()` plus `bytes.NewReader` with `io.Pipe` on `Persist` (`handoffs/01-A3.md:124-143`). The act's hard-kill rule covers a merged public change publishing the remedy on this surface (`A-source/A3-idea-gate.md:183-194`). Search counts beyond the local commit are present only as a handoff transcript, not raw receipts (`handoffs/01-A3.md:152-178`). |
@@ -16,7 +17,7 @@ The substantive **NO SURVIVOR** conclusion is supportable, but the act fails the
 | 9 — GATE 6 | Correctly exposes a failure | The handoff reports that S2's decisive branch uses a five-second wall clock (`handoffs/01-A3.md:301-310`), violating the no-wall-clock filter (`A-source/A3-idea-gate.md:340-352`). This is another reason the GATE-4 result cannot be promoted to a valid kill. |
 | 10 — GATE 7 | Pass | It gives both required answers: step-1 gold fails S2, and a sibling API would not replace the `Persist` path used by `writeBlock`/`RotateBlock` (`handoffs/01-A3.md:313-324`). |
 
-The declared `12 of 14` is not valid: item 12 was called waived even though its three veto axes were actually stated (`handoffs/01-A3.md:25-29,326-332`), and item 7 was ticked although the assertion did not satisfy its direct-observation requirement (`handoffs/01-A3.md:228-290,343-350`). The alternate GATE-1/GATE-3 kills support the no-survivor substance, but they do not cure a falsely ticked checklist line.
+The declared `12 of 14` is not valid: item 1 omits the card's named residual risk (`cards/C1-multisink-persist.md:94-111`; `handoffs/01-A3.md:180-184`), item 12 was called waived even though its three veto axes were actually stated (`handoffs/01-A3.md:25-29,326-332`), and item 7 was ticked although the assertion did not satisfy its direct-observation requirement (`handoffs/01-A3.md:228-290,343-350`). The alternate GATE-1/GATE-3 kills support the no-survivor substance, but they do not cure falsely ticked checklist lines.
 
 ## Evidence quality
 

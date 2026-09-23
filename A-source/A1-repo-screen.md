@@ -242,6 +242,33 @@ compiler task as security to game the table.**
 AI-authorship % (method) | LOC / subsystems | name-free hosting: YES/NO + the entry point | graded-path
 seconds, MEASURED | rank | why-not (for rejects)`
 
+## 9a. Two gates that SILENTLY PASS — assert before you measure
+
+`STATUS: LIVE`, both measured 2026-09-23. Each produces a clean-looking result from a check that
+never ran, which is worse than a failure because nothing looks wrong.
+
+**① A repo slug that 404s reads CLEAN on every gate.** A screen of `jdbi/jdbi3` — which does not
+exist — returned a textbook-clean G1 peer sweep. The real repo, `jdbi/jdbi`, has **its HEAD as a
+merged `claude-*` branch**, 12 merged `claude-*` PRs, and **292 commits by "Claude (on behalf of
+Steven Schlansker)"**. Every gate would have passed the typo.
+
+```bash
+gh api repos/<slug> --jq '.full_name' || { echo "SLUG DOES NOT RESOLVE — stop"; exit 1; }
+```
+Resolve the slug **first**, and screen the name the API returns, not the one you typed.
+
+**② The churn gate passes paths that do not exist.** A first churn table read `atc/algorithm 0`
+and `atc/radar 0`; neither directory is in the repo. A zero from a nonexistent path is
+indistinguishable from a genuinely quiet subsystem.
+
+```bash
+for d in <target subsystems>; do
+  [ -e "$clone/$d" ] || { echo "PATH ABSENT: $d — the gate did not run"; continue; }
+  printf '%-40s %s\n' "$d" "$(git -C "$clone" log --since=90.days --oneline -- "$d" | wc -l)"
+done
+```
+**Every churn figure must be accompanied by proof the path exists.** A `0` without it is unmeasured.
+
 ## 9b. Two gate corrections from the 2026-09-22 runs
 
 **G2's agentic-artifact check must be CONTENT-based, not presence-based.** `STATUS: LIVE`.

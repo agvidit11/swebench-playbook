@@ -114,7 +114,53 @@ card did not previously contain. I took the reading that deriving `CONSTRAINT`/`
 wrong shape (`cards.md:478-489`) is transcription, not re-cutting, and recorded both citations in
 `artifacts/cardC3.md` so the derivation is checkable. A sentence in `A3` would remove the doubt.
 
-## R8 — `B2` is missing two rules the source pipeline had (carried from the common brief, not reached)
+## R8 — GATE 1's fork-collapse test would have killed C3 for free, and nothing makes you run it first
+
+The gate table prices GATE 1 at **free** and GATE 4/5 at fifteen model calls plus six Docker runs.
+C3's contract sentence and observable-consequence sentence are the same sentence with the pronouns
+changed — the fork-collapse test's exact stated condition — and that is visible from the card
+alone, before any tooling. I ran the expensive gates anyway because this was a commissioned
+re-measurement, and they agreed. On an ordinary run that is ~45 minutes spent confirming something
+a two-line comparison had already decided.
+
+The reason it is easy to skip: the fork-collapse test is a single blockquote inside GATE 1's prose
+(`A3-idea-gate.md:~126`), while the checklist line that covers it (line 3) bundles it with three
+other pre-filters and asks for "the two sentences side by side" as one proof among four. It reads
+like paperwork. It is the cheapest kill in the act.
+
+**Fix:** give the fork-collapse test its own checklist line with its own proof — *the two
+sentences, written out, and a one-word verdict* — and put it **first**, ahead of pre-filters 1-3.
+Related: `probe-lint.py` has the card's `CONSTRAINT` and `DESIRED` in hand and could compute this
+for free. If `DESIRED`'s content words are a subset of `CONSTRAINT`'s, the fork has collapsed and
+the probe is ceremony; the linter should say so rather than passing the prompt.
+
+## R9 — the new pre-filter 4 is right, and C3 is the counter-example that shows it is not sufficient
+
+`A3` gained GATE 1 pre-filter 4 (observational equivalence) partway through this run, off the
+frostdb C1 finding. C3 **passes** it cleanly: a report-only implementation cannot fake
+`Succeeding.invocations() == 0`, so the difference is a clean predicate over the public interface.
+C3 then measured **5 of 5** on GATE 4 anyway. The two failure modes are independent —
+
+- frostdb C1: wide design divergence, and the grader **cannot see** it → zero variance.
+- santuario C3: the grader **can see** it perfectly, and every implementation lands on the same
+  side → zero variance.
+
+Worth a sentence in pre-filter 4, because as written ("If yes, outcome variance is zero by
+construction") it invites the converse reading, that passing it buys you variance. It does not.
+Only GATE 4 measures variance.
+
+## R10 — the playbook changed underneath this run
+
+`00-ROUTER.md` and `A-source/A3-idea-gate.md` were both edited while the act was executing
+(`432a3cb A3 GATE 1: add the observational-equivalence pre-filter`, `e744c14 A3: fix the
+instrument that produced two invalid kills`). I found out from a tool-level file-changed notice,
+not from anything in the process. The changes were improvements and I adopted them mid-act, but
+the gate numbering, the checklist length and the router's S2/S3 routing rule all moved, and an
+agent that had already copied the checklist into its notes would have reported against a stale
+one. Cheap fix: put a revision line at the top of each act-file and have the HANDOFF record which
+revision it executed.
+
+## R11 — `B2` is missing two rules the source pipeline had (carried from the common brief, not reached)
 
 Not hit in this run — it died at `A3` and never reached `B2` — but recording it as instructed:
 `B2-contract.md` lacks **"step 2's spec must be self-contained"** and **"no 'deferred to step 2'

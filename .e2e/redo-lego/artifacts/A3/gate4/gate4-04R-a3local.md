@@ -100,3 +100,56 @@ no outcome variance here to grade.
 This kill is **not** a convergence reading. It is an executed measurement of outcome, on the gate
 A3 calls PRIMARY, with the assertion validated at `base_commit` first — the exact instrument whose
 absence qualified both of the prior run's GATE-5 kills.
+
+---
+
+## ADDENDUM — what the KILL AUDIT found, recorded because it is the strongest case against this kill
+
+Codex, dispatched to argue the candidate is ALIVE, did the thing I asked and could not do myself: it
+wrote an assertion I had not written and ran it against all five implementations
+(`/tmp/redo-lego-impl-*/challenge/http01/killaudit_test.go`). It injects a listener whose *second*
+`Close()` fails, so the direct listener close succeeds and only the **serving component's** shutdown
+fails.
+
+```
+impl-1  --- FAIL: TestKillAuditCleanUpReportsServingCloseFailure
+impl-2  ok
+impl-3  ok
+impl-4  ok
+impl-5  ok
+```
+
+**4 of 5.** The split is behavioural and real, not a quirk. impl-1's `CleanUp` contains:
+
+```go
+	if server != nil {
+		// Terminate any connections accepted before teardown
+		// so they are no longer usable afterwards.
+		_ = server.Close()
+	}
+```
+
+— it discards the shutdown error, which is the precise defect the CONSTRAINT forbids. One of five
+cold implementations reintroduced the bug it was asked to fix, in a new place.
+
+**Two reasons this does not overturn the kill.**
+
+1. **4/5 is above the band.** A3's target is 1–3 of 5, ceiling 3, and 4/5 is explicitly "over it".
+   And A3 warns a purely local n=5 is *"a lower bound on difficulty"* — the local generator is not
+   the graded model, so 4/5 local points at 5/5 on the server, not at 3/5.
+2. **The assertion cannot legally be a grader.** It constructs `ProviderServer` from its unexported
+   fields (`listener`, `server`, `done`). It compiled against all five only because all five chose
+   the same three field names — which is itself another convergence datum. GATE 1 pre-filter 2 ("can
+   you write the grader without naming the data structure? If not, the fork is already zero") and
+   GATE 6 [R01] ("grading private state rejects valid alternative designs") both forbid it. An
+   implementation that called the field `srv` would fail to *compile*, which grades as a
+   `GRADING_FAILURE`, not a wrong answer.
+
+The question that follows — *can the same 4-vs-1 distinction be drawn through the exported surface
+alone?* — is put to Codex in the audit. With real sockets it looks impossible: `CleanUp` closes the
+listener first, so the serving component's own close then returns `use of closed network
+connection`, which every implementation filters out. There is no black-box way to make only the
+second close fail.
+
+**Net:** the one measurable variance on this surface is 4/5 and is not gradeable. The kill stands,
+and it is now qualified with the best counter-evidence anyone produced.
