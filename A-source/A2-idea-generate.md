@@ -233,6 +233,41 @@ So keep using admissions as evidence the premise is real. **Do not use one as th
 on a SEARCH card**, and never think you can neutralise it by being vaguer in the contract — that
 was tried and measured.
 
+## 3b0. STEP 1's BAND BOUNDS WHAT STEP 2 CAN EVER MEASURE
+
+`STATUS: LIVE`, measured 2026-09-24 on `connect-go-trailing-metadata-parity`. This is a structural
+property of multi-turn seeding and it can make a step **unmeasurable by construction.**
+
+**Step-2 cells fan out from step-1 SNAPSHOTS, not from the oracle.** So the diversity of step 2's
+solver population is bounded by how many *distinct* step-1 runs succeeded. Push step 1 to the
+bottom of the band and you have made step 2 deterministic:
+
+> Step 1 measured **1 of 5**. All five step-2 cells therefore descended from **one** passing step-1
+> run. All five step-2 implementations were recovered from their trajectories and carry an
+> **identical 34-name filter** — the 21 HTTP-forbidden names plus an exact transcription of all 17
+> library-reserved names. They are transcriptions because the solved step 1 they inherited
+> *defines those very predicates*.
+
+**Step 2's branch count against the real solver population was therefore 0**, and no amount of
+grading could move it. Proven three ways: a controlled A/B where the same two branch classes were
+added to both steps and moved step 1 `1.0 → 0.2` while step 2 stayed `1.0 → 1.0`; the identical-
+implementation recovery above; and a `C6` replay where all five real implementations scored 1.0
+against the widened set.
+
+### What follows for how you shape a card
+
+- **A step-1 band near 1/5 is not a win, it is a cost.** It buys step 1's calibration by making
+  step 2 unmeasurable. The knobs are coupled and you cannot tune them independently.
+- **Aim step 1 at the MIDDLE of the band (2–3 of 5).** More distinct step-1 survivors means a more
+  diverse step-2 seed population — the only source of step-2 variance that exists.
+- **Step 2 must require something step 1's solution does not already define.** If step 2's answer
+  can be transcribed from predicates step 1's golden establishes, every seed already carries it.
+  This is the `GATE 7` decorative-cascade question, sharpened: not *"does step 2 depend on step 1"*
+  but **"can step 2's requirement be satisfied by re-applying step 1's own predicate?"** If yes,
+  the cascade is real and the *measurement* is still dead.
+- When step 2 reads 5/5 and step 1 is at the bottom of the band, **suspect transcription before
+  you suspect an easy step 2** — and check it by recovering the implementations, not by arguing.
+
 ## 3b. STEP STRUCTURE IS THE ONLY LEVER THAT MEASURABLY WORKS
 
 `STATUS: LIVE` — n=23,524, `.e2e/avocado-study/FINDINGS.md`. Read this before you shape a card.

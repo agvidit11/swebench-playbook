@@ -381,7 +381,21 @@ padding, repeated values and protocol-owned trailers. They did **not** cover inv
 or **HTTP-forbidden trailer names** (`Authorization`, `If-*`) — a class you find by asking "what
 does Go's `net/http` treat specially in trailers?", never by re-reading your own test file.
 
-Write the enumeration down. An unlisted class is an ungraded requirement.
+**Range over the AXES, not just the values.** `STATUS: LIVE` — this task missed the same class
+twice, and the second miss survived a `GOOD` review at 17 of 17 rubrics:
+
+| axis | the miss it caused |
+|---|---|
+| **value bytes** | the obvious one — NUL, CR, LF, invalid UTF-8 |
+| **library-reserved names** | 17 protocol-reserved names lived in a *different* map from the 21 HTTP-forbidden ones. The golden filtered only the latter, so the in-process path kept trailers all three wire protocols drop |
+| **transport / RPC shape** | the defect appeared only on one transport and only on one RPC shape — a unary-only enumeration would have found nothing |
+
+The second miss was caught by probing **98 input classes × 4 transports × 2 RPC shapes = 784
+observations**, against a tree built from the golden and a second built from a real solver
+implementation. 18 diverged, all one class, and the **golden** was the wrong one.
+
+Write the enumeration down as a product of axes. An unlisted class is an ungraded requirement, and
+an unlisted *axis* is a whole family of them.
 
 ### ② Golden-vs-contract differential → catches R12, the serious one
 

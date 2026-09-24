@@ -17,6 +17,13 @@ true and which lies — is **not** restated here: → `00-ROUTER.md` §2 and
 
 ## FIRST: pull everything and write the ledger version entry
 
+> **Freshness check — a dead remote reports everything as UNPUSHED.** `STATUS: LIVE`, 2026-09-24.
+> Comparing local files against `origin/main` has a third failure mode beyond "stale" and
+> "ahead": if the remote is unreachable, `origin/main` is a **stale local ref** and every file
+> reads as unpushed. The HTTPS fetch fails silently here because a global `insteadOf` rewrite
+> forces it — fetch over `ssh://git@github.com:22/...` and compare against `FETCH_HEAD`, not
+> against `origin/main`.
+
 `STATUS: LIVE`. Before diagnosing anything, pull the **complete** evidence set and append this
 version's entry to `<task>/audit/REVIEW-LEDGER.md`. Commands, format and the carry-forward rules
 are in `reference/R9-review-ledger.md`.

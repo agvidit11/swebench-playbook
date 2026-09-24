@@ -19,6 +19,28 @@ This act exits through `C-drive/C6-replay-verify.md`. → `00-ROUTER.md` §8b.
 
 ---
 
+## When hardening CANNOT work: step 2 is a transcription of step 1
+
+`STATUS: LIVE`, measured 2026-09-24. Before you widen a too-easy step 2, check whether its solver
+population is a single implementation wearing five hats.
+
+Step-2 cells fan out from step-1 snapshots. If step 1 passed only once, **all five step-2 cells
+descend from that one run**, and if step 2's requirement can be satisfied by re-applying a
+predicate step 1's golden already defines, every seed arrives already carrying the answer.
+
+**The check, and it is cheap:** recover the final file contents from each step-2 trajectory and
+diff them against each other. Identical implementations means branch count **0** against the real
+population, and **no graded set can move the band** — measured, with a controlled A/B in which the
+same two branch classes moved step 1 by −0.8 and step 2 by exactly **0**.
+
+**When this is the diagnosis, hardening the grader is the wrong act.** The only lever is a step-2
+**contract** change requiring something step 1's solution does not define — and that is
+`instruction.md`, which is Avocado's or the human's. Record it `Owner: Avocado/human`, say so
+plainly, and do not spend a round widening tests that cannot separate anybody.
+
+Note the trap in the obvious response: tightening step 1 to raise its band makes step-2 seeds
+*more* uniform, not less. → `A-source/A2-idea-generate.md` §3b0.
+
 ## Update the review ledger before you hand off
 
 Set the disposition on every finding you touched → `C-drive/C2-repair-grading.md`
