@@ -45,6 +45,46 @@ when an earlier write is already logged.
 **So the rule is temporal, not just spatial:** it is not enough that Codex owns `tests/` *now*. No
 Claude write may ever have touched it, at any point in the task's history.
 
+### A clean full re-author does NOT repair it. There is no retrofit.
+
+`STATUS: LIVE` — measured 2026-09-24, **n=1 but well controlled.** A peer re-authored **all five**
+files under `tests/` from scratch with Codex — `config.json`, `test.sh`, `run_script.sh`,
+`parser.py` and the test source — freezing behaviour deliberately so the graded ids stayed
+byte-identical. The rewrite was clean and complete, and calibration survived it:
+
+| gate | result |
+|---|---|
+| Structural | passed 17/17 |
+| Oracle | passed 3/3 |
+| **Balance** | **passed — avocado 3/5, opus 5/5, in band** |
+| AI assessment | passed — Accept |
+| Contamination | passed — LOW |
+| **Provenance** | **FAILED — "Unauthorized third-party model authorship detected"** |
+
+**Five of six gates green, a perfectly calibrated task, and provenance still fails.** The check
+reads the **write history**, not current content or current authorship.
+
+**Remedies for an already-poisoned task — only these two:**
+
+1. A **UI override**, *if* the evidence genuinely shows the false-positive signature. But see the
+   warning below before spending a cycle on this.
+2. A **fresh task** with no Claude write anywhere in its history.
+
+**Not** a re-author. **Not** a rename. **Not** overwriting with identical bytes.
+
+> **Warning on remedy 1, from our own measurement.** The signature usually cited is
+> `contentByteExact: false`, all `presentInCurrent: false`, and a `combinationNote` saying the
+> verdict was carried forward rather than re-observed. **`presentInCurrent` is unreliable** — a
+> one-token edit flips it to `false` while the offending block survives verbatim, and we measured
+> **12 of 12 logged blocks still present** on a task matching that supposed false-positive
+> signature. Substring-match the logged blocks against the current file yourself before arguing an
+> override. Arguing one on a signature that does not hold burns a review cycle and credibility.
+
+**Therefore prevention is the entire remedy**, and it is cheap: enforce Codex/1P ownership of the
+whole `tests/` directory from `B1` onward, and never let a "just fix `before_repo_set_cmd`" edit
+through. Our own four tasks all pass provenance because the pipeline enforced this from scaffold
+time rather than retrofitting it.
+
 ## 1. Why ownership is a hard rule and not a style preference
 
 Provenance is scored **by the server, against a write log, by file path**. It is not scored
