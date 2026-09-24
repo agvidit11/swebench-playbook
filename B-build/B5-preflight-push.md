@@ -218,7 +218,10 @@ of structure, oracle or review quality you expect to fail, and do not push until
 been pushed, it has a `<task>/audit/REVIEW-LEDGER.md` (`→ reference/R9-review-ledger.md`).
 
 ```bash
-grep -c 'OPEN' <task>/audit/REVIEW-LEDGER.md    # must be 0
+# Match the ledger's STATUS COLUMN, not the word anywhere. A bare `grep -c OPEN`
+# also matches this playbook's own prose and the ledger's own explanation of what
+# OPEN means -- it can never return 0. Measured 2026-09-24.
+grep -cE '^\| *F[0-9-]+ *\|.*\| *OPEN *\|' <task>/audit/REVIEW-LEDGER.md   # must be 0
 ```
 
 **Every finding from every prior version must be `FIXED`, `OBSOLETE-BY-PIVOT`, or `WAIVED` — each

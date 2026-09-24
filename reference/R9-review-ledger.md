@@ -16,7 +16,10 @@ proven obsolete by a pivot. Never "we changed a lot since then".**
 ## What to pull — all of it, every version
 
 ```bash
-T=<task>; V=<n>; D=$T/audit/evidence/v$V; mkdir -p $D
+# Evidence lives OUTSIDE the task bundle. Trial artifacts are tens of MB of *.log
+# and zero-byte files, which preflight TIER 0's file inventory flags -- and they are
+# not part of the task. Keep only the LEDGER inside <task>/audit/.
+T=<task>; V=<n>; D=~/swebench-playbook/.e2e/evidence/$(basename $T)-v$V; mkdir -p $D
 
 codimango task errors  $T --json          > $D/task-errors.json      # per-step bands, gate strings
 codimango task show    $T --json          > $D/task-show.json        # validationDetails, tbdReviewStatus
@@ -39,7 +42,7 @@ codimango api trials artifacts <trialId> --download $D/trials/<trialId>
 where the *actual* failure lives. A reviewer's prose is a summary of these; the quoted exception is
 the evidence. → `C-drive/C6-replay-verify.md` for replaying them against a proposed change.
 
-**Read the human reviews too.** `codimango tasks reviews --full` is authoritative and carries
+**Read the human reviews too.** `codimango task reviews --full` (singular `task`) is authoritative and carries
 sourcing and novelty rejections that `job review` does not surface at all.
 
 ## Ledger format
@@ -52,7 +55,7 @@ pulled: task-errors, task-show, job-review, tbd-assessment, human-reviews,
         trials 3 jobs / 11 trials / 6 failing  -> audit/evidence/v3/
 bands:  avocado 1|1  opus 0.4|1  gpt 0.8|1     oracle 2/3
 
-| id | rubric | finding | evidence | status |
+| id | rubric | finding | evidence | status |   <!-- status column is what B5 greps -->
 |---|---|---|---|---|
 | F3-01 | R06 | tests miss invalid UTF-8 and HTTP-forbidden trailer names | job-review.json:R06 | OPEN |
 | F3-02 | R12 | golden lets an Authorization trailer diverge across protocols | job-review.json:R12 | OPEN |
