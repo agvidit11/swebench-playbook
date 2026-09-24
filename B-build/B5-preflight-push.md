@@ -284,6 +284,24 @@ re-check prior findings will re-ship the same defect under a new SHA indefinitel
 missing input class means re-running the contract-domain enumeration (`B3` §①), not re-reading the
 sentence. An R12 finding means re-running the golden-vs-contract differential (`B3` §②).
 
+## AFTER the push: a commit does not always create jobs
+
+`STATUS: LIVE`, 2026-09-24 — **two tasks in one session** sat at `gen=null` with zero jobs after a
+clean push. The router treats `(no jobs on Nest)` as an exception; it is closer to routine.
+
+```bash
+codimango task show <task> --json | jq '{commitSha, validationStatus}'   # sha must be yours
+codimango job list <task> --json | jq length                             # 0 means nothing started
+codimango task rerun <task>                                              # then re-check
+```
+
+If `rerun` answers *"Could not reach GitHub to check for a newer commit"*, that is a transient
+upstream failure — **retry it before reaching for an empty commit.** It succeeded on retry both
+times, and an empty commit would have superseded a pending run for nothing.
+
+Poll per router §3 after that. A push you never confirmed created a job is a push you cannot
+diagnose later.
+
 ## THE p2p FLAKE SCREEN — run before every push
 
 `STATUS: LIVE` — added 2026-09-23. `connect-go-trailing-metadata-parity` failed **R09 and R13**

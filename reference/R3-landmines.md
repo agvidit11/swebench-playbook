@@ -15,6 +15,35 @@ and dies at review. None of these are style; every row is a measured failure. Ro
 
 ---
 
+## ⚠ `before_repo_set_cmd: ""` when the test_patch MODIFIES a pre-existing file
+
+`STATUS: LIVE`, 2026-09-24, and **no local gate detects it.** Second suspected instance in the repo.
+
+If your `test_patch` *modifies* a file that already exists at `base_commit` — rather than creating
+a new one — and any solver plausibly edits that same file, the hidden patch will fail to apply and
+**every non-oracle trial aborts with `GRADING_FAILURE` before a single assertion runs.**
+
+The oracle is immune, because `solve.sh` never touches test files. So **oracle 3/3 and a total
+grading collapse coexist happily**, and the server reports it as a difficulty verdict.
+
+Measured: a step-1 contract asked solvers to remove a validation error that a pre-existing test
+asserted on. Every arm updated that test — correctly — and the hidden patch then collided at the
+same offset. 9 of 9 attempts, byte-identical abort. Reported as `0/0/0` "too hard" plus
+`BAD_GRADING_WRONG`; the task was actually **saturated at 5/5**.
+
+**Check at `B3` time:**
+
+```bash
+# which files does the test_patch MODIFY (not create)?
+python3 -c "import json;d=json.load(open('<task>/steps/N/tests/config.json'));
+print([l.split(' b/')[-1] for l in d['test_patch'].splitlines() if l.startswith('diff --git')])"
+# for each, does it exist at base?  and would a solver plausibly edit it?
+git -C <clone> cat-file -e <base_sha>:<path> && echo "PRE-EXISTING -- collision risk"
+```
+
+**If it pre-exists and the contract gives a solver any reason to touch it**, set
+`before_repo_set_cmd` to restore exactly that path before grading. Empty is not safe here.
+
 ## A. Scaffold traps
 
 ### A.1 — The eleven `task init` ships broken
