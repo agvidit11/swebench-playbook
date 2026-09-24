@@ -45,42 +45,37 @@ when an earlier write is already logged.
 **So the rule is temporal, not just spatial:** it is not enough that Codex owns `tests/` *now*. No
 Claude write may ever have touched it, at any point in the task's history.
 
-### A clean full re-author does NOT repair it. There is no retrofit.
+### Does a re-author repair it? UNRESOLVED — the evidence contradicts itself.
 
-`STATUS: LIVE` — measured 2026-09-24, **n=1 but well controlled.** A peer re-authored **all five**
-files under `tests/` from scratch with Codex — `config.json`, `test.sh`, `run_script.sh`,
-`parser.py` and the test source — freezing behaviour deliberately so the graded ids stayed
-byte-identical. The rewrite was clean and complete, and calibration survived it:
+`STATUS: SCOPED-TO unresolved.` An earlier version of this section said a clean re-author cannot
+clear a logged write and there is no retrofit. **That was retracted by its own author within the
+hour, on new data.** Both observations, from the same cohort:
 
-| gate | result |
-|---|---|
-| Structural | passed 17/17 |
-| Oracle | passed 3/3 |
-| **Balance** | **passed — avocado 3/5, opus 5/5, in band** |
-| AI assessment | passed — Accept |
-| Contamination | passed — LOW |
-| **Provenance** | **FAILED — "Unauthorized third-party model authorship detected"** |
+| task | change | provenance |
+|---|---|---|
+| `smoltcp-drop-head-on-persistent-unaddressable` | **13 lines** in `tests/config.json` (+8/−5) | **CLEARED** |
+| `protoc-gen-go-mcp-shared-schema-memoization` | **all five** `tests/` files rewritten (+347/−266) | **NOT cleared** |
 
-**Five of six gates green, a perfectly calibrated task, and provenance still fails.** The check
-reads the **write history**, not current content or current authorship.
+A 13-line edit cleared it; a complete re-author did not. That is the opposite of what a
+write-history rule predicts, and two further tasks flipped to passing in the same window, so the
+flips are not isolated.
 
-**Remedies for an already-poisoned task — only these two:**
+**Working hypothesis, not a finding: the verdict is not a deterministic function of authorship
+history.** Some readings appear to be **stale carry-forward rather than fresh observation** — which
+matches two independent signals we already had: `presentInCurrent: false` flipping on a one-token
+edit while the block survives verbatim, and a reviewer describing a verdict as *"carried forward
+from the previous run (not re-observed here)"*.
 
-1. A **UI override**, *if* the evidence genuinely shows the false-positive signature. But see the
-   warning below before spending a cycle on this.
-2. A **fresh task** with no Claude write anywhere in its history.
+**Practical consequences:**
 
-**Not** a re-author. **Not** a rename. **Not** overwriting with identical bytes.
+- **Treat a single provenance reading as low-confidence.** Re-run before concluding anything from
+  it, and never spend a repair round on one observation.
+- **Do not promise that a re-author will clear it, and do not claim it cannot.** We do not know.
+- **The correlation still holds and is the actionable part**, across two independent cohorts:
+  tasks where Claude never touched `tests/` pass **consistently** — all four of ours, plus two of
+  the peer's. Tasks where Claude did touch it fail **at least sometimes**.
 
-> **Warning on remedy 1, from our own measurement.** The signature usually cited is
-> `contentByteExact: false`, all `presentInCurrent: false`, and a `combinationNote` saying the
-> verdict was carried forward rather than re-observed. **`presentInCurrent` is unreliable** — a
-> one-token edit flips it to `false` while the offending block survives verbatim, and we measured
-> **12 of 12 logged blocks still present** on a task matching that supposed false-positive
-> signature. Substring-match the logged blocks against the current file yourself before arguing an
-> override. Arguing one on a signature that does not hold burns a review cycle and credibility.
-
-**Therefore prevention is the entire remedy**, and it is cheap: enforce Codex/1P ownership of the
+**So prevention remains the right rule** — not because a cure is impossible, but because it is the only lever whose effect is predictable. It is cheap: enforce Codex/1P ownership of the
 whole `tests/` directory from `B1` onward, and never let a "just fix `before_repo_set_cmd`" edit
 through. Our own four tasks all pass provenance because the pipeline enforced this from scaffold
 time rather than retrofitting it.
