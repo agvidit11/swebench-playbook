@@ -311,6 +311,52 @@ fraction of 0.077 — about one test in thirteen. **Nobody fails wholesale.** A 
 implementation is a passing one with one hole in it, so the only question that decides your band is
 how many distinct holes your set can see.
 
+## ⑤ THE ANTI-`BAD_GRADING_WRONG` GATE — prove the grader ACCEPTS correct work
+
+`STATUS: LIVE`, 2026-09-24. **We had no gate for this and shipped one anyway.**
+
+Everything else on this page asks *"does the grader catch wrong work?"* — the mutant, the branch
+count, the contract-domain enumeration. `BAD_GRADING_WRONG` is the opposite failure: **the grader
+rejects work that is right.** Nothing here tested for it.
+
+What we *did* have was the D1 alternative-**spelling** proof (§2) — which covers exactly one of the
+four over-pinning layers, and not the dominant one:
+
+| layer | what the test demands the spec never stated | covered before today? |
+|---|---|---|
+| **Name** | a specific accessor / method / key name | yes — §2 |
+| **Value** | a specific enum value, symbol, or String-vs-Class form | **no** |
+| **Shape** | the *container* or element type — Array vs Hash vs custom object | **no — and this layer dominates** |
+| **Semantic** | genuinely different behaviour | n/a, that is the task |
+
+On one measured task, widening names (round 1) left it at 0 of 9 and widening values (round 2) left
+it at 0 of 9; **8 of the 9 failures were one line** that indexed the observable with `.fetch(0)`,
+requiring an Array where the agent returned a custom object. Widening shape took it to 6 of 9.
+
+### The gate
+
+**At least one independently-written correct implementation must PASS your graded set.**
+
+You already have the implementations — `GATE 4`'s n=5, or better, real trajectories pulled per
+`C6`. Run them against the **real** grader, not the A3 sketch.
+
+```
+0 of N pass   -> BAD_GRADING_WRONG. Do not push. The grader rejects correct work.
+1..N-1 pass   -> good; this is also your branch-count evidence
+N of N pass   -> no separation; that is §④, a different problem
+```
+
+**`0 of N` is the signature, and it co-occurs with a "too hard" band.** A step reading `0/0/0` and
+`BAD_GRADING_WRONG` together is almost never a hard task — it is a grader rejecting everyone.
+Measured on `kustomize-localize-source-fidelity` step 1.
+
+**When it fires, remove or loosen an assertion. Never add tests** — adding tests to a grader that
+already rejects correct work makes it reject more.
+
+**Diagnose by layer before you touch anything**, using the table above and the actual exception
+text: a `NoMethodError` on the *collection* is a shape failure, not a naming one, and widening the
+wrong layer costs a full round each time.
+
 ## THE THREE CHECKS THAT CATCH `BAD_GRADING_WEAK`
 
 `STATUS: LIVE` — added 2026-09-23 after `connect-go-trailing-metadata-parity` returned
@@ -401,6 +447,10 @@ a whole validation cycle. → `C-drive/C3-harden.md` for the mutant-is-a-floor c
         one that catches silent-contract + pinning-test (4 of 4 BAD_GRADING_WRONG)
         proof: `python3 ~/.claude/skills/swebench-mt/instruction-lint.py <task> <clone>`
                must report PASS, and must NOT print "no test_patch yet"
+[ ] 20a. ANTI-WRONG: >=1 independently-written CORRECT implementation PASSES the
+        real graded set (not the A3 sketch). 0 of N = BAD_GRADING_WRONG, do not push
+        proof: the per-implementation reward lines, and which layer any failure sits
+        in (Name/Value/Shape/Semantic) -- shape dominates and is easiest to miss
 [ ] 20b2. BRANCH COUNT estimated and >=3: how many INDEPENDENT ways can a competent
         implementation be incomplete such that this graded set catches it?
         proof: the list, one line each. Test count is not branch count -- one task
