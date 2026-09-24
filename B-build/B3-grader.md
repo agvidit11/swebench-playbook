@@ -293,6 +293,15 @@ competent implementation get this one wrong while getting every other one right?
 | branch count | read |
 |---|---|
 | **≤2** | expect a degenerate band. The set cannot separate. Widen it or do not push. |
+
+**When branch count and `GATE 4` disagree, BRANCH COUNT WINS.** `STATUS: LIVE`, 2026-09-23 — they
+disagreed on a real candidate (`GATE 4` 3/5 in band, branch count 2) and nothing said which
+governed. The precedent settles it: `connect-go` measured `GATE 4` **3/5 local** and returned
+**avocado 5/5** from the server. A local n=5 is five draws from one generator; branch count is a
+structural property of the graded set. Trust the structure.
+
+If widening the set to reach 3 branches is not possible, that is the answer — the contract does
+not have enough independently-checkable surface to carry a task.
 | 3–6 | workable |
 | 7+ | good, provided each is genuinely independent |
 
