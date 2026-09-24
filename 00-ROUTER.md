@@ -89,8 +89,27 @@ until it is green. Diagnose it first regardless of what else is red.
 | Grader rejected vs agent wrong | `attemptResults[].result`: `GRADING_FAILURE` vs `FAIL_REASONING` | the aggregate pass rate |
 | Patch applies / grades | `job list` filtered on `.config.env.__validation_stage` | — |
 | Provenance | `provenanceCheck.agentWrites.agentModified` | `classifierResult.p3p` — hits 0.99 on clean human prose |
+| **Avocado's pass count** | **`metacodePassCount` / `metacodePassTotal`** | **any `avocado*` field — they are null even when avocado ran 5 trials** |
+| Was the quality review actually run? | `structuredReviewTbrAgenticReviewRawResult` — check `skipped_due_to_build_failure` | **`tbdReviewStatus` alone** — see below |
+| Did the run even happen? | `quotaSkippedAt` — if set, **there is no verdict at that SHA** | any band field; they will be empty and read as 0 |
 
 Five traps that each cost a real round:
+
+- **`tbdReviewStatus: "fail"` is NOT a quality verdict.** Measured on two tasks 2026-09-24: it read
+  `fail` while the quality review itself said `Accept` / `GOOD`, because
+  `structuredReviewTbrAgenticReviewRawResult` was
+  `{"build_error_category":"docker_auth","skipped_due_to_build_failure":true,"pass":false}`. The
+  review never ran; the field reports the *infrastructure* outcome. On the other task every backing
+  object was `null` and it still read `fail`. **Open the raw result before believing it.**
+- **`quotaSkippedAt` means there is no verdict at all.** A task can carry it at the validated SHA
+  while an *earlier* commit has real numbers — do not read the earlier commit's bands as this
+  version's. There is no `S8` row for this state; treat it as "not run" and re-trigger.
+- **`difficulty.classification` can deny that completed runs exist.** Measured: `"NO_DATA"`,
+  `"No Opus/Claude agent runs yet"`, `passed: 0, total: 0` — while **five opus trials had
+  completed** and `job review` returned `GENUINELY_HARD`. Worse than merely disagreeing.
+- **`tbdReviewDetails` is `null` on every task checked**, so anything reading
+  `.tbdReviewDetails.full_assessment` yields nothing. Use `codimango task reviews --full`
+  (**singular `task`** — `tasks reviews` is rejected by the CLI).
 
 - **`tbrNotFinalized: true` is PENDING, not failed.** Do not spend an attempt on it.
 - **A missing `Agentic trial-output review` row does not mean the gate did not run.** Resolve per task with `job review --commit`.

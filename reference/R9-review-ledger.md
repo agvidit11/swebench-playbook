@@ -21,8 +21,9 @@ T=<task>; V=<n>; D=$T/audit/evidence/v$V; mkdir -p $D
 codimango task errors  $T --json          > $D/task-errors.json      # per-step bands, gate strings
 codimango task show    $T --json          > $D/task-show.json        # validationDetails, tbdReviewStatus
 codimango job review   $T --json          > $D/job-review.json       # rubrics + evidence + attemptResults
-codimango task show    $T --json | jq -r '.tbdReviewDetails.full_assessment' > $D/tbd-assessment.txt
-codimango tasks reviews $T --full         > $D/human-reviews.txt     # authoritative; job review misses these
+# NOTE: .tbdReviewDetails is null on every task checked so far -- this yields nothing.
+codimango task show    $T --json | jq -r '.tbdReviewDetails.full_assessment // "null"' > $D/tbd-assessment.txt
+codimango task reviews $T --full          > $D/human-reviews.txt     # SINGULAR 'task'; 'tasks reviews' is rejected
 
 # trials + trajectories — the part most often skipped
 codimango job list  $T --json             > $D/jobs.json

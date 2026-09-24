@@ -320,6 +320,34 @@ grep -rln "<behaviour keyword>" <clone>/src/test | head   # a shipped test = the
 >    This relaxation does **not** extend to bug-fix or existing-behaviour cards. There the golden
 >    is small and a real DESIRED implementation is affordable, so write it.
 >
+>    ### ⚠ THE COLD PROBE REPRODUCES OPUS, NOT AVOCADO
+>
+>    `STATUS: LIVE`, measured 2026-09-24 on `concourse`. This is why GATE 4 keeps mispredicting.
+>
+>    The probe predicted **avocado 3/5**; the server returned **avocado 5/5**. But the probe was
+>    not wrong about the *problem* — it named the two discriminating branches correctly, and those
+>    are exactly the two **opus** lost on (`opus 0/5`). Read that again: **the n=5 cold
+>    implementations behaved like opus, not like avocado.**
+>
+>    The behavioural split was clean and total:
+>
+>    | | opus (0/5) | avocado (5/5) |
+>    |---|---|---|
+>    | edited `atc/exec/step.go` to widen the interface | **5 of 5** | **0 of 5** |
+>    | modified a restored upstream `_test.go` | **5 of 5** | **0 of 5** |
+>    | approach | asked the injected state to mint a scope → nil deref on a bare fake | self-contained wrapper with nil guards |
+>
+>    **So a local n=5 measures the difficulty of your task for whatever model generated the
+>    implementations — and that is not the model the gate scores.** A 3/5 local reading is not a
+>    prediction of the avocado band; it is a statement about the probe generator.
+>
+>    Two consequences:
+>
+>    1. **Never report a GATE 4 number as a predicted avocado band.** Report it as "n of 5 cold
+>       implementations failed", and say which generator produced them.
+>    2. This is the third independent reason **branch count beats GATE 4** (`B3` §④) — branch count
+>       is a property of the graded set and does not depend on who wrote the code you tested it on.
+>
 >    All three are required. On frostdb the negative control was decisive: the old buffered
 >    implementation showed "sink b reached the end of its copy, 2,739,919 bytes, while sink a
 >    had consumed nothing."
