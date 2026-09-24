@@ -225,8 +225,15 @@ Read the function. If the precedence / ordering / guard the candidate proposes i
 > earlier gates.** `STATUS: LIVE`
 >
 > ```bash
-> # 1. FUNCTION-scoped history. The file-scoped form returns noise and hides this.
-> git log -L :<func>:<path> --oneline | head -40
+>   # 1. FUNCTION-scoped history. The file-scoped form returns noise and hides this.
+>   git log -L :<func>:<path> --oneline | head -40
+>   #    ^ VERIFY THE BINDING. Measured 2026-09-23: the regex form
+>   #      `-L '/func.*Name/,...'` silently bound to a 5-line TYPE DECLARATION and
+>   #      reported 2 commits for an 11-commit file. That miss is why a run killed a
+>   #      candidate on the wrong grounds and never saw merged PR #5892.
+>   #      Sanity-check: the span it printed should be the function body, and the
+>   #      count should be plausible against `git log --oneline -- <path> | wc -l`.
+>   #      Cross-check with `git log -S '<a literal from the function>' --oneline`.
 > # 2. remote branches — count them properly; "all dependabot" was false 23 of 26
 > git branch -r | grep -vE 'dependabot|^\s*origin/HEAD'
 > git diff --stat origin/main...origin/<branch>        # for anything related

@@ -201,6 +201,41 @@ editing `task.toml` there means a new commit and re-validation on something alre
 
 ---
 
+## 2b. Row 22 — a live `origin` remote is a SOLUTION-LEAKAGE vector
+
+`STATUS: LIVE`, 2026-09-23. **Not in the 21 rows above, and it was found in every one of the 11
+tasks in one author's repo.** `allow_internet = true` is often required (a module proxy, a package
+index), and the scaffold leaves `origin` configured — so a solver can `git fetch origin` and read
+the upstream fix directly. This is the R05/R07 `BAD_LEAKAGE` that failed `redb` and got `sqlfluff`
+rejected.
+
+```dockerfile
+# after the fetch/checkout, before the image is finalised:
+RUN git remote remove origin
+```
+
+**Verify in the REBUILT image, not the Dockerfile:**
+
+```bash
+git remote -v                  # empty
+git fetch origin main          # must be fatal
+git rev-list --all --count     # base ancestry only
+```
+
+Check this on existing tasks too — it is invisible to every other gate.
+
+## 2c. Row 19 amended — `ENV PATH` does not survive `bash -l`
+
+`STATUS: LIVE`, 2026-09-23. A login shell re-reads `/etc/profile`, which overwrites `PATH` — so a
+toolchain installed under `ENV PATH` vanishes when the verifier runs under `bash -l`, even though
+the reference Dockerfile uses that pattern. Measured: `go` disappeared.
+
+```dockerfile
+RUN printf 'export PATH=%s\n' "$PATH" > /etc/profile.d/10-toolchain.sh
+```
+
+Prove it the way the verifier will: `docker run ... bash -lc 'command -v go'`.
+
 ## 5. CHECKLIST
 
 Tick every line or waive it with a reason. The full preflight run belongs to `B5`; here you only

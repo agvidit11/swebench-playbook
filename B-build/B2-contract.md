@@ -219,6 +219,32 @@ script implements the pre-D1 absolute never-name policy, so it will FAIL on a sy
 headings, >4 emphasis markers, >350 words) and contract coverage; severity rules →
 `B5-preflight-push.md §1`. `STATUS: LIVE`
 
+## 6a. HOW the prose reaches the file — the step this act never specified
+
+`STATUS: LIVE`, 2026-09-23. This act says Avocado authors the contract and Claude must not. It
+never said **by what mechanism**, and the obvious improvisations are all violations:
+
+| tempting | verdict |
+|---|---|
+| Avocado returns prose, Claude writes it to the file | **violation.** Claude wrote the bytes. |
+| Claude pipes Avocado's stdout into the path via a script or heredoc | **violation.** Indirection is not laundering. |
+| Claude obfuscates the path to get a Bash command past the guard | **violation, and guard evasion.** |
+
+**The default, and the only one that is clean: Avocado writes the file itself, with its own tool,
+inside its own dispatch.** The brief tells it the path and the rules; it does the write. Claude
+never holds the bytes.
+
+> **A near-miss was self-reported on 2026-09-23**: an agent briefly wrote an obfuscated path into
+> an Avocado prompt to slip past the `team-aai` guard, recognised it as evasion, removed it before
+> dispatching, and logged it against itself. That is the right response — and the reason it was
+> tempting is that the guard fires on *any* Bash text containing the path, **including text merely
+> instructing an authorised agent to write it.** So the guard pushes you toward evasion precisely
+> when you are trying to comply. Use the Write tool for the brief, name the path plainly in it, and
+> let Avocado do the write.
+
+**Verify after, don't assume:** the file was empty before dispatch (`B1` §0), is non-empty after,
+and Claude's own tool history contains no write to it.
+
 ## 6b. Vagueness does not create difficulty — measured, twice
 
 `STATUS: LIVE`. The temptation this act exists to resist is to make a contract vaguer when a
