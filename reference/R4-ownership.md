@@ -15,6 +15,36 @@ restate the matrix.
 
 ---
 
+## Measured per-file exposure, and what does NOT clear it
+
+`STATUS: LIVE`, 2026-09-24, from a peer author's scored cohort. Provenance passed on exactly the
+tasks where **Codex re-authored every file under `tests/` from scratch**, and failed on every task
+where Claude edited `tests/config.json` at any point — **even when Codex later patched the same
+file**.
+
+| file | measured match score |
+|---|---|
+| `tests/config.json` | **0.787** |
+| `tests/test.sh` | 0.325 |
+| `tests/parser.py` | 0.246 |
+| `tests/run_script.sh` | 0.107 |
+
+`config.json` is the highest-exposure file in the task, and the edits that cause it are the
+innocuous-looking ones: `before_repo_set_cmd`, regenerating `pass_to_pass`,
+`selected_test_files_to_run`. Those feel like configuration rather than authorship. They are not.
+
+**Neither of these clears a logged write:**
+
+- overwriting the file with byte-identical content
+- renaming the file or the task
+
+A later Codex patch over the same path does not clear it either. The write log is append-only —
+the only remediation is a **1P re-author from scratch**, and even that is unconfirmed as sufficient
+when an earlier write is already logged.
+
+**So the rule is temporal, not just spatial:** it is not enough that Codex owns `tests/` *now*. No
+Claude write may ever have touched it, at any point in the task's history.
+
 ## 1. Why ownership is a hard rule and not a style preference
 
 Provenance is scored **by the server, against a write log, by file path**. It is not scored
