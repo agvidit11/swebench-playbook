@@ -10,6 +10,11 @@ every act-file names the references it needs.
 **Never believe a number before reading §2.** Most wasted rounds in both source pipelines
 were spent repairing a field that was lying.
 
+**And never read a green local gate as a green server gate** without knowing which of three it is
+— the real check, a stand-in for it, or a proxy measuring a different subject. Five defects
+reached the server on gates that were locally green, one per class.
+→ `B-build/B5-preflight-push.md` §WHY LOCAL GATES MISS THINGS.
+
 ---
 
 ## 1. State → act-file
@@ -388,6 +393,9 @@ HANDOFF <act-id>
   EXIT:      <the exit condition, and the command output proving it met>
   RUNG:      <L0|L1|L2|L3 believed reached, per §3b, and the evidence -- or "pre-push" with
               the rung you are targeting and what currently blocks it>
+  UNVERIFIED:<every authoritative check that did NOT run, and every local gate that is a
+              STAND-IN or a PROXY rather than the real thing -- see B5. A rung claimed
+              over an unavailable check is claimed, not verified.>
   CHECKLIST: <n of m ticked; every waived line with its reason>
   ARTIFACTS: <paths written>
   FACTS:     <named facts the next act needs and cannot re-derive cheaply>
