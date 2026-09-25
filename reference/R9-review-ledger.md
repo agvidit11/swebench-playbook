@@ -71,6 +71,24 @@ with its current status:
 | `FIXED v<n>` | addressed, with the commit and the check that proves it |
 | `OBSOLETE-BY-PIVOT v<n>` | the thing it describes no longer exists — see the pivot test below |
 | `WAIVED v<n>` | deliberately accepted, with a named owner and a reason |
+| `ESCALATED v<n>` | **only an external owner can fix it** — Avocado for contract prose, or the human. Does **not** block `B5` GATE ZERO. |
+
+**Why `ESCALATED` exists.** `STATUS: LIVE`, 2026-09-25 — without it the ledger deadlocks. A
+finding whose only remedy is `instruction.md` cannot be fixed by the agent that found it, cannot be
+self-waived twice, and therefore stays `OPEN` forever — which means `B5` GATE ZERO blocks **every
+future push of that task** with no change in its facts. A task can then be unpushable because it
+correctly reported something it is forbidden to repair.
+
+`ESCALATED` requires, every version, all four:
+
+- the named owner — `Avocado` or `human`, never the agent itself
+- exactly what the external owner would have to change
+- why the agent may not do it (the rule and its section)
+- **re-statement in the current version's section.** It does not decay into silence; an escalation
+  nobody acts on stays visible, it just stops blocking.
+
+An agent may **not** self-assign `ESCALATED` to something it could fix. If the remedy is a test, a
+patch, a config or an environment change, it is `OPEN` and it is yours.
 
 ## The pivot test — the only way a finding leaves OPEN without being fixed
 

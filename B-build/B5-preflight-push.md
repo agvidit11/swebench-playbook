@@ -264,6 +264,9 @@ been pushed, it has a `<task>/audit/REVIEW-LEDGER.md` (`→ reference/R9-review-
 # also matches this playbook's own prose and the ledger's own explanation of what
 # OPEN means -- it can never return 0. Measured 2026-09-24.
 grep -cE '^\| *F[0-9-]+ *\|.*\| *OPEN *\|' <task>/audit/REVIEW-LEDGER.md   # must be 0
+# ESCALATED rows do NOT block -- only an external owner can clear them, and blocking
+# on one makes a task permanently unpushable for correctly reporting a defect it is
+# forbidden to repair. They must still be re-stated in the current version's section.
 ```
 
 **Every finding from every prior version must be `FIXED`, `OBSOLETE-BY-PIVOT`, or `WAIVED` — each
