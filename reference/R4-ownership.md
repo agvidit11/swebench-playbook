@@ -15,6 +15,23 @@ restate the matrix.
 
 ---
 
+## Committing a file Avocado wrote is NOT authoring it
+
+`STATUS: LIVE`. An agent escalated this as a human decision, correctly cautious, so settle it here.
+
+`push-task.sh` stages `git add -A -- "$T/"`, which necessarily includes `instruction.md` when
+Avocado has just changed it. **That is not a violation.** The rule governs **who writes the bytes**,
+and Avocado wrote them. `git add` and `git commit` are index and object operations; they do not
+modify the file, and provenance has passed on every task we have pushed this way.
+
+What would be a violation: editing the file, seeding it, piping content into it, or handing Avocado
+a draft. None of those is a commit.
+
+**But keep the two halves together.** A contract change and its graded coverage must land in the
+**same commit** — contract-without-coverage is the R06 shape that produced `BAD_GRADING_WEAK`, and
+coverage-without-contract is R02. An uncommitted contract change sitting in a shared checkout is
+also a live hazard: another session's scoped `git add` has swept up staged work twice.
+
 ## Measured per-file exposure, and what does NOT clear it
 
 `STATUS: LIVE`, 2026-09-24, from a peer author's scored cohort. Provenance passed on exactly the

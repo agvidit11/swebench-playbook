@@ -268,6 +268,44 @@ against the widened set.
 - When step 2 reads 5/5 and step 1 is at the bottom of the band, **suspect transcription before
   you suspect an easy step 2** — and check it by recovering the implementations, not by arguing.
 
+## 3b1. A SECOND REQUIREMENT CAN BE IMPLIED BY THE FIRST — check before you add one
+
+`STATUS: LIVE`, measured 2026-09-25, **2,560 observations per tree across 7 trees.**
+
+When a step is saturated, the instinct is to add a requirement that looks *orthogonal* to the one
+already there. Orthogonal in concept is not orthogonal in implementation.
+
+Measured case: step 2 required trailer **parity**; a new requirement demanded caller/handler
+**isolation** — no shared backing memory. Those read as independent properties, and the contract
+author's stated judgement was that *"the natural transcription preserves the aliasing."*
+
+**It does not.** Parity is specified at *value* granularity — individual values are dropped while
+siblings under the same key survive — so every correct implementation must build a new slice:
+
+```go
+kept := make([]string, 0, len(vals))
+for _, value := range vals { if !isValidTrailerValue(value) { continue }; kept = append(kept, value) }
+dst.SetValues(key, kept)
+```
+
+`kept` is private by construction. **Parity-at-value-granularity IMPLIES isolation.** All five real
+implementations satisfied the "new" requirement for free; the differential measured **0 of 2,560**
+far-side changes on every one of them.
+
+**The check, before you spend a round adding a requirement:** write down the code a correct
+solution to the *existing* requirement must contain. Does that code already satisfy the new one? If
+the existing requirement forces an allocation, a copy, a normalisation or a validation, then every
+property downstream of that operation comes free with it.
+
+**Two related traps from the same measurement:**
+
+- **Free at the wrong granularity.** Entry-level isolation was already free at base — each
+  `CallInfo` owns its own map — so an entry-level assertion is a vacuous `fail_to_pass`. Only the
+  per-key *value backing array* aliased. Enumerate granularity, not just the property.
+- **A property that is false in the GOLDEN too.** Request and response headers alias in **every**
+  tree including the golden. An assertion phrased over "headers" rather than "the trailer" would
+  have turned the oracle red. Scope every new assertion to exactly the surface the contract names.
+
 ## 3b. STEP STRUCTURE IS THE ONLY LEVER THAT MEASURABLY WORKS
 
 `STATUS: LIVE` — n=23,524, `.e2e/avocado-study/FINDINGS.md`. Read this before you shape a card.

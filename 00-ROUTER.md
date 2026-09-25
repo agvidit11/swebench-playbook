@@ -348,6 +348,32 @@ an honest unmet line, not a waiver.
 Use task-scoped temp paths (`/tmp/<task>-oracle.patch`, never `/tmp/oracle.patch`) — generic
 names collide across parallel sessions and silently swap one task's oracle into another.
 
+### ONE TASK PER AGENT CONTEXT. Never two.
+
+`STATUS: LIVE`, 2026-09-24. An agent that has just diagnosed task A carries A's conclusions into
+task B, and the failure is silent — it looks like speed.
+
+Measured: one agent repaired `kustomize` (diagnosis: **packaging**, `test_patch` collided with a
+pre-existing test) and then immediately diagnosed `crossplane` in the same context. The second
+diagnosis was sound, but nothing in the record distinguishes "measured independently" from
+"pattern-matched from the task I just finished". That distinction is the whole value of the
+evidence.
+
+Three reasons, in order of how much they cost:
+
+1. **Judgement bleed.** Priors from task A are indistinguishable from evidence in task B. A
+   diagnosis reached by analogy reads identically to one reached by measurement.
+2. **Context exhaustion.** That agent spent 294k tokens across two tasks; the second got the
+   depleted half, and the deepest work always comes late in an act.
+3. **Unattributable friction.** When one context produces findings for two tasks, a defect in the
+   record cannot be traced to which run produced it.
+
+**So: one agent, one task, fresh context, its own reviewer.** If a second task needs work, that is
+a second pair. Sequencing tasks is `C5`'s job and it sequences *pairs*, not acts inside one head.
+
+The one exception: a **resume** of the same task after a stall, where recovering prior state is
+the point.
+
 ### Building N tasks at once
 
 The one orchestration shape that is proven. Do not improvise a different one.
