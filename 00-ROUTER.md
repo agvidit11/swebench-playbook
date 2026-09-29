@@ -513,6 +513,7 @@ mechanism.
 | `C-drive/C4-loosen-salvage.md` | too hard, false negatives, salvage. |
 | `C-drive/C5-cohort-loop.md` | which task to work, in what order, when to park. |
 | `C-drive/C6-replay-verify.md` | replay real prior trajectories against a proposed change. `C2`/`C3`/`C4` exit through it. |
+| `reference/R10-step1-calibration.md` | **MT priority.** step-1 f2p floor, the bimodal band, and why instruction length is not a calibration dial. |
 | `C-drive/C7-revision-response.md` | answer a HUMAN reviewer and re-submit: route each ask to its owner, independent re-read, full re-validation. |
 | `reference/R1-field-authority.md` | full decode of every gate string and CLI field. |
 | `reference/R2-signal-integrity.md` | is this number real. |

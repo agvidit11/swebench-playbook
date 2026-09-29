@@ -81,7 +81,13 @@ Two things the script cannot do: rerun a timing-sensitive suite under load to ex
 
 ## 1c. THE POPULATION SAYS YOU BUILT IT TOO EASY
 
-`STATUS: LIVE`, 2026-09-29. Measured over one author's 48 tasks, 24 of them failing:
+**Multi-turn is the priority format.** Cut MT-only first, because it is a different and much
+sharper picture than the all-format numbers below: **9 MT tasks failing, 9 of 9 on the balance
+gate, 8 of 9 on step 1, and zero on provenance, structure or oracle.** Everything upstream of
+calibration already works for MT. → `reference/R10-step1-calibration.md`, which carries the
+mechanical floor and is enforced at `6a2`.
+
+`STATUS: LIVE`, 2026-09-29. All formats, one author's 48 tasks, 24 of them failing:
 
 | | count |
 |---|---:|
@@ -426,6 +432,10 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         Name each branch and show the mutant it catches (B3 §3). <=2 BLOCKS.
         MT: count PER STEP. Step 1 at <=2 blocks the task, not just the step.
         proof: the named branches, one line each, with its mutant result
+[ ] 6a2. MULTI-TURN: step-1 f2p count >= 8, counted from config.json. <=4 BLOCKS
+        outright -- 3 for 3 came back 1.0. 5-7 needs a written reason. Every
+        step counted, not just step 1; the last step is never exempt. (R10)
+        proof: the per-step counts
 [ ] 6b. C6 verdict on EVERY changed graded artifact — tests/*, golden, contract —
         each PROVEN against a real prior trajectory, or written down as UNPROVEN.
         "It passes the oracle" is not a verdict. BLOCKING on a re-push (S16b)
