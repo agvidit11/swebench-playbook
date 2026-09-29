@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# authorship-audit.sh — did Claude write ANYTHING inside this task directory?
+#
+#   ./authorship-audit.sh <task-name>
+#
+# WHY THIS EXISTS. Two tasks came back CONTAMINATED with `agentModified: true`:
+#
+#   rustcrypto-x509      steps/1_*/tests/run_script.sh   claude_code  matchScore 0.982
+#   dropshot-websocket   steps/1_*/tests/parser.py       claude_code  matchScore 0.061
+#
+# Read that second score. 0.061 means the file barely resembles what was logged any more --
+# and it STILL failed. **The gate fires on the agent WRITE LOG, not on current content.**
+# Rewriting, renaming or having Avocado re-author afterwards does not erase the write. The
+# only winning move is never to write the file.
+#
+# instruction.md was CLEAN on both. D2 held. The hole was tests/, where our ownership rule
+# says "Codex, never Claude" -- and the team-aai guard that enforces it fires on Edit/Write
+# ONLY, so a Bash heredoc walks straight through (feedback_tests_guard_bypass_via_bash).
+#
+# Claude Code session transcripts record the full text of every tool call, Bash included.
+# That is a local audit trail for the exact bypass the guard misses.
+#
+# SCOPE, 2026-09-29: Claude writes NOTHING inside a task directory. Codex makes every change
+# except instruction.md, which is Avocado/human only. The single carve-out is <task>/audit/**,
+# which is author-side evidence rather than task content -- reported as ALLOWED but still
+# listed, because we do not actually know the server's full scan set and an unlisted
+# exception is how the last two got through.
+
+set -uo pipefail
+TASK="${1:?usage: authorship-audit.sh <task-name>}"
+TASK="$(basename "${TASK%/}")"
+SESSIONS="$HOME/.claude/projects"
+
+# Scan EVERY project dir, not just -home-agvidit. Measured 2026-09-29: the first version of
+# this script scanned one dir, missed BOTH known-contaminated tasks, and reported PASS. There
+# are 13 project dirs and the writes that mattered were not in the one I guessed. A detector
+# that misses its known positives is worse than no detector -- it manufactures confidence.
+[ -d "$SESSIONS" ] || { echo "authorship-audit: no session dir at $SESSIONS" >&2; exit 2; }
+# RECURSIVE, and this is load-bearing: 226 of 237 transcripts on this box are SUBAGENT
+# transcripts at <project>/<session>/subagents/agent-*.jsonl. A depth-2 glob sees 11 of 237
+# and misses exactly the agents that do the writing. Delegated work is where the write happens.
+shopt -s nullglob
+mapfile -t FILES < <(find "$SESSIONS" -name '*.jsonl' -type f 2>/dev/null)
+[ "${#FILES[@]}" -gt 0 ] || { echo "authorship-audit: no transcripts found" >&2; exit 2; }
+
+echo "task:     $TASK"
+echo "scanning: ${#FILES[@]} transcripts (main sessions + subagents) across $(ls -1d "$SESSIONS"/*/ 2>/dev/null | wc -l) project dirs"
+echo
+
+python3 - "$TASK" "${FILES[@]}" <<'PY'
+import json, re, sys, os
+
+task = sys.argv[1]
+paths = sys.argv[2:]
+
+# A write is any of: Write/Edit/NotebookEdit naming a tests/ path, or a Bash command that
+# redirects, copies, moves or edits in place into one. Reading is fine and must not fire.
+WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+# Any write verb aimed at a path containing the task name. Deliberately broad: a false
+# positive costs one look, a false negative costs a task. cp INTO the tree is the one that
+# actually bit us on concourse and it is not an Edit/Write, which is why the guard missed it.
+BASH_WRITE = re.compile(
+    r">{1,2}\s*\S*TASKNAME"
+    r"|tee\s+[^|;&]*TASKNAME"
+    r"|\bcp\s+[^|;&]*TASKNAME"
+    r"|\bmv\s+[^|;&]*TASKNAME"
+    r"|\brsync\s+[^|;&]*TASKNAME"
+    r"|sed\s+-i[^|;&]*TASKNAME"
+    r"|truncate\s+[^|;&]*TASKNAME"
+    r"|dd\s+[^|;&]*of=\S*TASKNAME"
+    r"|patch\s+[^|;&]*TASKNAME"
+    r"|git\s+(?:apply|checkout|restore)\s+[^|;&]*TASKNAME"
+    r"|open\([^)]*TASKNAME[^)]*['\"][wa]"
+    r"|write_text\(|writelines\("
+)
+
+BASH_WRITE = re.compile(BASH_WRITE.pattern.replace("TASKNAME", re.escape(task)))
+
+def classify(text):
+    """audit/ is author-side evidence, not task content. Everything else is a violation."""
+    return "ALLOWED(audit)" if f"{task}/audit/" in text and "/tests/" not in text \
+                               and "/solution/" not in text else "VIOLATION"
+
+hits = []
+for p in paths:
+    parent = os.path.basename(os.path.dirname(p))
+    sess = ("sub:" if parent == "subagents" else "") + os.path.basename(p)[:20]
+    try:
+        with open(p, errors="replace") as fh:
+            for ln, line in enumerate(fh, 1):
+                if task not in line or "tests/" not in line:
+                    continue
+                try: rec = json.loads(line)
+                except Exception: continue
+                for blk in (rec.get("message") or {}).get("content") or []:
+                    if not isinstance(blk, dict) or blk.get("type") != "tool_use":
+                        continue
+                    name = blk.get("name"); inp = blk.get("input") or {}
+                    if name in WRITE_TOOLS:
+                        fp = str(inp.get("file_path", ""))
+                        if task in fp:
+                            hits.append((sess, ln, name, fp, classify(fp)))
+                    elif name == "Bash":
+                        cmd = str(inp.get("command", ""))
+                        if task in cmd and BASH_WRITE.search(cmd):
+                            one = " ".join(cmd.split())[:150]
+                            hits.append((sess, ln, "Bash", one, classify(cmd)))
+    except Exception as e:
+        print(f"  (skipped {sess}: {e})", file=sys.stderr)
+
+violations = [h for h in hits if h[4] == "VIOLATION"]
+allowed    = [h for h in hits if h[4] != "VIOLATION"]
+
+if allowed:
+    print(f"note: {len(allowed)} write(s) to <task>/audit/ — permitted carve-out, not counted\n")
+
+if not violations:
+    print("PASS — no Claude write inside the task directory (outside audit/).")
+    print()
+    print("This is an EARLY WARNING, not a clearance. The server's agent write log is")
+    print("authoritative and covers sessions this scan cannot see. A clean result here")
+    print("means 'no evidence locally', never 'provenance will pass'.")
+    sys.exit(0)
+
+print(f"BLOCKED — {len(violations)} Claude write(s) inside this task directory:\n")
+for sess, ln, how, what, _ in violations:
+    print(f"  [{sess} :{ln}] {how}")
+    print(f"      {what}")
+print()
+print("The write is already logged server-side. Rewriting the file does NOT clear it --")
+print("dropshot failed at matchScore 0.061, meaning the content had almost entirely")
+print("changed and the record still stood. Treat this task as provenance-blocked and")
+print("route the file to a permitted author for a clean re-creation.")
+sys.exit(1)
+PY

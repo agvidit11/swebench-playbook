@@ -306,3 +306,30 @@ HANDOFF R4
   OPEN:      §6 — whether a contaminated task can be made clean again is unknown in both sources
   NEXT:      back to your act-file. A prose-only finding never blocks the rest of the plan.
 ```
+
+## SUPERSEDED 2026-09-29 — Claude's write surface is now `audit/` only
+
+Everything above describing a Claude write surface inside a task (`task.toml`,
+`environment/Dockerfile`, `solution/*`, `README.md`) is **retired**. The rule is now:
+
+| path | owner |
+|---|---|
+| `instruction.md`, `steps/*/instruction.md` | **Avocado / human only** — unchanged |
+| `<task>/audit/**` | Claude |
+| **everything else under `<task>/`** | **Codex** |
+
+Claude's role inside a task is validation, triggering runs, reading, routing and dispatch.
+
+This is not a style preference. `rustcrypto-x509` and `dropshot-websocket` both returned
+`CONTAMINATED` on `tests/` files written by `claude_code`, while their `instruction.md` was
+CLEAN. The old per-file ownership table was correct about `instruction.md` and wrong to imply
+anything else was safe for Claude to touch — **we do not know the server's full scan set**, and
+the two files that killed those tasks (`run_script.sh`, `parser.py`) were not in the set we had
+observed. Assume every path under `<task>/` is scanned.
+
+The `audit/` carve-out is a judgement call, not a measurement: it is author-side evidence rather
+than shipped task content, and `B5` GATE ZERO needs the ledger in-tree. **It is the one place
+this rule is soft, and `tools/authorship-audit.sh` lists those writes rather than hiding them**
+so the exception stays visible. If a provenance failure ever names a path under `audit/`, close
+the carve-out and move evidence out of the bundle.
+

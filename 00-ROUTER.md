@@ -288,7 +288,44 @@ on an already-acceptable task has pushed it from `BAD_GRADING_WEAK` to `BAD_GRAD
 > **Only Avocado (MetaCode) or Vidit by hand may write those files. There is no exception
 > and no override.**
 
-This binds in every act-file `A1`–`C6`, including the loop, the auto-checks and the harness
+### THE SECOND IRON-CLAD RULE — Claude writes NOTHING in a task directory
+
+`STATUS: LIVE`, 2026-09-29. Set after two tasks died of it.
+
+> **Claude does not write any file under `<task>/`. Not `tests/`, not `solution/`, not
+> `environment/`, not `task.toml`, not `README.md`. The one carve-out is `<task>/audit/**`.**
+>
+> **Codex makes every change except `instruction.md`. Claude validates, triggers runs, reads,
+> routes and dispatches. That is the whole of Claude's role inside a task.**
+
+**Why it had to become absolute.** `rustcrypto-x509` and `dropshot-websocket` both returned
+`CONTAMINATED`, `agentModified: true`. On both, **`instruction.md` was CLEAN** — the first iron-clad
+rule held perfectly. The kill was `tests/run_script.sh` and `tests/parser.py`, written by
+`claude_code`.
+
+Three things make this unrecoverable, and each one is why the rule has no soft version:
+
+1. **The gate fires on the write LOG, not on current content.** `dropshot` failed at
+   `matchScore` **0.061** — the file had almost entirely changed since and the record still
+   stood. Rewriting it, renaming it, or having Avocado re-author it afterwards does not clear
+   the write.
+2. **The team-aai guard only fires on `Edit`/`Write`.** The concourse violation was
+   `cp "$S/tests/config.json" "$D/tests/config.json"` — a Bash copy walks straight through
+   (`feedback_tests_guard_bypass_via_bash`).
+3. **Subagents do most of the writing.** 226 of 237 transcripts on this box are subagent
+   transcripts. A rule the orchestrator follows and its delegates do not is not a rule.
+
+Enforce it, do not trust it:
+
+```bash
+~/swebench-playbook/tools/authorship-audit.sh <task>    # exit 1 on any Claude write
+```
+
+Measured the day it was written: **all four live tasks failed it** — concourse 3 violations,
+kustomize 10, plus the two already-contaminated. This rule is new precisely because we were
+breaking it constantly without noticing.
+
+This binds in every act-file `A1`–`C7`, including the loop, the auto-checks and the harness
 work. It binds *indirectly* too: routing prose through another agent, a script, a heredoc,
 or a patch file into that path is the same violation as typing it. Suggesting the exact
 replacement text for someone else to paste is the same violation.
@@ -406,7 +443,10 @@ the next one's contract is written. `C5` owns the queue once more than one task 
 3. **Never act on an UNMEASURED number.** → §2, `R2`.
 4. **Never edit an instruction file during C1–C5.** Record it, `Owner: human`, keep going.
 5. **Never harden by making the contract vaguer.** Approach vaguer is good; interface never. → `B2`.
-6. **Never push a task with an OPEN finding in its review ledger.** Every finding from every
+6. **Never let Claude write inside `<task>/`** — any path, any tool, any mechanism, including
+   Bash `cp`/`mv`/redirect and including delegated subagents. `audit/**` is the only carve-out.
+   Codex makes the change; Avocado owns `instruction.md`. → §5, `tools/authorship-audit.sh`.
+7. **Never push a task with an OPEN finding in its review ledger.** Every finding from every
    prior version must be `FIXED`, `OBSOLETE-BY-PIVOT` or `WAIVED`, each with evidence.
    → `B-build/B5-preflight-push.md` §GATE ZERO, `reference/R9-review-ledger.md`.
 

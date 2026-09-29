@@ -459,6 +459,12 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         proof: the C6 report per changed artifact
 [ ] 6c. Independent re-read by an agent that wrote none of the tree (§3b)
         proof: the per-file report.  BLOCKING on a re-push
+[ ] 6c2. AUTHORSHIP AUDIT: `tools/authorship-audit.sh <task>` exits 0. Any
+        Claude write under <task>/ outside audit/ BLOCKS. The server logs the
+        write permanently -- dropshot failed at matchScore 0.061, meaning the
+        content had almost completely changed and the record still stood. You
+        cannot fix this after the fact. (00-ROUTER.md §5)
+        proof: the audit output and $?
 [ ] 6d. B6 REVIEW GATE: `tools/review-gate.sh <task> check` exits 0 -- every
         installed reviewer returned the exact verdict Accept, zero Critical,
         zero High. BLOCKING. The server's reviewer cannot see an unpushed

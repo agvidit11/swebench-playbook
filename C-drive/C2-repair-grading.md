@@ -2,8 +2,9 @@
 
 ```
 ACT:    C2-repair-grading
-OWNER:  Codex  (dispatched and verified by Claude; Claude may write task.toml,
-                environment/Dockerfile, solution/*, README.md, audit/* — never tests/*)
+OWNER:  Codex — ALL of it. Claude dispatches, verifies and triggers runs, and writes
+                only <task>/audit/*. Never tests/, solution/, environment/, task.toml
+                or README.md. instruction.md is Avocado/human. (00-ROUTER.md §5)
 INPUT:  a C1 diagnosis naming a grading defect, a golden defect, or a packaging artifact
 OUTPUT: a repaired artifact, pushed
 EXIT:   the named defect is closed, verified against real prior trajectories (C6),
