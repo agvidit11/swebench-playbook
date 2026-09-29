@@ -276,10 +276,15 @@ grep -cE '^\| *F[0-9-]+ *\|.*\| *OPEN *\|' <task>/audit/REVIEW-LEDGER.md   # mus
 # ESCALATED rows do NOT block -- only an external owner can clear them, and blocking
 # on one makes a task permanently unpushable for correctly reporting a defect it is
 # forbidden to repair. They must still be re-stated in the current version's section.
+# DEFERRED-TO-POST-PUSH rows do NOT block either -- their remedy is a rerun or a
+# missing model arm, which can only be dispatched AGAINST the SHA this push creates.
+# Blocking on one blocks the push that would let it close. Carry each into §7 and
+# close it there, in this session. (R9)
 ```
 
-**Every finding from every prior version must be `FIXED`, `OBSOLETE-BY-PIVOT`, or `WAIVED` — each
-with its evidence line. One `OPEN` finding and you do not push.**
+**Every finding from every prior version must be `FIXED`, `OBSOLETE-BY-PIVOT`, `WAIVED`,
+`ESCALATED` or `DEFERRED-TO-POST-PUSH` — each with its evidence line. One `OPEN` finding and you
+do not push.**
 
 Why this is gate zero and not a later line: `connect-go` returned `BAD_GRADING_WEAK` on R06, R07
 and R12. Those findings were **fully stated in the agentic review**, and nothing forced the next
@@ -421,6 +426,15 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
 ---
 
 ## 7. POST-SUBMISSION CHECKLIST — the minutes after the push lands
+
+```
+[ ] 0. Every DEFERRED-TO-POST-PUSH row in the ledger executed NOW, against the SHA
+       you just created, and closed with its output. This is the only disposition
+       that leaves the push with work outstanding; if you stop here it reverts to
+       OPEN and blocks the next push. (R9)
+       proof: the command output, and the ledger row flipped to FIXED
+```
+
 
 ```
 [ ] 1. Record the pushed SHA. Everything below is read AGAINST it.

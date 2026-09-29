@@ -29,12 +29,21 @@ codimango task show    $T --json | jq -r '.tbdReviewDetails.full_assessment // "
 codimango task reviews $T --full          > $D/human-reviews.txt     # SINGULAR 'task'; 'tasks reviews' is rejected
 
 # trials + trajectories — the part most often skipped
-codimango job list  $T --json             > $D/jobs.json
-for J in $(jq -r '.[].id' $D/jobs.json); do
-  codimango api trials list $J --json     > $D/trials-$J.json
+# NOTE: every one of these prints a one-line support banner BEFORE the JSON.
+# Pipe through `tail -n +2` or jq dies on "Invalid numeric literal at line 1".
+codimango job list  $T --json | tail -n +2 > $D/jobs.json
+# jobs.json is an OBJECT: {jobs:[...], commitTimes:[...], total, ...} -- not an array.
+# The arm and the commit live in .config, not at the top level, and the top-level
+# avocado*/agent* fields are null. Map the arms first:
+jq -r '.jobs[] | [.id, (.config.agentName//"-"), (.config.commitSha//"none")[0:7], .status] | @tsv' $D/jobs.json
+# `codimango api ...` does NOT exist -- the subcommand is `trial`, singular, top level.
+for J in <the job ids you actually want>; do
+  codimango trial list $J --json | tail -n +2 > $D/trials-$J.json
 done
 # every non-degenerate arm, and EVERY failing trial in it:
-codimango api trials artifacts <trialId> --download $D/trials/<trialId>
+codimango trial artifacts <trialId> --download $D/trials/<trialId>
+# the per-test failure census -- this is the C6 corpus, and it is one line:
+grep -ho 'Missing tests: \[.*\]' $D/trials/*/verifier/test-stdout.txt
 ```
 
 **The trajectories are not optional.** `verifier/test-stdout.txt`, `verifier/output.json` and
@@ -72,6 +81,7 @@ with its current status:
 | `OBSOLETE-BY-PIVOT v<n>` | the thing it describes no longer exists — see the pivot test below |
 | `WAIVED v<n>` | deliberately accepted, with a named owner and a reason |
 | `ESCALATED v<n>` | **only an external owner can fix it** — Avocado for contract prose, or the human. Does **not** block `B5` GATE ZERO. |
+| `DEFERRED-TO-POST-PUSH v<n>` | **the remedy is an action that cannot run before the push it applies to** — a rerun, a missing model arm, anything measured against the new SHA. Does **not** block GATE ZERO; picked up by `B5` §7 instead. |
 
 **Why `ESCALATED` exists.** `STATUS: LIVE`, 2026-09-25 — without it the ledger deadlocks. A
 finding whose only remedy is `instruction.md` cannot be fixed by the agent that found it, cannot be
@@ -86,6 +96,19 @@ correctly reported something it is forbidden to repair.
 - why the agent may not do it (the rule and its section)
 - **re-statement in the current version's section.** It does not decay into silence; an escalation
   nobody acts on stays visible, it just stops blocking.
+
+**Why `DEFERRED-TO-POST-PUSH` exists.** `STATUS: LIVE`, 2026-09-29 — the same deadlock as
+`ESCALATED`, one step later. A reviewer asked for a model arm to be run *at the commit under
+review*; that arm can only be dispatched against a pushed SHA, so the finding cannot be closed
+before the push and GATE ZERO blocks the push that would let it close. It requires, every version:
+
+- the exact command that will close it, written out
+- execution **in the same working session as the push** — it is a deferral of minutes, not of
+  intent. Carry it into `B5` §7 POST-SUBMISSION and close it there with the output.
+- if the session ends with it unclosed, it reverts to `OPEN` and blocks the next push.
+
+It is **not** for work you would rather do later. If the remedy could run before the push, it is
+`OPEN` and it runs now.
 
 An agent may **not** self-assign `ESCALATED` to something it could fix. If the remedy is a test, a
 patch, a config or an environment change, it is `OPEN` and it is yours.
