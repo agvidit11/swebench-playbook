@@ -64,6 +64,46 @@ So `≥8` buys you out of the failure mode that killed six tasks, and buys you i
 that killed two. That trade is worth taking: too-easy is 6 of 9 MT failures and too-hard is 2, and
 a too-hard step has a diagnosable cause (`C4`) while a saturated step often has none.
 
+## The floor is STEP-1 ONLY. It does not transfer.
+
+`STATUS: LIVE`, 2026-09-29 — established the same day the floor was, by testing it instead of
+assuming it. **Step-2 `f2p` count carries no signal whatsoever:**
+
+| step-2 outcome | step-2 `f2p` counts |
+|---|---|
+| in band | 7, 30, 9 |
+| too easy | 4, 11, 5, 6, **8** |
+| too hard | 7 |
+
+`7` appears in both *in band* and *too hard*. `11` is too easy while `7` is in band. The bolded
+`8` is `connect-go`'s step 2 — **it satisfies the step-1 floor exactly and came back `1.0`.** Had
+this file shipped with "f2p ≥ 8" as a whole-task rule, it would have blessed the step that is
+currently failing.
+
+The mechanism is seeding: step 2 does not run against a fresh cohort, it runs against **the
+snapshots that already passed step 1** (`reference_swebench_mt_step_seeding`). Its population is
+pre-filtered to winners, so its own graded-set size is not what sets its difficulty. Count step 2
+if you like — it tells you nothing about its band.
+
+### What step 2's band does track: step 1's
+
+| step 1 | step 2 | task |
+|---|---|---|
+| in band | in band | django `0.4→0.2`, open62541 `0.2→0.4`, jsonschema `0.8→0.4` |
+| in band | **too easy** | connect-go `0.2→1.0` |
+| `1.0` | `1.0` / `0.8` | chromem-go, spire-bundle, spire-workload, go-zero-flush |
+| `1.0` | `0.0` | protoc-gen-go-mcp |
+
+They agree in **7 of 9**. Step 1 saturating and step 2 saturating is mostly one fact about the
+task, not two.
+
+**Do not over-read this into an intervention.** This is observational — hard tasks are hard at
+both steps. There is a *separate*, measured, interventional result pointing the other way:
+tightening step 1 homogenises the snapshots step 2 inherits and can push step 2 **toward** `5/5`
+(`reference_swebench_mt_step_seeding`). Both hold. What follows is that step 1 is the highest-
+leverage place to work, **not** that fixing step 1 fixes step 2 — after any step-1 change,
+step 2's band is unverified until re-measured.
+
 ## What does NOT predict it — stop reaching for this one
 
 **Step-1 instruction length is uncorrelated.** Word counts by outcome:
@@ -112,8 +152,9 @@ the result here either way. A rule that cannot be embarrassed is not a rule.
        proof: the number, or the reason
 [ ] 3. The count is independent CONDITIONS, not repeated assertions on one
        proof: one line per condition naming what it alone can catch (B3 §4)
-[ ] 4. Every step counted, not just step 1 — the last step is never exempt
-       proof: the per-step counts
+[ ] 4. Step 2+ counted for the record, with NO floor applied — the count does not
+       predict their band; their seeds do. Last step still never exempt.
+       proof: the per-step counts, and the step-1 band they inherit from
 [ ] 5. Declared step count checked against the exemption rule (3+ buys one)
        proof: task.toml [[steps]] length
 ```

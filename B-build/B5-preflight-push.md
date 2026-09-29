@@ -433,9 +433,12 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         MT: count PER STEP. Step 1 at <=2 blocks the task, not just the step.
         proof: the named branches, one line each, with its mutant result
 [ ] 6a2. MULTI-TURN: step-1 f2p count >= 8, counted from config.json. <=4 BLOCKS
-        outright -- 3 for 3 came back 1.0. 5-7 needs a written reason. Every
-        step counted, not just step 1; the last step is never exempt. (R10)
-        proof: the per-step counts
+        outright -- 3 for 3 came back 1.0. 5-7 needs a written reason. The
+        floor is STEP 1 ONLY: step-2 f2p does not predict step-2 band at all
+        (connect-go shipped step 2 at f2p 8 and got 1.0). Count later steps
+        for the record; the last step is never exempt, it just is not gated
+        on count -- its band comes from the seeds it inherits. (R10)
+        proof: the per-step counts, and step 1's band
 [ ] 6b. C6 verdict on EVERY changed graded artifact — tests/*, golden, contract —
         each PROVEN against a real prior trajectory, or written down as UNPROVEN.
         "It passes the oracle" is not a verdict. BLOCKING on a re-push (S16b)
