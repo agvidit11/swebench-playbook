@@ -146,6 +146,15 @@ Read the full diff before pushing. Confirm each changed file is one the act that
 supposed to write, and that no agent truncated, reformatted or half-rewrote a file it was only
 meant to read. Ownership by path → `00-ROUTER.md §5`.
 
+### 3b. One reader who wrote none of it
+
+`STATUS: LIVE`, 2026-09-29. Everything above is the author auditing the author. Claude reads its
+own diff in §3 and self-scores the reviewer's own axes in §2, and Codex reads back the tests it
+wrote itself. On a task that has been through even one repair round, hand the **whole tree** —
+not the diff — to a Codex context that wrote no part of it, and ask for a per-file verdict plus
+`B3` §①b. It is one dispatch and it is the last chance to catch a fix that broke the file it
+wasn't touching. Mandatory on any re-push; recommended on a first push.
+
 ---
 
 ## 4. Re-check `origin/main` before you push
@@ -384,6 +393,12 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         proof: `git -C $REPO diff -- <task> | wc -l`, plus your read-through note
 [ ]  6. Agentic-reviewer precheck walked (§2): PASS / AT-RISK for all 17 axes
         proof: the 17 lines
+[ ] 6b. C6 verdict on EVERY changed graded artifact — tests/*, golden, contract —
+        each PROVEN against a real prior trajectory, or written down as UNPROVEN.
+        "It passes the oracle" is not a verdict. BLOCKING on a re-push (S16b)
+        proof: the C6 report per changed artifact
+[ ] 6c. Independent re-read by an agent that wrote none of the tree (§3b)
+        proof: the per-file report.  BLOCKING on a re-push
 [ ]  7. Local structural PASS, knowing it does not imply a server pass (§1)
         proof: `codimango bench validate -p <task> --structural-only` -> `Overall: PASS`
 [ ]  8. origin/main re-checked; no peer has landed the same work (§4)

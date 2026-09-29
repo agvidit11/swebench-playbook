@@ -67,6 +67,7 @@ S12–S15 name the *destination* `C1` will route you to, not a shortcut past it.
 | S7 | Oracle 3/3 local, not pushed | `B-build/B5-preflight-push.md` | Claude |
 | S8 | Pushed, `validationStatus=pending`, sha matches yours | **wait** — see §3 | — |
 | S9 | Any server verdict, not yet diagnosed | `C-drive/C1-read-verdict.md` | Claude |
+| S9b | `needs_revision`, or **any human review with scored rubrics** | `C1` for the diagnosis, then `C-drive/C7-revision-response.md` | Claude routes · Avocado owns the prose |
 | S10 | `Oracle validation` red | `C-drive/C2-repair-grading.md` | Codex |
 | S11 | `Structural checks` red | `reference/R3-landmines.md` → `C2` | Codex |
 | S12 | `BAD_GRADING_WRONG` | `C2` — **remove an assertion** | Codex |
@@ -512,6 +513,7 @@ mechanism.
 | `C-drive/C4-loosen-salvage.md` | too hard, false negatives, salvage. |
 | `C-drive/C5-cohort-loop.md` | which task to work, in what order, when to park. |
 | `C-drive/C6-replay-verify.md` | replay real prior trajectories against a proposed change. `C2`/`C3`/`C4` exit through it. |
+| `C-drive/C7-revision-response.md` | answer a HUMAN reviewer and re-submit: route each ask to its owner, independent re-read, full re-validation. |
 | `reference/R1-field-authority.md` | full decode of every gate string and CLI field. |
 | `reference/R2-signal-integrity.md` | is this number real. |
 | `reference/R3-landmines.md` | scaffold + packaging traps. |
