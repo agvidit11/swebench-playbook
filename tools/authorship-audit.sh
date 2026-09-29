@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # authorship-audit.sh — did Claude write ANYTHING inside this task directory?
 #
-#   ./authorship-audit.sh <task-name>
+#   ./authorship-audit.sh <task-name> [--since YYYY-MM-DD]
+#
+# --since gates only writes at or after that date. REMEDIATION MODE: a task already
+# contaminated has a permanent transcript record, so a bare run blocks it forever and the
+# gate becomes useless exactly when you are trying to fix it. Use --since to prove no NEW
+# Claude write happened during the repair, and record the historical violation in the
+# ledger instead of pretending it is gone.
 #
 # WHY THIS EXISTS. Two tasks came back CONTAMINATED with `agentModified: true`:
 #
@@ -29,6 +35,8 @@
 set -uo pipefail
 TASK="${1:?usage: authorship-audit.sh <task-name>}"
 TASK="$(basename "${TASK%/}")"
+SINCE=""
+[ "${2:-}" = "--since" ] && SINCE="${3:?--since needs YYYY-MM-DD}"
 SESSIONS="$HOME/.claude/projects"
 
 # Scan EVERY project dir, not just -home-agvidit. Measured 2026-09-29: the first version of
@@ -43,15 +51,16 @@ shopt -s nullglob
 mapfile -t FILES < <(find "$SESSIONS" -name '*.jsonl' -type f 2>/dev/null)
 [ "${#FILES[@]}" -gt 0 ] || { echo "authorship-audit: no transcripts found" >&2; exit 2; }
 
-echo "task:     $TASK"
+echo "task:     $TASK${SINCE:+   (only writes on/after $SINCE)}"
 echo "scanning: ${#FILES[@]} transcripts (main sessions + subagents) across $(ls -1d "$SESSIONS"/*/ 2>/dev/null | wc -l) project dirs"
 echo
 
-python3 - "$TASK" "${FILES[@]}" <<'PY'
+python3 - "$TASK" "$SINCE" "${FILES[@]}" <<'PY'
 import json, re, sys, os
 
-task = sys.argv[1]
-paths = sys.argv[2:]
+task  = sys.argv[1]
+since = sys.argv[2] or None
+paths = sys.argv[3:]
 
 # A write is any of: Write/Edit/NotebookEdit naming a tests/ path, or a Bash command that
 # redirects, copies, moves or edits in place into one. Reading is fine and must not fire.
@@ -59,22 +68,29 @@ WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 # Any write verb aimed at a path containing the task name. Deliberately broad: a false
 # positive costs one look, a false negative costs a task. cp INTO the tree is the one that
 # actually bit us on concourse and it is not an Edit/Write, which is why the guard missed it.
-BASH_WRITE = re.compile(
-    r">{1,2}\s*\S*TASKNAME"
-    r"|tee\s+[^|;&]*TASKNAME"
-    r"|\bcp\s+[^|;&]*TASKNAME"
-    r"|\bmv\s+[^|;&]*TASKNAME"
-    r"|\brsync\s+[^|;&]*TASKNAME"
-    r"|sed\s+-i[^|;&]*TASKNAME"
-    r"|truncate\s+[^|;&]*TASKNAME"
-    r"|dd\s+[^|;&]*of=\S*TASKNAME"
-    r"|patch\s+[^|;&]*TASKNAME"
-    r"|git\s+(?:apply|checkout|restore)\s+[^|;&]*TASKNAME"
-    r"|open\([^)]*TASKNAME[^)]*['\"][wa]"
-    r"|write_text\(|writelines\("
+BASH_WRITE_TEMPLATE = (
+    # The write TARGET must itself contain the task name. Matching "a write verb somewhere
+    # in a command that mentions the task" over-fires badly: it flagged this very script
+    # writing a brief to /tmp that merely quoted the task name. A guard that cries wolf is
+    # ignored, which is the same end state as a guard that is too narrow.
+    r">{1,2}\s*(?:\S*/)?TASKNAME\S*"
+    r"|tee\s+(?:-a\s+)?(?:\S*/)?TASKNAME\S*"
+    r"|\bcp\s+(?:-\S+\s+)*\S+\s+\S*TASKNAME\S*"
+    r"|\bmv\s+(?:-\S+\s+)*\S+\s+\S*TASKNAME\S*"
+    r"|\brsync\s+[^|;&]*\s\S*TASKNAME\S*"
+    r"|sed\s+-i\S*\s+[^|;&]*\S*TASKNAME\S*"
+    r"|truncate\s+[^|;&]*\S*TASKNAME\S*"
+    r"|dd\s+[^|;&]*of=\S*TASKNAME\S*"
+    r"|patch\s+[^|;&]*\S*TASKNAME\S*"
+    r"|git\s+(?:apply|checkout|restore)\s+[^|;&]*\S*TASKNAME\S*"
+    r"|open\(\s*['\"][^'\"]*TASKNAME[^'\"]*['\"]\s*,\s*['\"][wa]"
 )
 
-BASH_WRITE = re.compile(BASH_WRITE.pattern.replace("TASKNAME", re.escape(task)))
+BASH_WRITE = re.compile(BASH_WRITE_TEMPLATE.replace("TASKNAME", re.escape(task)))
+# pathlib writes: only when a literal path containing the task name is being written
+PATHLIB_WRITE = re.compile(
+    r"Path\(\s*['\"][^'\"]*" + re.escape(task) + r"[^'\"]*['\"]\s*\)[^\n]{0,80}?\.write_",
+)
 
 def classify(text):
     """audit/ is author-side evidence, not task content. Everything else is a violation."""
@@ -92,6 +108,10 @@ for p in paths:
                     continue
                 try: rec = json.loads(line)
                 except Exception: continue
+                if since:
+                    ts = str(rec.get("timestamp") or "")[:10]
+                    if ts and ts < since:
+                        continue
                 for blk in (rec.get("message") or {}).get("content") or []:
                     if not isinstance(blk, dict) or blk.get("type") != "tool_use":
                         continue
@@ -102,7 +122,7 @@ for p in paths:
                             hits.append((sess, ln, name, fp, classify(fp)))
                     elif name == "Bash":
                         cmd = str(inp.get("command", ""))
-                        if task in cmd and BASH_WRITE.search(cmd):
+                        if task in cmd and (BASH_WRITE.search(cmd) or PATHLIB_WRITE.search(cmd)):
                             one = " ".join(cmd.split())[:150]
                             hits.append((sess, ln, "Bash", one, classify(cmd)))
     except Exception as e:
