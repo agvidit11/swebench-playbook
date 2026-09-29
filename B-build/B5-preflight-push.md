@@ -79,6 +79,30 @@ Two things the script cannot do: rerun a timing-sensitive suite under load to ex
 
 ---
 
+## 1c. THE POPULATION SAYS YOU BUILT IT TOO EASY
+
+`STATUS: LIVE`, 2026-09-29. Measured over one author's 48 tasks, 24 of them failing:
+
+| | count |
+|---|---:|
+| failing tasks whose blocker is the balance gate | **23 of 24** |
+| of those, **too easy** (avocado >3/5) | **19** |
+| of those, too hard / no gradient | 4 |
+| MT step-gate failures naming **step 1** | 6 |
+
+**The error is directional, about five to one, and it is always the same direction.** Whatever
+process produced these tasks believed they were hard and they were not. Read that as a prior
+about your own current estimate, because it was produced by the same process.
+
+This is why `6a` blocks. Branch count was already the signal documented to beat `GATE 4`
+(`B3` §④), and it was already an `A3` exit criterion — **but `A3` estimates it at ideation, when
+no grader exists, and nothing ever re-counted it against the grader actually built.** An estimate
+made before the artifact exists, never re-checked after it exists, is not a gate.
+
+The corollary for `B3`: **widen past the point that feels sufficient.** "Sufficient" is the
+judgement that produced 19 too-easy tasks. The measured cost of over-widening is `too hard`, at
+4 tasks; the measured cost of under-widening is 19.
+
 ## 2. The agentic-reviewer precheck
 
 Run the reviewer's own dimensions locally **before** pushing, so a predictable FAIL is caught here
@@ -398,6 +422,10 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         proof: `git -C $REPO diff -- <task> | wc -l`, plus your read-through note
 [ ]  6. Agentic-reviewer precheck walked (§2): PASS / AT-RISK for all 17 axes
         proof: the 17 lines
+[ ] 6a. BRANCH COUNT, RE-COUNTED AGAINST THE GRADER YOU BUILT — not the A3 estimate.
+        Name each branch and show the mutant it catches (B3 §3). <=2 BLOCKS.
+        MT: count PER STEP. Step 1 at <=2 blocks the task, not just the step.
+        proof: the named branches, one line each, with its mutant result
 [ ] 6b. C6 verdict on EVERY changed graded artifact — tests/*, golden, contract —
         each PROVEN against a real prior trajectory, or written down as UNPROVEN.
         "It passes the oracle" is not a verdict. BLOCKING on a re-push (S16b)
