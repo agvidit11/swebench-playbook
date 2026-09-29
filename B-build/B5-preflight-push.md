@@ -432,7 +432,9 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         Name each branch and show the mutant it catches (B3 §3). <=2 BLOCKS.
         MT: count PER STEP. Step 1 at <=2 blocks the task, not just the step.
         proof: the named branches, one line each, with its mutant result
-[ ] 6a2. MULTI-TURN: step-1 f2p count >= 8, counted from config.json. <=4 BLOCKS
+[ ] 6a2. MULTI-TURN: step-1 f2p count. TARGET ~20 -- the median of the org's
+        accepted reference portfolio (n=49). 7 is their MINIMUM ever shipped
+        and is our hard floor. Counted from config.json. <=4 BLOCKS
         outright -- 3 for 3 came back 1.0. 5-7 needs a written reason. The
         floor is STEP 1 ONLY: step-2 f2p does not predict step-2 band at all
         (connect-go shipped step 2 at f2p 8 and got 1.0). Count later steps

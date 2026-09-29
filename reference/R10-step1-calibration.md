@@ -64,6 +64,47 @@ So `≥8` buys you out of the failure mode that killed six tasks, and buys you i
 that killed two. That trade is worth taking: too-easy is 6 of 9 MT failures and too-hard is 2, and
 a too-hard step has a diagnosable cause (`C4`) while a saturated step often has none.
 
+## CALIBRATED AGAINST A WORKING PORTFOLIO — the floor was far too timid
+
+`STATUS: LIVE`, 2026-09-29. Everything above was derived from **our own 13 graded MT tasks, a
+portfolio that mostly fails.** A floor fitted to failing data tells you where failure starts, not
+where success lives. Measured against `codimango/swe-bench-pro-bekap` (49 MT tasks, ~30-45
+accepted — the reference portfolio in the org):
+
+| | ours | **theirs** |
+|---|---:|---:|
+| MT tasks | 23 | **49** |
+| step-1 `f2p` — **median** | **5** | **20** |
+| step-1 `f2p` — min | 2 | **7** |
+| step-1 `f2p` — max | 17 | 83 |
+| step-2 `f2p` — median | 7 | **21** |
+| step-1 instruction, words (median) | 161 | **415** |
+| shape | 2- and 3-step, mixed with single-turn | **48 of 52 are 2-step MT** |
+
+**Their minimum is above our median.** Thirteen of our twenty-one step-1s sit below the smallest
+graded set they have ever shipped. Our step-1 `f2p` distribution is
+`[2,2,3,4,4,4,5,5,5,5,5,7,7,8,8,10,11,13,13,16,17]`; theirs starts at 7 and runs to 83.
+
+**Revised target: step-1 `f2p` ≈ 20, and treat 7 as the hard floor, not 8 as the goal.** The
+`≥8` rule above is not wrong — nothing at ≥8 came back too easy — it is just the bottom of the
+working range being mistaken for the target. Aim at the median of a portfolio that gets accepted,
+not at the edge of one that does not.
+
+### The length finding, corrected
+
+Our own data said step-1 instruction length carries no signal, and *within our range* it does not
+— but our range is the problem. Their median step 1 is **415 words to our 161**, 2.6×.
+
+These are the same fact, not two: **an assertion needs a contract sentence behind it (`B3` §①b),
+so twenty graded conditions cannot be supported by a 160-word contract.** Our instructions are
+short because they grade almost nothing. Length follows from the size of the conjunction.
+
+This also resolves the tension with de-scaffolding. De-scaffolding removes **hand-holding** — the
+how-to, the recipe, the implementation shape. It does not remove **requirements**. A 415-word
+contract that states twenty obligations and no method is not scaffolded; a 200-word one that
+walks the model through the fix is. Cutting words without asking which kind you are cutting is
+how a task ends up at `f2p` 5 with a 161-word contract and a `1.0` band.
+
 ## The floor is STEP-1 ONLY. It does not transfer.
 
 `STATUS: LIVE`, 2026-09-29 — established the same day the floor was, by testing it instead of
