@@ -397,6 +397,30 @@ implementation. 18 diverged, all one class, and the **golden** was the wrong one
 Write the enumeration down as a product of axes. An unlisted class is an ungraded requirement, and
 an unlisted *axis* is a whole family of them.
 
+### ①b The REVERSE direction — every assertion must trace to a contract sentence → catches R02
+
+`STATUS: LIVE`, 2026-09-25. §① walks **contract → tests** and catches under-coverage. Nothing
+walked **tests → contract**, so an assertion grading a rule the contract never states passed every
+local gate.
+
+A human reviewer on `concourse` asked for exactly this, and the AI assessment had independently
+found the same two: *"Both are cases where a test checks something your instruction only hints at."*
+The remedy they wanted was a contract sentence, not a test change — which means the defect is
+cheap to fix **before** a push and needs Avocado **after** one.
+
+**The check, one line per graded assertion:**
+
+| assertion | the contract sentence that requires it |
+|---|---|
+| … | quote it, or the assertion is unsupported |
+
+"Hints at" is not support. If the contract gestures at a behaviour without stating it, you have two
+legal moves: **have Avocado state it**, or **drop the assertion**. Grading an unstated rule is R02,
+and it reads to a solver as an unfair test.
+
+Do this for **every** `fail_to_pass` entry and every assertion inside it. It is the cheapest gate on
+this page and it is the one a human reviewer will run by hand.
+
 ### ② Golden-vs-contract differential → catches R12, the serious one
 
 **Run the golden against the classes your tests do NOT cover.** If the golden violates the
@@ -461,6 +485,9 @@ a whole validation cycle. → `C-drive/C3-harden.md` for the mutant-is-a-floor c
         one that catches silent-contract + pinning-test (4 of 4 BAD_GRADING_WRONG)
         proof: `python3 ~/.claude/skills/swebench-mt/instruction-lint.py <task> <clone>`
                must report PASS, and must NOT print "no test_patch yet"
+[ ] 19b. REVERSE TRACE: every graded assertion quoted against the contract sentence
+        that requires it. "Hints at" is not support -- either Avocado states it or
+        the assertion is dropped. An unstated graded rule is R02            [R02]
 [ ] 20a. ANTI-WRONG: >=1 independently-written CORRECT implementation PASSES the
         real graded set (not the A3 sketch). 0 of N = BAD_GRADING_WRONG, do not push
         proof: the per-implementation reward lines, and which layer any failure sits

@@ -15,6 +15,36 @@ true and which lies — is **not** restated here: → `00-ROUTER.md` §2 and
 
 ---
 
+## Two things in a PASSING verdict that still need reading
+
+`STATUS: LIVE`, 2026-09-25 — both were visible to us on `concourse` and both were skipped because
+the gate said `passed`.
+
+**① An `Accept` with a non-zero finding count is not clean.**
+
+```
+AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 0 · Low 2)
+```
+
+Two findings existed. The finding *text* is not retrievable from `task show` — only the count — so
+the count is the whole signal, and it means **go look for them yourself**. A human reviewer later
+found both by inspection and asked for a change. Run `B3` §①b (reverse trace) against any
+non-zero count; that is the check that surfaces them.
+
+**② An arm with `no trials` means the gate passed on a partial sample.**
+
+```
+Passed — avocado not trivial and >=1 agent solved
+  (avocado: 0/5, opus: no trials, gpt: 5/5)
+```
+
+That gate passed on **one** solving model. A human reviewer asked for an opus run at that commit
+for exactly this reason. `no trials` is not `0/5` — it is an unstarted arm, and a verdict resting
+on it is one model away from being unsupported.
+
+**Check every arm for `no trials` on a PASSING gate, and trigger the missing one before you call
+the task done.** It costs a rerun and it closes a reviewer ask you would otherwise receive.
+
 ## FIRST: pull everything and write the ledger version entry
 
 > **Freshness check — a dead remote reports everything as UNPUSHED.** `STATUS: LIVE`, 2026-09-24.

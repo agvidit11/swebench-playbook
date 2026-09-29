@@ -287,6 +287,23 @@ re-check prior findings will re-ship the same defect under a new SHA indefinitel
 missing input class means re-running the contract-domain enumeration (`B3` §①), not re-reading the
 sentence. An R12 finding means re-running the golden-vs-contract differential (`B3` §②).
 
+## AFTER the verdict: a PASSING gate can still be one model short
+
+`STATUS: LIVE`, 2026-09-25. Scan every arm in the balance string before you call a task done:
+
+```bash
+codimango task errors <task> 2>&1 | grep -i balance
+```
+
+`no trials` on any arm is **not** `0/5` — it is an unstarted arm, and a `passed` verdict resting on
+it is supported by however many models actually ran. Measured: a gate read
+`Passed — avocado not trivial and >=1 agent solved (avocado 0/5, opus: no trials, gpt 5/5)` and a
+human reviewer's first ask was *"run opus at this commit, because there are no claude-code trials
+at all — your gate passed with codex as the only solving model."*
+
+**Trigger the missing arm and re-read before declaring done.** It is a rerun, not a rebuild, and it
+pre-empts a Request-changes.
+
 ## AFTER the push: a commit does not always create jobs
 
 `STATUS: LIVE`, 2026-09-24 — **two tasks in one session** sat at `gen=null` with zero jobs after a
