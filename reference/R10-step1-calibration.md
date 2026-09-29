@@ -45,7 +45,7 @@ measure.
 | **4** | spire-workload | `1.0` |
 | **5** | go-zero-flush, protoc-gen-go-mcp | `1.0`, `1.0` |
 | **5** | connect-go, zendesk-biz | `0.2`, `0.0` |
-| **8** | django-model-utils, jsonschema | `0.4`, `0.8` |
+| **8** | django-model-utils, jsonschema | `0.4`, **`0.8` — over ceiling, grandfathered** |
 | **10** | franz-go-kadm | `0.0` |
 | **13** | sparql-ruby | `0.0` |
 | **17** | open62541 | `0.2` |
@@ -56,8 +56,13 @@ Read it as two one-directional rules, which is all the data supports:
   competent implementation satisfies all of them. This is a floor, and it is *mechanical* — you
   can count it from `config.json` with no judgement at all, which makes it a better gate than any
   estimate.
-- **`f2p` ≥ 8 has never come back too easy. 5 for 5.** It is a *necessary* condition, not a
-  sufficient one: two of those five went to `0.0` instead.
+- **`f2p` ≥ 8 has come back too easy once in five — CORRECTED 2026-09-29.** The original claim
+  here was "never, 5 for 5" and it was wrong: `jsonschema` sits at `f2p=8` with a step-1 rate of
+  **`0.8` = 4 of 5, which is over the 3/5 ceiling and therefore too easy.** It is recorded as
+  *accepted* only because it passed under the **pre-9/15 rules**; its own gate string says so.
+  I counted an accepted-but-grandfathered task as evidence that the floor holds. The honest
+  reading is **4 of 5**, and two of the remaining four went to `0.0`. `≥8` is a weak necessary
+  condition, not a guarantee.
 - **`f2p` = 5 is a coin flip** — two saturated, one landed in band, one went to zero.
 
 So `≥8` buys you out of the failure mode that killed six tasks, and buys you into a different one
@@ -183,6 +188,25 @@ calibration dial.** Trimming a 230-word step 1 to 180 is not a calibration chang
 4. **The last step is never exempt, and the single-1.0 exemption needs 3+ declared steps**
    (`00-ROUTER.md` §252). A 2-step task must land *both* steps. Seven of the nine MT failures are
    2-step — not because 2-step is wrong, but because it has no slack.
+
+## What the accepted tasks actually prove — and it is less than three
+
+`STATUS: LIVE`, 2026-09-29. Per-task review of all three accepted MT tasks:
+
+| task | why it was accepted | reproducible? |
+|---|---|---|
+| `open62541` | an **observable ownership/lifetime fork** — lent-and-released vs materialized-then-used — produced real outcome variance where **four other candidate forks did not** | **yes** — `R6` §P3 + `A3` GATE 4, and the rejected alternatives prove the probe ran |
+| `django-model-utils` | **unknown.** Bands look deliberate (`0.4|0.2`) but without trial-level failures we cannot tell discrimination from sampling luck | no |
+| `jsonschema` | **grandfathered.** Step 1 at `4/5` is over today's ceiling; accepted under pre-9/15 rules | **no — it would fail today** |
+
+**We have exactly one multi-turn success we can explain and repeat.** That is the honest state,
+and it should change what we weight: the **outcome-variance probe** (`A3` GATE 4, `R6` §P3) is
+the one mechanism with a clean causal record — it moved `open62541` from `5/5` into band and it
+rejected four forks that would not have. Counting `f2p` is a proxy for the same underlying
+thing and a weaker one. **Prefer the probe; use the count as a cheap pre-filter.**
+
+Do not cite `review=accepted` as evidence a shape satisfies today's gate without reading the
+gate string for `pre-9/15 rules`.
 
 ## The live prediction this makes
 
