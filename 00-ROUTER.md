@@ -59,13 +59,16 @@ S12–S15 name the *destination* `C1` will route you to, not a shortcut past it.
 |---|---|---|---|
 | S0 | No repo picked | `A-source/A1-repo-screen.md` | subagents ×N |
 | S1 | Repo picked, no candidate cards | `A-source/A2-idea-generate.md` | MetaCode |
-| S2 | Cards exist, no probe measured | `A-source/A3-idea-gate.md` | Claude + Codex |
+| S1b | Cards exist, no corpus verdict | `A-source/A4-corpus-prior.md` | Claude |
+| S2 | Cards carry a corpus verdict, no probe measured | `A-source/A3-idea-gate.md` | Claude + Codex |
 | S3 | Survivor card, no task dir | `B-build/B1-scaffold.md` | Claude |
 | S4 | Dir exists, no contract | `B-build/B2-contract.md` | MetaCode / 1P |
 | S5 | Contract written, no graded suite | `B-build/B3-grader.md` | Codex |
 | S6 | Suite exists, oracle not 3/3 local | `B-build/B4-solution-env.md` | Claude |
-| S6a | Oracle 3/3, no local band over VALID TERMINAL attempts | `B-build/B7-local-calibration.md` | Claude |
-| S6b | Local band read, reviewers not yet run locally | `B-build/B7-local-calibration.md` | forecast, freeze, ladder. Classify every failure and read WHY before the band counts. PROVISIONAL — contradicts A3 §399 on purpose. |
+| S6a | Oracle 3/3, no local band over VALID TERMINAL attempts | `A-source/A4-corpus-prior.md` | search the WHOLE org corpus by engineering concept. `task list --filter all` narrows to you; `gh repo list` caps at 1000 of 5,105. Both blind past our own work. |
+| `B-build/B7-local-calibration.md` | Claude |
+| S6b | Local band read, reviewers not yet run locally | `A-source/A4-corpus-prior.md` | search the WHOLE org corpus by engineering concept. `task list --filter all` narrows to you; `gh repo list` caps at 1000 of 5,105. Both blind past our own work. |
+| `B-build/B7-local-calibration.md` | forecast, freeze, ladder. Classify every failure and read WHY before the band counts. PROVISIONAL — contradicts A3 §399 on purpose. |
 | `B-build/B6-review-gate.md` | Claude + 1 subagent per reviewer |
 | S7 | Oracle 3/3 local, reviewers Accept, not pushed | `B-build/B5-preflight-push.md` | Claude |
 | S8 | Pushed, `validationStatus=pending`, sha matches yours | **wait** — see §3 | — |
@@ -516,6 +519,7 @@ mechanism.
 | `C-drive/C4-loosen-salvage.md` | too hard, false negatives, salvage. |
 | `C-drive/C5-cohort-loop.md` | which task to work, in what order, when to park. |
 | `C-drive/C6-replay-verify.md` | replay real prior trajectories against a proposed change. `C2`/`C3`/`C4` exit through it. |
+| `A-source/A4-corpus-prior.md` | search the WHOLE org corpus by engineering concept. `task list --filter all` narrows to you; `gh repo list` caps at 1000 of 5,105. Both blind past our own work. |
 | `B-build/B7-local-calibration.md` | forecast, freeze, ladder. Classify every failure and read WHY before the band counts. PROVISIONAL — contradicts A3 §399 on purpose. |
 | `B-build/B6-review-gate.md` | run the server's own reviewers locally before pushing. The self-scored 17-axis walk is not a review. |
 | `reference/R10-step1-calibration.md` | **MT priority.** step-1 f2p floor, the bimodal band, and why instruction length is not a calibration dial. |
