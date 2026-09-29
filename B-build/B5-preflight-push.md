@@ -111,6 +111,12 @@ judgement that produced 19 too-easy tasks. The measured cost of over-widening is
 
 ## 2. The agentic-reviewer precheck
 
+**Superseded as a standalone gate by `B-build/B6-review-gate.md`.** `STATUS: LIVE`, 2026-09-29.
+The 17-axis walk below is a *self-score* — the author recalling what a reviewer would say. Four
+of the actual reviewer skills were installed on this machine the whole time and we ran none of
+them. Run `B6` first; use the walk below only to reason about an axis `B6` flagged. A self-score
+shares an author with the thing it scores.
+
 Run the reviewer's own dimensions locally **before** pushing, so a predictable FAIL is caught here
 rather than a cohort later. State **PASS** or **AT-RISK** for each, one line of reasoning, and
 focus on the ones this task's build could plausibly have broken. The rules behind each axis live
@@ -432,9 +438,15 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         Name each branch and show the mutant it catches (B3 §3). <=2 BLOCKS.
         MT: count PER STEP. Step 1 at <=2 blocks the task, not just the step.
         proof: the named branches, one line each, with its mutant result
-[ ] 6a2. MULTI-TURN: step-1 f2p count. TARGET ~20 -- the median of the org's
-        accepted reference portfolio (n=49). 7 is their MINIMUM ever shipped
-        and is our hard floor. Counted from config.json. <=4 BLOCKS
+[ ] 6a2. MULTI-TURN: step-1 f2p counted, as a COHESION SIGNAL, not a quota.
+        RETRACTED 2026-09-29: the earlier "target ~20" was wrong. The reference
+        portfolio's own policy is "no numeric threshold blocks the task; count
+        behavioral obligations, not individual assertions" and "do not
+        manufacture behaviors to reach a quota" -- their median of 20 is an
+        OUTCOME of counting obligations, not a target anyone aims at. A low
+        count triggers a cohesion review (is this one obligation or several?);
+        a high count triggers a split review. Neither blocks on the number.
+        Only <=4 still BLOCKS
         outright -- 3 for 3 came back 1.0. 5-7 needs a written reason. The
         floor is STEP 1 ONLY: step-2 f2p does not predict step-2 band at all
         (connect-go shipped step 2 at f2p 8 and got 1.0). Count later steps
@@ -447,6 +459,11 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         proof: the C6 report per changed artifact
 [ ] 6c. Independent re-read by an agent that wrote none of the tree (§3b)
         proof: the per-file report.  BLOCKING on a re-push
+[ ] 6d. B6 REVIEW GATE: `tools/review-gate.sh <task> check` exits 0 -- every
+        installed reviewer returned the exact verdict Accept, zero Critical,
+        zero High. BLOCKING. The server's reviewer cannot see an unpushed
+        tree, so this is the only place a rubric failure is cheap. (B6)
+        proof: the check output and $?
 [ ]  7. Local structural PASS, knowing it does not imply a server pass (§1)
         proof: `codimango bench validate -p <task> --structural-only` -> `Overall: PASS`
 [ ]  8. origin/main re-checked; no peer has landed the same work (§4)

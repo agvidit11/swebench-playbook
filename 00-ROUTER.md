@@ -64,7 +64,8 @@ S12–S15 name the *destination* `C1` will route you to, not a shortcut past it.
 | S4 | Dir exists, no contract | `B-build/B2-contract.md` | MetaCode / 1P |
 | S5 | Contract written, no graded suite | `B-build/B3-grader.md` | Codex |
 | S6 | Suite exists, oracle not 3/3 local | `B-build/B4-solution-env.md` | Claude |
-| S7 | Oracle 3/3 local, not pushed | `B-build/B5-preflight-push.md` | Claude |
+| S6b | Oracle 3/3, reviewers not yet run locally | `B-build/B6-review-gate.md` | Claude + 1 subagent per reviewer |
+| S7 | Oracle 3/3 local, reviewers Accept, not pushed | `B-build/B5-preflight-push.md` | Claude |
 | S8 | Pushed, `validationStatus=pending`, sha matches yours | **wait** — see §3 | — |
 | S9 | Any server verdict, not yet diagnosed | `C-drive/C1-read-verdict.md` | Claude |
 | S9b | `needs_revision`, or **any human review with scored rubrics** | `C1` for the diagnosis, then `C-drive/C7-revision-response.md` | Claude routes · Avocado owns the prose |
@@ -513,6 +514,7 @@ mechanism.
 | `C-drive/C4-loosen-salvage.md` | too hard, false negatives, salvage. |
 | `C-drive/C5-cohort-loop.md` | which task to work, in what order, when to park. |
 | `C-drive/C6-replay-verify.md` | replay real prior trajectories against a proposed change. `C2`/`C3`/`C4` exit through it. |
+| `B-build/B6-review-gate.md` | run the server's own reviewers locally before pushing. The self-scored 17-axis walk is not a review. |
 | `reference/R10-step1-calibration.md` | **MT priority.** step-1 f2p floor, the bimodal band, and why instruction length is not a calibration dial. |
 | `C-drive/C7-revision-response.md` | answer a HUMAN reviewer and re-submit: route each ask to its owner, independent re-read, full re-validation. |
 | `reference/R1-field-authority.md` | full decode of every gate string and CLI field. |
