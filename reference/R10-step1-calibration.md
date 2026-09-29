@@ -66,7 +66,14 @@ a too-hard step has a diagnosable cause (`C4`) while a saturated step often has 
 
 ## CALIBRATED AGAINST A WORKING PORTFOLIO — the floor was far too timid
 
-`STATUS: LIVE`, 2026-09-29. Everything above was derived from **our own 13 graded MT tasks, a
+`STATUS: PROVISIONAL`, 2026-09-29. **Do not act on the ~20 target yet.** The counts below are
+real and re-measurable; what is unresolved is whether they transfer. The reference portfolio's
+tasks are a **different genre** — their instructions are specification documents that name every
+class and method signature, where ours are bug reports in a user's voice. A graded-set size that
+works for "implement this stated API" may not be reachable for "find and fix this subtle bug",
+and our own `B5` R04/R08 axes treat signature-pinning as a failure mode. Resolution needs their
+human-review scores, which are not in the repo. Downgraded from LIVE the same day it was written,
+before anyone could build on it. Everything above was derived from **our own 13 graded MT tasks, a
 portfolio that mostly fails.** A floor fitted to failing data tells you where failure starts, not
 where success lives. Measured against `codimango/swe-bench-pro-bekap` (49 MT tasks, ~30-45
 accepted — the reference portfolio in the org):
