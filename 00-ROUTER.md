@@ -82,6 +82,7 @@ S12–S15 name the *destination* `C1` will route you to, not a shortcut past it.
 | S14 | Step gate "too easy" / avocado >3/5 on any step | `C-drive/C3-harden.md` | MetaCode + Codex |
 | S15 | Step gate "too hard" / 0 on every model | `C-drive/C4-loosen-salvage.md` | Codex |
 | S16 | All five done-criteria green (§4) | **park it. Do not re-open.** | — |
+| S16c | >10 commits, or a terminal condition | `C-drive/C8-retire.md` | Claude proposes · **Vidit decides** |
 | S16b | A change to any graded artifact is proposed but unverified | `C-drive/C6-replay-verify.md` | Claude pulls, Codex runs |
 | S17 | More than one task in flight | `C-drive/C5-cohort-loop.md` | Claude |
 
@@ -565,6 +566,7 @@ mechanism.
 | `assets/avocado/` + `tools/avocado-brief.sh` | the four Avocado prompt templates, a computed word cap, and a lint that refuses to send drafted prose. → `B2`. |
 | `B-build/B6-review-gate.md` | run the server's own reviewers locally before pushing. The self-scored 17-axis walk is not a review. |
 | `reference/R10-step1-calibration.md` | **MT priority.** step-1 f2p floor, the bimodal band, and why instruction length is not a calibration dial. |
+| `C-drive/C8-retire.md` | park is not retire. The commit budget (accepted: median 6.5, **max 10**) and the terminal conditions. |
 | `C-drive/C7-revision-response.md` | answer a HUMAN reviewer and re-submit: route each ask to its owner, independent re-read, full re-validation. |
 | `reference/R1-field-authority.md` | full decode of every gate string and CLI field. |
 | `reference/R2-signal-integrity.md` | is this number real. |
