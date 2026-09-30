@@ -42,11 +42,35 @@ G10 is the exit gate: a shortlist row without a measured number is not a shortli
 
 ```bash
 cd /tmp/llc && git pull                                  # goes stale; measured 16 days behind
+# ^ if /tmp/llc does not exist, CLONE it — it is 2.7 GB and takes ~4 min:
+#   git clone ssh://git@github.com:22/codimango/low-level-task-classifications.git /tmp/llc
 find . -iname "*<repo>*" -type f                         # 1. filename sweep — highest signal
 grep -rli "<repo>" tmp/tasks                             # 2. bare-name content sweep — READ the hits
 grep -rliF -- "<distinctive symbol>" tmp/tasks           # 3. invariant/API symbol sweep
 gh search code --owner codimango "<repo>" --limit 30     # 4. live — PRIMARY, not a supplement
+gh search code --owner codimango "<owner>/<repo>"        # 5. THE SLUG. Not optional — see below.
 ```
+
+> ### Sweeps 1–4 are all NAME-based and all four missed the only real peer. Sweep 5 found it.
+>
+> `STATUS: LIVE`, 2026-09-30. Measured on `belaban/JGroups`. Sweeps 1–4 returned 70+ hits between
+> them and **every single one resolved to `jgroups-extras/jgroups-raft`, a different repository**,
+> so the repo read peer-free through the whole of G1. The real peer —
+> `codimango/CtrlG_DetectPatch :: ctrlg-detect-and-patch-…` — never writes the string `jgroups`
+> anywhere except inside a GitHub URL in its `task.toml`:
+>
+> ```toml
+> source = 'https://github.com/belaban/JGroups/commit/eeaf5241cce464ef21a2dfc4938729ade9ebef36'
+> ```
+>
+> It was found only by searching the **owner/repo slug**, and only because `A4` runs that query.
+> Hoisted here because `A1` is where the peer verdict is supposed to be decided, and because a
+> task in a different benchmark family (a three-sentence detect-and-patch prompt, no `steps/`)
+> is exactly the shape that de-identified slug screening cannot see.
+>
+> Read every hit: a slug search also returns repo *pools* (`discovery-f/java_pool.json` is a raw
+> 958-row dump — a **race signal, not a kill**, per §3) and rendered artifacts
+> (`waziz-webcraft-map-of-github/**.graph.dot` — noise).
 
 `/tmp/llc` holds **133,263 unique tasks** and **151,249 copied `instruction.md` files** (a later
 count read 154,135); real copies live at `/tmp/llc/tmp/tasks/<participant>/<task>.md`. Clone it
@@ -217,6 +241,19 @@ Record per repo: image build time, dependency install time, and wall-clock of th
 per-hostname RPS cap, not an allowlist gap** — ten concurrent Java tracks will rate-limit each
 other, so stagger them. `STATUS: LIVE` (measured 2026-09-22)
 
+**A populated `/m2repo` is not enough for `mvn -o` — the PLUGIN DESCRIPTORS must be warmed too.**
+`STATUS: LIVE`, 2026-09-30. After a successful online `compile`+`test-compile` (68 jars, 22 MB),
+the first offline run still failed with `No plugin found for prefix 'surefire'` and four
+`Failed to retrieve plugin descriptor` warnings for `antrun`, `install`, `deploy` and `site`.
+**Run one full online `mvn test` before switching to `-o`**; after that, `--network=none` works.
+Measured on JGroups: `IMAGE_PULL 5s`, `COMPILE 15s`, then a one-class graded run at
+`--network=none` in **10 s**, `BUILD SUCCESS`.
+
+**Surefire bound to `suiteXmlFiles` ignores a bare class selector.** Where the POM binds its
+surefire executions to TestNG suite XMLs, a targeted run needs
+`-Dtest=<Class> -DfailIfNoSpecifiedTests=false`, and the class then runs **once per bound
+execution** — so read the *last* `Tests run:` line, not the count of them.
+
 ## 9. Ranking the survivors
 
 Rank on taxonomy gap after all gates pass — never use it to rescue a failed gate. Live snapshot
@@ -349,7 +386,7 @@ line means A1 is not complete.
 |---|---|---|
 | 1 | Refresh the dedup corpus | `cd /tmp/llc && git pull` — must be over `ssh://git@github.com:22/...`; record the new HEAD date |
 | 2 | Read the peer repo pools for this lane | hit list from `codimango/swe-bench-pro-jayzong:docs/repo-candidates/*` and `codimango/swe-bench-pro-aaitemp:discovery-f/*.json`; mark race-risk repos (signal, not kill) |
-| 3 | **G1** live peer sweep, *before cloning* | `gh search code --owner codimango "<repo>" --limit 30` — paste the count **and your reading of each hit**; nonzero exit = UNKNOWN, re-run |
+| 3 | **G1** live peer sweep, *before cloning* | `gh search code --owner codimango "<repo>" --limit 30` **and** `gh search code --owner codimango "<owner>/<repo>"` — the slug query is the one that catches a peer which never writes the bare repo name (§3). Paste the count **and your reading of each hit**; nonzero exit = UNKNOWN, re-run |
 | 4 | **G6** liveness receipt | the four `gh api` / `gh pr list` commands in §6, output pasted. `pushed_at` is not acceptable evidence |
 | 5 | **G5** licence | `gh api repos/<slug> --jq .license.spdx_id` **and** `head -5 LICENSE* COPYING*` after clone. Record the string; flag §7 CONFLICT if not MIT/Apache-2.0/BSD/ISC |
 | 6 | Full clone — **never `--depth`** | clone path recorded; `git rev-parse HEAD` |

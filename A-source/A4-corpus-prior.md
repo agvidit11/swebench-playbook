@@ -54,7 +54,20 @@ gh search code "<the key symbol you will grade> org:codimango" --limit 50 --json
 |---|---|
 | no peer on the upstream repo, none on the shape | `CLEAR` |
 | peers on the shape, different upstream and different seam | `ADJACENT` — record them, proceed, say why they differ |
-| a peer on the **same upstream repo**, or the same shape at the same seam | `COLLIDES` — do not scaffold. → `A3` GATE 1 |
+| a peer on the **same upstream repo at the same seam**, or the same shape at the same seam | `COLLIDES` — do not scaffold. → `A3` GATE 1 |
+| a peer on the **same upstream repo at a different seam** | `ADJACENT` — record it, write a **hard exclusion zone** naming the files, the defect class and the era it owns, and carry that zone into `A3` GATE 1 as a factual veto list |
+
+> **Why the `COLLIDES` row says "at the same seam" and did not always.** `STATUS: LIVE`,
+> 2026-09-30. As originally written the row read *"a peer on the same upstream repo"*, full stop —
+> which kills any repo that has ever hosted one peer task. That is not what the rest of the
+> playbook says: `A1` G1's kill threshold is *"any peer task on this repo's **subsystem/invariant**"*
+> and `A1` §3 ranks collisions by commit and struct, not by repo (*"same repo + same commit + same
+> struct beats same-file-different-commit"*). Read literally the old row would have killed every
+> repo in a distributed-systems lane and most of our own portfolio. Measured on `belaban/JGroups`:
+> one peer exists (`codimango/CtrlG_DetectPatch`), on the message-authentication gate applied to
+> membership-coordination responses, pinned to a 2016 CVE-fix commit, in a different benchmark
+> family — a decade and a subsystem away from anything the run went on to propose. The right
+> output there is an exclusion zone, not a dead repo.
 
 ### 2. Prior — weaker, and be honest about why
 
@@ -69,6 +82,21 @@ on calibration.
 ## Read the accepted task's instruction — as a SIZE and SPECIFICITY exemplar
 
 `STATUS: LIVE`, 2026-09-30. Do this at the START, before authoring, not as a rescue.
+
+**Source the exemplar from OUR repo, because peer acceptance is invisible by construction.**
+`STATUS: LIVE`, 2026-09-30. This section says to read an *accepted* peer's instruction; the section
+immediately above it says the server scopes `task show` to us, so we cannot see any other author's
+acceptance. Both are true, and the only way to satisfy them together is to take the exemplar from
+`swe-bench-pro-agvidit`, where acceptance **is** visible:
+
+```bash
+codimango task list --filter all --json | jq -r '.[] | select(.validationStatus=="passing" and .tbdReviewStatus=="pass") | .name'
+```
+
+Then pick one whose **subject matter is unrelated to your candidate** — that is a feature, not a
+compromise. An exemplar from an adjacent domain is the transposition risk this section forbids;
+an exemplar from a distant one can only teach size, structure and altitude. Reading a peer task on
+your own upstream's *family* is the maximal-risk case and should not be done at all.
 
 Once `A4` finds peer tasks on your shape, **open the instruction of an accepted one and measure
 it**: how long is it, how specific does it get about observable behaviour, where does it stop.

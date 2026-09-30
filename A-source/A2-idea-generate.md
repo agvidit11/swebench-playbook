@@ -30,6 +30,28 @@ usefully into a cascade later (§4b).
 > A "no candidates" report that has not exhausted all four is a report about the ideation, and
 > `A3` will treat it as one. **This does not license backfilling** — an honest zero after four
 > genuine axes is still zero, and inventing a fifth weak card is worse than reporting it.
+>
+> ### The four axes above are all GENERATIVE. Two VALIDITY questions bind harder, and neither was here.
+>
+> `STATUS: LIVE`, 2026-09-30. On the JGroups run all three cards passed all four generative axes
+> and then died at `A3` on exactly these two, one of them the round's top-ranked card. They cost a
+> full `A3` pass each and they are free to ask at survey time. Put them in the survey prompt:
+>
+> **V1 — IS THE BEHAVIOUR YOU WOULD REQUIRE ACTUALLY CORRECT?** Write the target behaviour, then
+> argue against it as the maintainer. Measured kill: a card required a message naming an unknown
+> fork identity to be restored to the residual batch — and that residual is delivered to the
+> **main** channel, so the "fix" would hand fork-scoped traffic to the main application. Both
+> shipped paths already agreed; the asymmetry was invented. `R6` Part B records the same trap from
+> the other side — *"the 'desired' behaviour can be the wrong answer"* — where a retained snapshot
+> would have meant trusting a rotated credential and the grader would have punished the safer
+> design. Neither the generative axes nor any `A3` gate before GATE 6 asks this.
+>
+> **V2 — HAS A DOCUMENTED DECISION ALREADY REJECTED IT?** Read and **quote** the javadoc and class
+> comment on every method the candidate would change. Measured kill: `ProtocolStack.replaceProtocol`
+> says verbatim *"Should be done before the stack is connected"*, and the card's whole motivating
+> caller was live replacement in a connected stack. `A3` GATE 3 already lists documented design
+> decisions as a hard kill; the point of asking here is that it is one `grep` at survey time and a
+> whole scoring pass later.
 
 **Provenance — read `→ 00-ROUTER.md` §5 before writing anything.** This act's owner is Avocado
 (MetaCode), which *is* an authorised author for contract prose. **Anyone else running any part of
@@ -160,12 +182,39 @@ A *surface* at survey time is: an invariant or behaviour area, the files it live
 banner, not an answer.** `STATUS: LIVE`
 
 ```bash
-codex exec -s read-only --skip-git-repo-check -C <clone> \
-  --add-dir /tmp/<repo>-run -o /tmp/<repo>-run/survey.md \
-  "Read /tmp/<repo>-run/survey.txt and follow it." < /dev/null
+# NEVER use -o. See the box below. Name the output path INSIDE the prompt instead.
+codex exec -s workspace-write --skip-git-repo-check -C /tmp/<repo>-run --add-dir <clone> \
+  "Read /tmp/<repo>-run/survey.txt and follow it. <clone> is READ-ONLY. Write your COMPLETE
+   answer to /tmp/<repo>-run/survey-cx.md and do not overwrite that file afterwards." < /dev/null
 
 ~/.claude/skills/swebench-mt/mc.sh /tmp/<repo>-run/survey.txt <clone> /tmp/<repo>-run/survey.out
 ```
+
+> ### `codex exec -o <path>` DESTROYS the file the model wrote to that path. `STATUS: LIVE`, 2026-09-30.
+>
+> Measured on the JGroups run. The model wrote a **76,837-byte** survey to
+> `/tmp/jgroups-run/survey-cx.md`; on completion the harness overwrote it with its own 90-byte
+> final message, `Completed: [survey-cx.md](…). The repository was not modified.` Exit 0.
+>
+> The content was **not recoverable**: the model wrote via a tool rather than by echoing, so
+> `codex.log` held only fragments, and `~/.codex/logs_2.sqlite` reads
+> `database disk image is malformed`. One full survey lost, ~12 minutes.
+>
+> The failure signature is the same as the no-TTY banner — a tiny file at exit 0 — but the cause
+> and the fix are different, so the "check the output size" rule above catches it and then sends
+> you looking in the wrong place. **Drop `-o`, and tell the model the path in the prompt.**
+> The re-run under that form produced 71,435 bytes.
+
+**`mc.sh` leaves its `muse` process alive after the model has finished writing.** The output file
+stops growing but neither the wrapper nor the child exits, so a poller reads "still working"
+forever. Check whether the file has stopped growing, then
+`pkill -f 'prompt-file <your prompt path>'` before dispatching again. `STATUS: LIVE`, 2026-09-30.
+
+**Run BOTH engines on the same ask, in parallel, and merge.** `STATUS: LIVE`, 2026-09-30. They cost
+the same wall clock and they return almost disjoint surfaces: on the JGroups run, 18 surfaces each,
+and **exactly 1 of 36 was found by both**. A single-engine survey is therefore not a sample of the
+repo, it is a sample of one model's attention. The one overlapping seam was the round's top-ranked
+card. Merging is `§4b`'s job and the merge table gets the union.
 
 `mc.sh` is mandatory. A hand-rolled `script -qec` line breaks two ways: a missing TTY returns a
 192-byte banner at exit 0 (it bit three dispatches before the cause was found), and embedding
@@ -210,7 +259,7 @@ completes"; the probe dropped that clause and measured nothing.
 | **Predicted per-arm rate, per step** | step 1: avocado ≤ 3/5 **and opus ≥ 3/5, gpt ≥ 3/5**; step 2: avocado ≤ 3/5, others mixed. Step-2 effective n is bounded by step-1 successes — one task moved opus 0.6 → 0.2 on a **byte-identical** config, leaving exactly **one** step-2 sample, which passed, and the gate reported *"step 2 has no gradient"*. Nothing was wrong with step 2. If step 1 is the harder step, **you have the steps backwards for measurement purposes**. Answer: *what stops avocado passing step 1 outright?* — two tasks saturated step 1 at **5/5** |
 | **Step-1 guard cases owned by step 2** | for each step-1 invariant, the **step-2 `fail_to_pass` case** that would fail if it regressed. Never step 1's `fail_to_pass` IDs in step 2's `pass_to_pass`. The finding *"step 2 does not require step 1's fail-to-pass tests to keep passing"* hit **three tasks** in one cohort, a full repair round each. Any card whose step 2 says *continues* / *restates* / *the same guarantees hold* must ship this field in the same breath |
 | **Inter-step file overlap** | which files each step touches, and whether step 2 is *incremental on step 1* or *cumulative from base*. **Two tasks broke on patch composition because both steps rewrote the same file from the same base.** Heavy overlap is a yellow flag, not a disqualifier — it tells the scaffolder step 2 must be a delta. Barely-overlapping file sets are a legitimate tiebreak |
-| **Size estimate** | files, ~lines, primitives reused. Target **80–150 net lines across 2–4 files** |
+| **Size estimate** | files, ~lines, primitives reused. Target **80–150 net lines across 2–4 files**, and **PER STEP, not per task** — see §6a |
 | **Rubric self-audit** | §7 |
 
 ## 3a. THE TODO PARADOX — an in-code admission is a premise receipt AND a difficulty destroyer
@@ -401,6 +450,34 @@ test for user content under a generated directory nor a golden that survived it,
 delegated to a library call that recursed. Same for *durable* / *cross-process* / *atomic* /
 *idempotent*: name **the test that actually crosses the boundary**, or the reviewer finds *"claims
 durable manifest behavior, but the required tests only check that some metadata file exists."*
+
+## 6a. SIZE THE SECOND STEP SEPARATELY, AT SURVEY TIME
+
+`STATUS: LIVE`, 2026-09-30. **This is the gate that killed the most on the JGroups run, and it was
+the last one anyone checked.**
+
+The 80–150-line target is stated once, for the task. Read that way it is satisfied by a substantial
+step 1 plus anything at all in step 2 — and that is exactly the shape every card in that run had.
+The second halves were, in order: an interface method that does not exist at `base_commit`; a
+15–25-line lifecycle-balancing fix; one guarded callback; one forwarded call; one identity guard.
+Each was real. None was a step. Combining the last three is a bag of sibling guards, which is the
+decorative cascade `GATE 7` exists to reject.
+
+**So every card states net production lines for step 1 and step 2 separately, and a step 2 under
+~20 production lines kills the card as multi-turn at survey time.** Test bulk does not count and
+cannot manufacture difficulty.
+
+Two failure modes to name explicitly when you size step 2:
+
+- **The step-2 requirement needs a symbol that does not exist at `base_commit`.** Check it here,
+  not at `A3` GATE 0. On that run the natural step 2 was "deliver the incumbent's queued content
+  before retiring it" and the relevant interface exposed a size accessor but **no way to extract
+  the queued items** — so the requirement was unimplementable without coining a method.
+- **The step-2 requirement lands on the same publicly-attended seam as step 1.** A second
+  constraint that a merged or applied PR has already been about inherits that PR's disclosure.
+
+When step 2 fails this, the card is not dead — it is a **single-turn** candidate, and `GATE 7`'s
+ladder wants that recorded with its WHY rather than discovered three gates later.
 
 ## 6. Auto-rejects at ideation
 

@@ -256,6 +256,32 @@ Read the function. If the precedence / ordering / guard the candidate proposes i
 
 Repo-level screening does not cover this. Run per surviving candidate on the **specific behaviour** — the last point where dropping a candidate costs nothing. `STATUS: LIVE`
 
+> ### CONFLICT — UNRESOLVED: "merged PR touching the surface" vs the disclosure split. Owner: human.
+>
+> `STATUS: LIVE`, 2026-09-30. The hard-kill list below and the disclosure split above give
+> **opposite answers** on the same candidate, and until this run nothing had forced the question.
+>
+> Measured on `belaban/JGroups`. `TPConfig.setBundler` stops the incumbent bundler *before* the
+> candidate's `start()` can throw, so a failed candidate leaves a stopped bundler installed and
+> the transport's data plane dead. Reproduced by execution, not grep. The function carries two
+> public PRs in 18 months — `#807` (CLOSED, landed as `5658b5e7f`) and `#860` (CLOSED, one comment
+> *"Applied"*, landed as `f190fddab`, **whose diff is byte-equal to the current HEAD body**).
+>
+> | reading | verdict | basis |
+> |---|---|---|
+> | the hard-kill list: *"any merged public PR touching the surface"* | **KILL** | an applied closed PR is a merged PR in substance, and it touches the exact function |
+> | the disclosure split: symptom allowed / **cause** kills / **remedy** kills | **NOT a kill** | both commit bodies were read in full. `5658b5e7f`: *"allows setting the bundler instance … Previously it had to be set by class name or it would be overwritten during init."* `f190fddab`: *"allows setting the bundler instance on TP before it is initialized/channel is created."* Neither mentions preparation failure, rollback, a stopped incumbent, or destruction. They **introduced and refactored the hazardous shape without publishing its cause or remedy.** |
+>
+> An adversarial audit briefed to argue the candidate ALIVE reached the same split independently
+> and said so in those words.
+>
+> **Operationally until a human resolves it: apply the strict reading, and record BOTH.** The
+> split is the newer LIVE rule and exists precisely because the blanket form *"kills every SEARCH
+> candidate that exists"* — but the blanket form is what is written in the kill list, and this
+> act's standing instruction is to apply the strict reading when in doubt. Whichever you use,
+> write both verdicts into the handoff with the commit bodies quoted, so the decision is
+> reviewable rather than a judgement call buried in a kill line.
+
 Hard kill, no exception for obfuscation, contamination score or post-cutoff timing: any **merged** public PR touching the surface; any **closed-unmerged** PR whose diff or thread contains the remedy; any open issue whose **body or comments** propose the direction, workaround, API or remedy — even informally, even with no code, even if our oracle would be more robust; rewinding `base_commit` to a public PR's parent; a **documented design decision** rejecting the capability, unless explicitly overruled with new justification. **Finding the premise in open issues is a disqualifier, not a confirmation** — it feels like validation and is training-data exposure.
 
 ```bash
@@ -439,7 +465,7 @@ Each is a fail and each is decidable without a build. `STATUS: LIVE (PEER)`
 | **Determinism scan** [R09] | No wall clock, concurrency race, benchmark threshold or NP-hard "minimum" in any contract. Verify the card's named injection point exists |
 | **Mechanism-naming scan** [R01+R04] | Neither step may name a **file, algorithm, data structure or language construct** — implementation, fails R04. Interface naming is settled by GATE 0: a surviving candidate needs no new name, so there is nothing to pin |
 | **Never grade against a library export** [R05] | If the reference answer is callable from inside the solution — matching a public export's output exactly — the grader leaks the solution |
-| **Anti-overcorrection** [N04] | **Under ~20 lines, or composes two shipped functions → discard.** Verification alone selects trivia: absent *and* substantial. Target 80–150 net lines across 2–4 files |
+| **Anti-overcorrection** [N04] | **Under ~20 lines, or composes two shipped functions → discard.** Verification alone selects trivia: absent *and* substantial. Target 80–150 net lines across 2–4 files — **and apply it PER STEP.** A card with a substantial step 1 and a step 2 that is one guard, one forwarded call or one interface method that does not exist at `base_commit` is a single-turn candidate, not a multi-turn one. Measured 2026-09-30: this row, applied per step, was the binding kill on an entire repo — every remaining defect in the target domain was individually worth fixing and individually too small to be half a task. → `A2` §6a sizes it at survey time so it does not cost a full gate pass |
 | **Normaliser consistency** [R08] | If graded entries are read through a normaliser (`to_h`, a serializer, an accessor), **every** assertion must go through it; one assertion reaching past it re-narrows the contract |
 
 > **A wrong answer that HANGS is ungradeable, and this gate had no row for it.**

@@ -1010,3 +1010,120 @@ it would require asserting on-disk record framing. Same defect as go-zero S4
 (grader asserted a shared backing pointer while valid solutions used HAMTs).
 **Design the grader from the DISTRIBUTION of valid answers, not from the
 intended one.**
+
+---
+
+# RUN `.e2e/distsys-1` — belaban/JGroups, distributed-systems lane, 2026-09-30
+
+**Outcome: `A3 EXIT: NO SURVIVOR — REPO EXHAUSTED`. No task pushed.** One repo screened to G10,
+two A2 rounds (budget spent), 61 surfaces, 3 cards, 3 kills, 0 survivors. All artifacts under
+`.e2e/distsys-1/`; the mandatory kill ledger is `.e2e/distsys-1/kill-ledger.md`.
+
+## The repo was good. That is what makes the result informative.
+
+`belaban/JGroups` passed every A1 gate with room: Apache-2.0 (no §7 conflict), HEAD the same day,
+**0%** AI-authorship (69 identity hits over 921 commits, all `dependabot[bot]`), **0** peers on the
+core repo, **38** unresolved issues on the real tracker, **103,231** non-test LOC across 15
+packages with **29,251** of it in subsystems at `churn90 <= 9`, 198 in-memory TestNG fixtures, and
+a graded path of **10 s offline**. It is a better-screened repo than most we have built on.
+
+It still yielded nothing, and the reason is specific and reusable.
+
+## THE FINDING — a repo can be defect-rich and multi-turn-poor, and nothing upstream of GATE 6 sees it
+
+Three cards, three steelmen, and all three steelmen converged on one sentence: **the defects that
+remain in this codebase are individually substantial enough to be worth fixing and individually
+too small to be half of a multi-turn task.**
+
+Enumerated, on the one card whose premise was reproduced by execution (`TPConfig.setBundler` stops
+the incumbent bundler before the candidate's `start()` can throw, leaving a stopped bundler
+installed and the data plane dead), **five** candidate second steps were tried:
+
+| proposed step 2 | why it died |
+|---|---|
+| deliver the incumbent's queued content before retiring it | the interface exposes `size()` but **no way to extract the queued items** — needs a symbol absent at base → GATE 0 |
+| destroy the replaced bundler; retire a failed candidate instead of leaking it | ~15–25 production lines → N04 |
+| a candidate installed while the transport is not running must not be started | behavioural and deterministic, but "before init" is literally the title and body of the applied PR on that function |
+| replay the installed view to the candidate before its first send | one guarded callback; large only if made concurrent, which re-creates the nondeterminism that killed the original step 2 |
+| forward `resetStats()` to the bundler | one call |
+
+Combining the last three is a bag of sibling guards — the decorative cascade `GATE 7` rejects.
+**Step 1 was never the problem on any card in this run.** That inverts the corpus prior (81% of
+"too easy" blame lands on step 1) and it is why the size floor now has to be applied per step at
+survey time → `A2` §6a, and per step at the gate → `A3` GATE 6 N04.
+
+## Two engines, run in parallel, overlapped on 1 surface in 36
+
+Round 1 asked MetaCode and Codex the same question. Both returned 18 surfaces. **Exactly one seam
+was found by both** — and it was the round's top-ranked card. A single-engine survey is not a
+sample of the repo; it is a sample of one model's attention. Promoted into `A2` §3.
+
+Round 2, narrowed to the strictly in-domain subsystems and carrying six validity filters derived
+from the round-1 kills, returned **0 cards from both engines** over 25 surfaces. Four of Codex's
+thirteen were **already implemented at HEAD** with the invariant stated verbatim in the source —
+hollow premises caught at survey time rather than at GATE 2, which is the shift-left `A2` §3 wants.
+The convergence is the load-bearing fact: it is not one model being pessimistic.
+
+## THE VALIDITY GAP — A2's four axes are all generative, and two cards died on neither of them
+
+`A2`'s "no ideas is a verdict about this act" box lists four axes you must try before writing zero.
+All four ask *can I generate a premise here*. Neither asks *is the premise valid*. Two of the three
+cards died on questions that cost nothing to ask at survey time and a full `A3` pass to discover:
+
+- **Is the behaviour you would require actually correct?** The top-ranked card required a message
+  naming an unknown fork identity to be restored to the residual batch — and that residual is
+  delivered to the **main** channel, so the "fix" would hand fork-scoped traffic to the main
+  application. Both shipped paths already agreed; the asymmetry was invented. Same trap as
+  `R6` Part B's *"the 'desired' behaviour can be the wrong answer"*.
+- **Has a documented decision already rejected it?** `ProtocolStack.replaceProtocol` says verbatim
+  *"Should be done before the stack is connected"*, and the card's whole motivating caller was
+  live replacement in a connected stack.
+
+Both are now `A2` §"the four axes are all GENERATIVE" as V1 and V2.
+
+## A1's four peer sweeps are all NAME-based and all four missed the only real peer
+
+`belaban/JGroups` read peer-free through G1: 70+ hits across filename, content, symbol and live
+name sweeps, **every one** resolving to `jgroups-extras/jgroups-raft`, a different repository. The
+real peer, `codimango/CtrlG_DetectPatch`, never writes the string `jgroups` except inside a GitHub
+URL in its `task.toml`. It was found only by `A4`'s **owner/repo slug** query. Hoisted into `A1`
+§3 as sweep 5 and into the G1 checklist row.
+
+It also exposed an `A4` defect that would have killed the lane outright: `A4`'s `COLLIDES` row read
+*"a peer on the same upstream repo"*, full stop, which contradicts `A1` G1's subsystem threshold and
+`A1` §3's commit-and-struct ranking, and would kill any repo that has ever hosted one peer task.
+Corrected to *"at the same seam"*, with the different-seam case producing a recorded exclusion zone.
+
+## The kill audit earned its place — it corrected a rationale rather than rubber-stamping it
+
+Dispatched briefed to **argue the candidates are ALIVE**. It upheld all three kills and
+independently reached the GATE 3 split below — but it **overturned part of the Card 3 rationale**:
+live protocol insertion into a connected stack is real in-repo practice (the probe handler
+registers only after `startStack()` and does insert→hook→init→start; `Util.shutdown` and
+`DynamicDiscardTest` both insert into connected stacks; `ForkChannel.getFORK` inserts a `new FORK()`
+with no lifecycle call at all). The card still dies, on `insertProtocol`'s own *"already created
+(and initialized)"* contract and on size. The corrected rationale is what the ledger records.
+
+It also surveyed two seams **neither** round-2 survey examined — `util/RequestTable` (four real
+defects, including `forEachNonBlocking` snapshotting `buf`/`lo`/`hi` but indexing through the
+*current* `buffer.length`, deterministically exposable with a reentrant visitor that calls
+`grow()`) and `FD_ALL3.setTimeout`/`setInterval`. Both real; both under the size floor or needing
+a migration policy that is unstatable at base.
+
+## GATE 3 CONFLICT, now load-bearing for the first time — Owner: human
+
+The hard-kill list (*"any merged public PR touching the surface"*) and the 2026-09-23 disclosure
+split (symptom allowed / cause kills / remedy kills) give **opposite answers** on the bundler card.
+`TPConfig.setBundler` carries `#807` (CLOSED, landed `5658b5e7f`) and `#860` (CLOSED, comment
+*"Applied"*, landed `f190fddab`, diff byte-equal to current HEAD). Neither commit body mentions
+preparation failure, rollback, a stopped incumbent, or destruction — they **introduced and
+refactored the hazardous shape without publishing its cause or remedy**. Recorded in `A3` GATE 3 as
+`CONFLICT — UNRESOLVED`; the strict reading was applied and both were written into the handoff.
+Note the conflict did **not** decide this run: N04 kills the card independently.
+
+## Live, unbuilt, and worth someone's time
+
+`TPConfig.setBundler` failure atomicity is a **single-turn** candidate, reproduced by execution,
+fully IN-BASE, deterministic, in an operator-facing `@ManagedOperation`, with **four** independent
+branches each carrying a distinguishing mutant. It is recorded in `.e2e/distsys-1/kill-ledger.md`
+with its reproduction output. Owner: Vidit.
