@@ -122,7 +122,39 @@ have left `A3`.
 
 Mechanical proxy once tests exist: `check-symbol-reachability.py <task_dir> --repo <base_checkout>` classifies every asserted symbol STATED / IN-BASE / TEST-LOCAL / UNREACHABLE. **Any UNREACHABLE is the R01/R02 pattern.** The stated ratio ran **3/30, 6/25 and 4/25** on the three tasks that failed R01/R02/R08 — a low ratio is the signal before you read a single name.
 
-Two consequences to accept: this makes most `expose_interface` tasks unwritable (**52.1% at n=647 — ordinary**, so this trade is NOT obviously worth taking — prefer candidates where existing behaviour becomes correct, observable or safe); and it **subsumes the coined-observability auto-reject** (`→ A2-idea-generate.md §6`), since a ledger whose invented field names carry the contract fails at step 3 every time. What the contract may still state later is `B2`'s business, not this gate's.
+> ### ⚠ THE POSTURE BELOW IS CONTRADICTED BY OUR OWN ACCEPTED TASKS. `STATUS: LIVE`, 2026-09-30.
+>
+> This gate says coining a token makes a candidate almost-never-buildable, and steers toward
+> *"existing behaviour becomes correct, observable or safe"* — a defect framing. **Two of our
+> three accepted multi-turn tasks coin an API and name it in the contract.**
+>
+> `django-model-utils` step 1: *"Watched relation names are supplied with
+> `FieldTracker(related=[...])` ... e.g. `FieldTracker(related=['author'])`"* — a coined keyword
+> argument, named, with a literal usage example.
+>
+> `open62541` step 1 puts the whole signature in a fenced block:
+> `UA_StatusCode UA_EXPORT UA_NumericRange_print(const UA_NumericRange *range, UA_String *out);`
+>
+> Both accepted. And the org's highest-throughput author states the same policy outright:
+> *exact public API names, signatures, return shapes and exception types are required contract
+> details, not implementation details* — across a portfolio that is 47 of 49 `extend_behavior`.
+>
+> **Re-read the gate's own evidence.** The failure it cites is
+> *silent-contract-plus-pinning-test* — tests pin a token the contract does **not** name. The
+> remedy for that is to **name the token**. This gate instead banned the category that produces
+> coined tokens at all, which is a larger claim than the evidence supports and it is the reason
+> our ideation became defect-only.
+>
+> **Working rule until Vidit rules otherwise:** coining a token is not a veto. It is an
+> obligation — `B2` names every coined token in the contract, `B3` proves the grader accepts
+> nothing broader. That is the existing override, and it should be the default path rather than
+> a debt. What stays vetoed is the real failure: a token the tests pin and the contract is
+> silent about.
+>
+> This is not an argument reopening a measured rule — it is two of our own accepted tasks doing
+> the thing the gate forbids. Record the next coined-token candidate's outcome either way.
+
+Two consequences the gate as originally written accepted: it makes most `expose_interface` tasks unwritable (**52.1% at n=647 — ordinary**, so this trade is NOT obviously worth taking — prefer candidates where existing behaviour becomes correct, observable or safe); and it **subsumes the coined-observability auto-reject** (`→ A2-idea-generate.md §6`), since a ledger whose invented field names carry the contract fails at step 3 every time. What the contract may still state later is `B2`'s business, not this gate's.
 
 ## GATE 1 — the four free pre-filters
 
