@@ -1,0 +1,18 @@
+{INVARIANTS}
+
+Revise the existing instruction at {TARGET}. Read it first.
+
+It is correct as far as it goes. It is missing the obligations below — each is a rule that
+something already depends on but the text never states. Add them.
+
+MISSING OBLIGATIONS:
+{REQUIREMENTS}
+
+Constraints specific to a revision:
+- Do not restate anything the file already covers.
+- Prefer folding an obligation into an existing sentence over appending a new one, where that
+  reads more naturally. Economy matters more than symmetry.
+- Keep the existing voice exactly. A reader should not be able to tell the file was revised.
+- Do not re-scope, re-order or improve anything you were not asked about.
+
+Reply with the file written to disk and one line on where you put each obligation and why.

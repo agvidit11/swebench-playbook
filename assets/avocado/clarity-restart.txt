@@ -1,0 +1,16 @@
+{INVARIANTS}
+
+Previous attempts at {TARGET} were repeatedly judged over-specified: they described how to
+implement the behaviour rather than what the behaviour is.
+
+Start again from the requirements below. Do not read your previous attempts — they will pull
+you back toward the same shape.
+
+REQUIREMENTS:
+{REQUIREMENTS}
+
+Say what the reader must be able to observe from outside. Give no procedure, no ordering of
+internal work, no data structure, no helper, no algorithm. If a sentence would still be true
+after a completely different implementation, it belongs. If not, cut it.
+
+Reply with the file written to disk.

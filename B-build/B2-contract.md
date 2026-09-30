@@ -16,6 +16,51 @@ the file through a script, heredoc or patch. Supplying exact wording for someone
 the same violation as typing it. **This is the only file in the playbook that states the naming
 rule** — every other act links here. Do not restate §1, §3, §4 or §5 anywhere else.
 
+
+## Every Avocado prompt comes from a template. None are hand-written.
+
+`STATUS: LIVE`, 2026-09-29.
+
+```bash
+GENRE=bug-report ~/swebench-playbook/tools/avocado-brief.sh \
+      <initial|gapfill|retry|clarity> <task-or-step-dir> <requirements-file>
+# then: ~/.claude/skills/swebench-mt/mc.sh <prompt> <dir>
+```
+
+**Why this stopped being optional.** On one day I hand-wrote four Avocado briefs, each worded
+differently, for two tasks. That is unrepeatable, unautomatable, and — the part that matters —
+a live provenance hazard, because a brief written from scratch drifts toward supplying prose,
+and supplying prose is what flipped django from pass to fail.
+
+Four templates in `assets/avocado/`, sharing one `_INVARIANTS` block:
+
+| template | when |
+|---|---|
+| `initial` | no instruction yet |
+| `gapfill` | the file is right as far as it goes and is missing stated obligations |
+| `retry` | the previous attempt failed validation; carries byte-exact defects |
+| `clarity-restart` | two or more over-specification findings; do **not** read the prior attempts |
+
+**The cap is computed, never chosen:**
+
+| mode | cap |
+|---|---|
+| initial / clarity | `clamp(45 × obligations, 250, 600)` |
+| gapfill | `current words + 40 × obligations` |
+| retry | **the same cap as the attempt it replaces** |
+
+That last row is the one to keep. A cap that grows on every retry is how an instruction
+inflates until every model passes it, and then the task reads `5/5`.
+
+**The lint is the point.** The script reads the requirements file and **exits 1** rather than
+sending it when it finds drafted prose — `write:`, `phrase it as`, `something like`, `verbatim`,
+or a first-person sentence of ten words or more in quotes. Our instructions are first person;
+a *requirement* never is. If the brief contains the sentence, you wrote the instruction and
+asked Avocado to launder it.
+
+A requirement states **what the reader must come away knowing.** It does not supply the words.
+
+
 ## 1. THE RULE Avocado must satisfy
 
 Four clauses. Exhaustive, and no exceptions at this stage — the exception was already spent at

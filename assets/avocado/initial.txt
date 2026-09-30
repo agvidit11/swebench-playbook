@@ -1,0 +1,18 @@
+{INVARIANTS}
+
+Write the task instruction at {TARGET} from the requirements below.
+
+GENRE: {GENRE}
+
+The requirements are obligations, not text. They tell you what the reader must come away
+knowing. They are deliberately not written as prose — write the prose yourself, in your own
+words, in the voice the genre calls for.
+
+REQUIREMENTS:
+{REQUIREMENTS}
+
+Prefer one cohesive behaviour whose interactions create real state or compatibility
+constraints, over several loosely related ones. Include edge cases only where they follow from
+the real public contract.
+
+Reply with the file written to disk and one line on how you structured it and why.

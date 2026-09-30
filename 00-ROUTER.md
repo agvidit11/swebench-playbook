@@ -69,6 +69,7 @@ S12–S15 name the *destination* `C1` will route you to, not a shortcut past it.
 | `B-build/B7-local-calibration.md` | Claude |
 | S6b | Local band read, reviewers not yet run locally | `A-source/A4-corpus-prior.md` | search the WHOLE org corpus by engineering concept. `task list --filter all` narrows to you; `gh repo list` caps at 1000 of 5,105. Both blind past our own work. |
 | `B-build/B7-local-calibration.md` | forecast, freeze, ladder. Classify every failure and read WHY before the band counts. PROVISIONAL — contradicts A3 §399 on purpose. |
+| `assets/avocado/` + `tools/avocado-brief.sh` | the four Avocado prompt templates, a computed word cap, and a lint that refuses to send drafted prose. → `B2`. |
 | `B-build/B6-review-gate.md` | Claude + 1 subagent per reviewer |
 | S7 | Oracle 3/3 local, reviewers Accept, not pushed | `B-build/B5-preflight-push.md` | Claude |
 | S8 | Pushed, `validationStatus=pending`, sha matches yours | **wait** — see §3 | — |
@@ -561,6 +562,7 @@ mechanism.
 | `C-drive/C6-replay-verify.md` | replay real prior trajectories against a proposed change. `C2`/`C3`/`C4` exit through it. |
 | `A-source/A4-corpus-prior.md` | search the WHOLE org corpus by engineering concept. `task list --filter all` narrows to you; `gh repo list` caps at 1000 of 5,105. Both blind past our own work. |
 | `B-build/B7-local-calibration.md` | forecast, freeze, ladder. Classify every failure and read WHY before the band counts. PROVISIONAL — contradicts A3 §399 on purpose. |
+| `assets/avocado/` + `tools/avocado-brief.sh` | the four Avocado prompt templates, a computed word cap, and a lint that refuses to send drafted prose. → `B2`. |
 | `B-build/B6-review-gate.md` | run the server's own reviewers locally before pushing. The self-scored 17-axis walk is not a review. |
 | `reference/R10-step1-calibration.md` | **MT priority.** step-1 f2p floor, the bimodal band, and why instruction length is not a calibration dial. |
 | `C-drive/C7-revision-response.md` | answer a HUMAN reviewer and re-submit: route each ask to its owner, independent re-read, full re-validation. |

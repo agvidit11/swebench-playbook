@@ -1,0 +1,18 @@
+{INVARIANTS}
+
+Your previous attempt at {TARGET} did not pass validation. It is below, followed by the exact
+validation output.
+
+Correct only the defects named. Preserve every requirement that already passed. Do not add,
+remove, rename or reinterpret public behaviour that was not named as a defect. Each contract
+item should appear exactly once.
+
+The word limit is the SAME as the attempt it replaces. It does not grow on retry.
+
+YOUR PREVIOUS ATTEMPT:
+{PREVIOUS}
+
+VALIDATION OUTPUT, VERBATIM:
+{DEFECTS}
+
+Reply with the corrected file written to disk and one line per defect on how you addressed it.
