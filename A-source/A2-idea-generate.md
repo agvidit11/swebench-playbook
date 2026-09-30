@@ -61,6 +61,68 @@ observable contracts plus the grader API surface, and the `Interface Contract` t
 deliverable in place of prose. The instruction itself is written in `B2`, by its own owner.
 `STATUS: LIVE`
 
+
+## WHY WE KEEP FAILING TO FIND IDEAS — and it is not the ideas
+
+`STATUS: LIVE`, 2026-09-30. Read from the step names of every graded MT task we own.
+
+**Accepted — one shape, three times:**
+
+```
+1_related_snapshot       →  2_partial_invalidation
+1_schema_ir_normalizer   →  2_subsumption_decision
+1_canonical_print        →  2_range_difference
+```
+
+Step 1 builds a **representation**. Step 2 is a **different kind of operation over it** —
+invalidate it, decide with it, difference two of them. Step 2 cannot be *stated* without
+step 1, let alone implemented.
+
+**Failing — a different shape:**
+
+```
+1_wire_parity            →  2_inprocess_parity          same property, second location
+1_publisher_record       →  2_publish_accountability    reporting over step 1
+1_flush_outcomes         →  2_retained_batches  →  3_flush_attempt_accountability
+1_identity_readiness     →  2_readiness_subscription  →  3_progressive_delivery
+```
+
+`connect-go` is the cleanest: parity on the wire, then parity in-process. **Once parity is
+implemented, applying it to a second transport is mechanical.** No new reasoning, so step 2
+returned `5/5` — and the last step is never exempt.
+
+### The diagnosis
+
+**Every axis in this file is a DEFECT-FINDING axis.** They are good at *what is subtly wrong
+here*, which is exactly right for single-turn and **structurally cannot produce the accepted
+shape**. A defect is atomic. You cannot decompose "this bug" into representation-then-operation,
+and when you try, you reach for the same property somewhere else or a reporting layer — both
+mechanical given step 1.
+
+Measured: a run found a real, reproduced bug, enumerated **five** candidate second steps, and
+lost every one to `N04`. Its own conclusion was *"the defects remaining in this repo are
+individually worth fixing and individually too small to be half of a multi-turn task."*
+**Step 1 was never the problem on any card.**
+
+### What to search for instead, when the target is multi-turn
+
+Ask **"what representation does this codebase lack?"** before asking what is broken.
+
+| look for | step 1 | step 2 |
+|---|---|---|
+| a normalizer or canonical form that does not exist | build it | a decision only expressible over it |
+| a snapshot / captured state | build it | operate on a *part* of it |
+| a comparable value where only equality exists today | build the comparison | difference, subsumption, ordering |
+
+**The test for a real second step:** could step 2 be *stated* to someone who has not seen
+step 1? If yes, it is a separate task, not a second step. Could a competent engineer do step 2
+mechanically once step 1 exists? If yes, it will read `5/5`.
+
+**Corollary, and it is permission not defeat:** when a repo yields only atomic defects, the
+honest output is a strong single-turn task or a `NO SURVIVOR`. Forcing a second step onto a
+defect is how we produce the saturated step-2 tasks that dominate the failure list.
+
+
 ## 0. Your input: `HANDOFF A1`, or an imported shortlist receipt
 
 `STATUS: LIVE`. Three reviewers found this blocking: the router routes "repo picked, no cards"
