@@ -84,13 +84,10 @@ BASH_WRITE_TEMPLATE = (
     # near the words patch / sed / dd / rsync / git checkout — which is every run.
     r">{1,2}\s*(?:\S*/)?TASKNAME\S*"
     r"|tee\s+(?:-a\s+)?(?:\S*/)?TASKNAME\S*"
-    r"|\bcp\s+(?:-\S+\s+)*\S+\s+\S*TASKNAME\S*"
-    r"|\bmv\s+(?:-\S+\s+)*\S+\s+\S*TASKNAME\S*"
     # Between a write verb and its target there are only option flags and other path
     # arguments -- never prose. `[^|;&]*` allowed prose, so "# B1 scaffold patch — <taskname>"
     # in a heredoc body matched the `patch` alternative and the audit reported BLOCKED on a
     # brief written to /tmp. Restrict the gap to flag-or-path tokens.
-    r"|\brsync\s+(?:-\S+\s+)*\S*TASKNAME\S*"
     r"|sed\s+-i\S*\s+(?:-\S+\s+|'[^']*'\s+|\"[^\"]*\"\s+)*\S*TASKNAME\S*"
     r"|truncate\s+(?:-\S+\s+)*\S*TASKNAME\S*"
     r"|dd\s+(?:\S+=\S+\s+)*of=\S*TASKNAME\S*"
@@ -101,6 +98,21 @@ BASH_WRITE_TEMPLATE = (
 
 BASH_WRITE = re.compile(BASH_WRITE_TEMPLATE.replace("TASKNAME", re.escape(task)))
 # pathlib writes: only when a literal path containing the task name is being written
+def copies_into_task(cmd):
+    """cp/mv/rsync write only to their LAST path argument. Matching the task name anywhere in
+    the command flags copy-OUT as a write: a reviewer sandboxing `cp -a <task>/tests/. /tmp/rr/`
+    read as a violation and blocked a clean task three times. A blocking gate that cries wolf
+    gets switched off, which is the same end state as no gate."""
+    for seg in re.split(r"[|;&]+|\n", cmd):
+        toks = seg.split()
+        verb = next((t for t in toks if t in ("cp", "mv", "rsync")), None)
+        if not verb:
+            continue
+        args = [t for t in toks[toks.index(verb)+1:] if not t.startswith("-")]
+        if args and task in args[-1]:          # destination only
+            return True
+    return False
+
 PATHLIB_WRITE = re.compile(
     r"Path\(\s*['\"][^'\"]*" + re.escape(task) + r"[^'\"]*['\"]\s*\)[^\n]{0,80}?\.write_",
 )
@@ -142,7 +154,7 @@ for p in paths:
                         # hits across three consecutive audit runs, all of them the audit itself.
                         if "authorship-audit.sh" in cmd or "preflight.sh" in cmd:
                             continue
-                        if task in cmd and (BASH_WRITE.search(cmd) or PATHLIB_WRITE.search(cmd)):
+                        if task in cmd and (BASH_WRITE.search(cmd) or PATHLIB_WRITE.search(cmd) or copies_into_task(cmd)):
                             one = " ".join(cmd.split())[:150]
                             hits.append((sess, ln, "Bash", one, classify(cmd)))
     except Exception as e:
