@@ -66,6 +66,31 @@ Do not launder it into more than that. A shape appearing forty times means forty
 idea, which is an argument against it on novelty at least as much as it is an argument for it
 on calibration.
 
+## Read the accepted task's instruction — as a SIZE and SPECIFICITY exemplar
+
+`STATUS: LIVE`, 2026-09-30. Do this at the START, before authoring, not as a rescue.
+
+Once `A4` finds peer tasks on your shape, **open the instruction of an accepted one and measure
+it**: how long is it, how specific does it get about observable behaviour, where does it stop.
+That calibrates the two dimensions we are worst at — our accepted instructions run 154–230 words
+against a reference portfolio median of 393, and our contracts routinely defer the thing that is
+graded.
+
+It feeds `B2`'s computed cap directly: `initial` mode uses `clamp(45 × obligations, 250, 600)`,
+and a real accepted instruction on a similar shape tells you whether your obligation count is
+plausible before you have written a word.
+
+**The hard boundary, and it is the whole difference between this and plagiarism:**
+
+> The reference supplies an instruction **pattern and size example, never target behaviour.**
+
+Never send the reference to Avocado as content to rewrite. Never transpose its domain concepts,
+API names, state machine or feature structure. You are reading it the way you would read a
+well-written bug report from another team — for register and altitude, not for subject.
+
+If you cannot state what you took from it without naming a single symbol from that task, you
+took the right thing.
+
 ## Analogue does not mean clone
 
 Borrowed, and it is the right rule:
