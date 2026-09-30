@@ -241,6 +241,47 @@ is currently `pending`. This file predicts it returns **step 1 too easy at or ne
 comes back in band, the ≤4 floor is wrong and this section is the evidence that says so — record
 the result here either way. A rule that cannot be embarrassed is not a rule.
 
+## BUILD TWO STEPS. Three has never been accepted, in either corpus.
+
+`STATUS: LIVE`, 2026-09-30. Measured the day peer acceptance became readable.
+
+| declared steps | ours: accepted | ours: failing/pending | peer corpus: accepted |
+|---|---:|---:|---:|
+| **2** | **4** | 6 | **38** |
+| 3 | **0** | 4 (+2 passing) | **0** |
+| 4 | 0 | 1 | 0 |
+| 6 | 0 | 1 | 0 |
+
+**Nothing with three or more steps has ever been accepted.** Ours 0 of 8, the reference
+portfolio 0 of 40. Six of our nine failing MT tasks are 3-step; all four accepted are 2-step.
+
+**The reference portfolio's stated preference contradicts its own shipping record**, which
+matters before taking verbal advice from it. In the 2026-09-29 pod meeting its author said
+*"three turns have more priority than two-turn tasks, because more turns, that's a more quality
+data generated."* Their own skill says *"two steps by default; three allowed only with a
+recorded platform/task-owner exemption."* Their portfolio is 38 of 40 two-step.
+**Believe the portfolio.**
+
+### This makes one existing piece of advice actively harmful
+
+`A3`'s rescue ladder offers, before declaring single-turn: *"let a third step carry the
+dependency — a 3-step task also buys the single-1.0 exemption a 2-step cannot use."* The
+exemption is real, but it buys entry to a shape with a **0-for-48** acceptance record. If the
+cascade will not carry two steps, the honest outputs are a single-turn task or `NO SURVIVOR`
+(`A2`, "why we cannot find MT ideas").
+
+### The accepted structural profile, from 40 peer tasks
+
+| | median | range |
+|---|---:|---|
+| step-1 `f2p` | **19** | 4–57 |
+| step-2 `f2p` | **23** | 3–169 |
+| step-1 instruction words | **314** | 14–1555 |
+
+Our failing step-1s sit at `f2p` 2–5 against a median of 19, and our instructions at 154–230
+against 314. Both gaps point the same way, and neither is a target to hit mechanically — `f2p`
+is a proxy and pads trivially, which is the whole branch-count warning above.
+
 ## CHECKLIST
 
 ```
