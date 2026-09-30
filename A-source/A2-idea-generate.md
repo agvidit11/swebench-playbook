@@ -224,11 +224,20 @@ A *surface* at survey time is: an invariant or behaviour area, the files it live
 4. **Demand shape diversity.** Left alone an ideating model returns almost entirely existing-gap bug
    surfaces — measured **~85%** `semantic_bugs` + `expose_interface` across 38 tasks (17 and 15).
    Require: at least a third net-new capability, and at least two **revert-and-redo** shapes.
-5. **Then merge surfaces into tasks.** Most good 2–3 step cascades are two or three related surfaces
-   combined, not one idea with a second step bolted on. Three merge shapes that work:
-   build-then-use (introduce the representation → consume it in a decision), narrow-then-widen
-   (correct one site → extend the invariant across call sites), observe-then-enforce (expose the
-   state → act on it).
+5. **Then merge surfaces into tasks.** Most good 2-step cascades are two related surfaces combined,
+   not one idea with a second step bolted on. Three merge shapes were listed here as co-equal.
+   **They are not.** `STATUS: LIVE`, 2026-09-30 — scored against our own corpus:
+
+   | merge shape | record |
+   |---|---|
+   | **build-then-use** — introduce the representation → consume it in a decision | **3 of 3 accepted MT tasks.** `related_snapshot → partial_invalidation`, `schema_ir_normalizer → subsumption_decision`, `canonical_print → range_difference`. **This is the default. Deviating from it needs a reason.** |
+   | narrow-then-widen — correct one site → extend the invariant across call sites | `connect-go`: `wire_parity → inprocess_parity`. Step 2 returned **5/5**. Once the invariant is implemented, applying it at a second site is mechanical |
+   | observe-then-enforce — expose the state → act on it | the shape of most of our remaining failures (`publisher_record → publish_accountability`, `flush_outcomes → retained_batches`, `readiness_snapshot → readiness_subscription`). A reporting layer over step 1 is mechanical given step 1 |
+
+   The second and third columns are read from step names and one measured band, not from a
+   labelled field — treat the ranking as strong for build-then-use (3 of 3) and indicative for
+   the other two. What is not in doubt: **every accepted multi-turn task we have is
+   build-then-use**, and the shapes that add a second *location* or a second *view* saturate.
 
 **Gradient recipes, ranked by evidence** — bias the ask toward the top of this list. `STATUS: LIVE (PEER)`
 

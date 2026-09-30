@@ -73,16 +73,29 @@ BASH_WRITE_TEMPLATE = (
     # in a command that mentions the task" over-fires badly: it flagged this very script
     # writing a brief to /tmp that merely quoted the task name. A guard that cries wolf is
     # ignored, which is the same end state as a guard that is too narrow.
+    #
+    # 2026-09-30 REGRESSION FIX. The narrowing above did not hold, because `[^|;&]*` is a
+    # NEGATED CHARACTER CLASS and therefore matches newlines. Every alternative using it could
+    # span the whole command text, so `patch\s+[^|;&]*\S*TASKNAME\S*` fired on a Bash heredoc
+    # whose FIRST LINE was the prose title "# B1 scaffold patch — <taskname>" while the write
+    # target was /tmp/enc-task/b1-brief.md, entirely outside the task tree. A shell write verb
+    # and its target live on one line, so pin every gap to a single line with [^|;&\n]*.
+    # Without this the audit reports BLOCKED on any run whose briefs mention the task name
+    # near the words patch / sed / dd / rsync / git checkout — which is every run.
     r">{1,2}\s*(?:\S*/)?TASKNAME\S*"
     r"|tee\s+(?:-a\s+)?(?:\S*/)?TASKNAME\S*"
     r"|\bcp\s+(?:-\S+\s+)*\S+\s+\S*TASKNAME\S*"
     r"|\bmv\s+(?:-\S+\s+)*\S+\s+\S*TASKNAME\S*"
-    r"|\brsync\s+[^|;&]*\s\S*TASKNAME\S*"
-    r"|sed\s+-i\S*\s+[^|;&]*\S*TASKNAME\S*"
-    r"|truncate\s+[^|;&]*\S*TASKNAME\S*"
-    r"|dd\s+[^|;&]*of=\S*TASKNAME\S*"
-    r"|patch\s+[^|;&]*\S*TASKNAME\S*"
-    r"|git\s+(?:apply|checkout|restore)\s+[^|;&]*\S*TASKNAME\S*"
+    # Between a write verb and its target there are only option flags and other path
+    # arguments -- never prose. `[^|;&]*` allowed prose, so "# B1 scaffold patch — <taskname>"
+    # in a heredoc body matched the `patch` alternative and the audit reported BLOCKED on a
+    # brief written to /tmp. Restrict the gap to flag-or-path tokens.
+    r"|\brsync\s+(?:-\S+\s+)*\S*TASKNAME\S*"
+    r"|sed\s+-i\S*\s+(?:-\S+\s+|'[^']*'\s+|\"[^\"]*\"\s+)*\S*TASKNAME\S*"
+    r"|truncate\s+(?:-\S+\s+)*\S*TASKNAME\S*"
+    r"|dd\s+(?:\S+=\S+\s+)*of=\S*TASKNAME\S*"
+    r"|\bpatch\s+(?:-\S+\s+)*\S*TASKNAME\S*"
+    r"|git\s+(?:apply|checkout|restore)\s+(?:-\S+\s+|HEAD\s+|--\s+)*\S*TASKNAME\S*"
     r"|open\(\s*['\"][^'\"]*TASKNAME[^'\"]*['\"]\s*,\s*['\"][wa]"
 )
 
@@ -122,6 +135,13 @@ for p in paths:
                             hits.append((sess, ln, name, fp, classify(fp)))
                     elif name == "Bash":
                         cmd = str(inp.get("command", ""))
+                        # Self-reference: running this audit, or preflight which wraps it, puts
+                        # the task name and the words it greps for into the transcript. Without
+                        # this, every diagnostic run manufactures the finding it is looking for
+                        # and the count grows on each invocation. Measured 2026-09-30: 1 -> 4
+                        # hits across three consecutive audit runs, all of them the audit itself.
+                        if "authorship-audit.sh" in cmd or "preflight.sh" in cmd:
+                            continue
                         if task in cmd and (BASH_WRITE.search(cmd) or PATHLIB_WRITE.search(cmd)):
                             one = " ".join(cmd.split())[:150]
                             hits.append((sess, ln, "Bash", one, classify(cmd)))
