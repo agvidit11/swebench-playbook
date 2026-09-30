@@ -208,7 +208,33 @@ thing and a weaker one. **Prefer the probe; use the count as a cheap pre-filter.
 Do not cite `review=accepted` as evidence a shape satisfies today's gate without reading the
 gate string for `pre-9/15 rules`.
 
-## The live prediction this makes
+## The cleanest proof that branch count is not f2p count
+
+`STATUS: LIVE`, 2026-09-29. `sparql-ruby-query-execution-budget` reads
+`"1_execution_accounting" too hard — no model passed it`, with step-1 `f2p = 13`.
+
+Every avocado trial, classified individually:
+
+| trial | required | passed | missing |
+|---|---:|---:|---|
+| 43023843 | 15 | **14** | `./spec/budget_spec.rb[1:13]` |
+| 43030163 | 15 | **14** | `./spec/budget_spec.rb[1:13]` |
+| 43029583 | 15 | **14** | `./spec/budget_spec.rb[1:13]` |
+
+**Thirteen f2p entries, and a branch count of one.** Fourteen conditions that every arm
+satisfies discriminate nothing; a single condition — attributing ASK and CONSTRUCT result
+forms — decides the entire outcome, and the AND-composition turns 14/15 into reward `0`.
+
+The task is not hard. It is a coin flip on one requirement, reported as "no model passed it".
+
+**And the obvious remedy is a trap.** That requirement *is* stated, in a trailing clause
+("coverage stays open-ended across ... non-SELECT forms"), so it is not an R02. Clarify it and
+all three arms flip to passing — `5/5`, too easy. Leave it and it stays `0/5`, too hard.
+**There is no wording of one sentence that lands in band, because a single branch can only be
+on or off.** Only more branches can produce a distribution.
+
+Use this whenever someone proposes fixing a band by editing prose: ask first how many branches
+the set actually has. If the answer is one, prose cannot help.
 
 `kustomize-localize-source-fidelity` has **`f2p` = 3 on step 1** (`1_preserve_unknown_fields`) and
 is currently `pending`. This file predicts it returns **step 1 too easy at or near `1.0`**. If it

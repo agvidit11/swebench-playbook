@@ -60,6 +60,36 @@ asked Avocado to launder it.
 
 A requirement states **what the reader must come away knowing.** It does not supply the words.
 
+### DIFF THE WHOLE TASK AFTER EVERY AVOCADO DISPATCH. The prompt does not bound it.
+
+`STATUS: LIVE`, 2026-09-29. Measured the first time the templates were used in anger.
+
+The `_INVARIANTS` block says *"Write ONLY the instruction file you are asked to write. Do not
+create, delete, rename or edit any other path."* On a single-step gapfill dispatch, Avocado:
+
+- patched the step-1 `instruction.md` it was asked to — correctly, exactly as briefed
+- **rewrote steps 2 and 3's `instruction.md` from stubs into full contracts**, unasked
+- **rewrote two `tests/config.json` files**, authoring a new Go test file with seven
+  regression tests and swapping `fail_to_pass` entries
+
+Five files touched on a one-file brief. `mc.sh` hands Avocado the whole task directory and
+`--yolo`, so the only thing standing between it and every file is a sentence in a prompt, and
+that is not a boundary. This is exactly why the reference portfolio's runner builds a
+**disposable staging tree holding only the target instruction plus a cache-free repo copy, and
+atomically promotes only the candidate instruction bytes.** We do not have that yet.
+
+**Until we do, this is mandatory after every dispatch:**
+
+```bash
+git -C "$REPO" status --porcelain -- <task>     # expect exactly the file you briefed
+git -C "$REPO" diff --stat -- <task>
+```
+
+Anything else that moved is unreviewed and unrequested. Revert what you are allowed to revert —
+`tests/`, `solution/`, `environment/`, `task.toml` are yours via Codex. **You may not revert an
+`instruction.md`**: a `git checkout` of that path is a Claude write against a file whose write
+log is permanent and unclearable. Escalate those to Avocado or to the human.
+
 
 ## 1. THE RULE Avocado must satisfy
 
