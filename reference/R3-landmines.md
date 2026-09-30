@@ -326,3 +326,34 @@ HANDOFF R3
   NEXT:      `C-drive/C2-repair-grading.md` if you came from a red `Structural checks` row;
              otherwise back to `B-build/B1-scaffold.md` or `B-build/B5-preflight-push.md`
 ```
+
+## Authorship is now a BLOCKING preflight check, not a checklist line
+
+`STATUS: LIVE`, 2026-09-30. Local harness patch — `preflight.sh` TIER 3, **never pushed**
+(`feedback_swebench_local_harness_patches`).
+
+`B5` line `6c2` asked you to run `tools/authorship-audit.sh`. Checklist lines get skipped, and
+this is the one whose cost is a full validation cycle per attempt. It now runs inside
+`preflight.sh` automatically and **fails the run**.
+
+It gates **new** writes only — `--since` the last commit that touched the task. Historical
+writes are already logged server-side, and blocking on them would make every contaminated task
+permanently unrepairable, which is the deadlock `--since` exists to avoid.
+
+### The repair curve, measured
+
+The gate bands a `matchScore` between the logged tool-call content and the **submitted** file.
+It is monotonic and the threshold is near **0.05**:
+
+| score | verdict | gate |
+|---:|---|---|
+| 0.0298 | SUSPECT | **passes** |
+| 0.0631 | CONTAMINATED | fails |
+| 0.2020 | CONTAMINATED | fails |
+
+So contamination is **repairable, not terminal** — but only by diverging far enough. A reformat
+or an edit-in-place lands near the top of that table. What worked at 0.0298: derive the file's
+contract from its callers *without reading it*, then rewrite from the contract with different
+structure, names and control flow. `presentInCurrent` was `false` in all three cases and is
+noise; `matchScore` is the determinant.
+

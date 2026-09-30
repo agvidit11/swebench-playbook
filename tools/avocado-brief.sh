@@ -70,12 +70,20 @@ if fail:
 PY
 
 # ── word cap ───────────────────────────────────────────────────────────────────
+# Count only ADDITIVE obligations toward the cap. A "must not" line asks for a removal and
+# should not buy words -- counting it inflates the budget in the wrong direction.
 N=$(grep -cE '^\s*[-*0-9]' "$REQ"); [ "$N" -lt 1 ] && N=1
+NEG=$(grep -cEi '^\s*[-*0-9].*(must not|never|remove|drop|stop) ' "$REQ" || true)
+ADD=$((N - NEG)); [ "$ADD" -lt 1 ] && ADD=1
 TARGET="$DIR/instruction.md"
 CUR=0; [ -f "$TARGET" ] && CUR=$(wc -w < "$TARGET")
 case "$MODE" in
   initial|clarity) CAP=$((45*N)); [ "$CAP" -lt 250 ] && CAP=250; [ "$CAP" -gt 600 ] && CAP=600 ;;
-  gapfill)         CAP=$((CUR + 40*N)) ;;
+  gapfill)         CAP=$((CUR + 40*ADD))
+                   # Absolute ceiling. The reference portfolio's median shipped instruction is
+                   # 393 words and our accepted ones are 154-230; a brief that invites 900+ is
+                   # asking for the over-specification failure, not preventing it.
+                   [ "$CAP" -gt 700 ] && CAP=700 ;;
   retry)           CAP=${AVOCADO_CAP:-$CUR}
                    [ "$CAP" -lt 1 ] && { echo "avocado-brief: retry needs AVOCADO_CAP=<the cap of the attempt being replaced>" >&2; exit 2; } ;;
 esac
@@ -99,7 +107,7 @@ PY
 
 echo "mode:        $MODE"
 echo "target:      $TARGET"
-echo "obligations: $N"
+echo "obligations: $N  (additive $ADD, removals $NEG)"
 echo "word cap:    $CAP$([ "$MODE" = retry ] && echo '  (unchanged — caps do not ratchet on retry)')"
 echo "genre:       ${GENRE:-bug-report}"
 echo "prompt:      $OUT  ($(wc -w < "$OUT") words)"
