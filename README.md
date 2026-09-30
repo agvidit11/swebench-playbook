@@ -17,20 +17,37 @@ writing a bespoke brief — the act-file *is* the brief.
 00-ROUTER.md      state → act-file · field authority · concurrency · hard stops
 
 A-source/         no repo ──────────────→ a candidate worth building
-  A1-repo-screen        A2-idea-generate        A3-idea-gate
+  A1-repo-screen   A2-idea-generate   A3-idea-gate
+  A4-corpus-prior        search the WHOLE org corpus by concept, before ideating
 
 B-build/          a candidate ──────────→ a pushed task
-  B1-scaffold  B2-contract  B3-grader  B4-solution-env  B5-preflight-push
+  B1-scaffold  B2-contract  B3-grader  B4-solution-env
+  B7-local-calibration   classify every trial, then read the band
+  B6-review-gate         run the server's own reviewers locally, first
+  B5-preflight-push      preflight 0, then push
 
 C-drive/          a server verdict ─────→ a green task
   C1-read-verdict  C2-repair-grading  C3-harden  C4-loosen-salvage  C5-cohort-loop
+  C6-replay-verify       prove a change against real prior trajectories
+  C7-revision-response   answer a HUMAN reviewer and re-submit
+  C8-retire              park is not retire · the commit budget
 
 reference/        pulled on demand, never read front-to-back
   R1-field-authority  R2-signal-integrity  R3-landmines  R4-ownership
   R5-search-axes      R6-fork-patterns     R7-algo-catalogue (QUARANTINED)
+  R8-finding-to-file  R9-review-ledger     R10-step1-calibration
 
-ledger/           RUNS.md (evidence)  ·  RULES.md (precedence)  ·  PROVENANCE.md
+assets/avocado/   the four immutable Avocado prompts + shared _INVARIANTS
+tools/            review-gate · bundle-hash · authorship-audit · task-budget
+                  avocado-brief · probe-lint · reviewer-relay
+
+ledger/           RUNS.md (evidence) · RULES.md (precedence) · PROVENANCE.md
+                  POSTMORTEM-MT-2026-09.md (every MT task, per-task cause)
 ```
+
+**Build order is `B1 B2 B3 B4 → B7 → B6 → B5`, not numeric.** Calibrate and classify before you
+review, review before you push. The server's reviewer cannot see an unpushed tree, so `B6` is the
+last place a rubric failure is cheap.
 
 ## Three rules that keep it from rotting
 
