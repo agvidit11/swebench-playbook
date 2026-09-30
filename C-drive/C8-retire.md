@@ -79,10 +79,25 @@ was measured under before you make it a law.
 
 ## Terminal conditions — retire without needing the count
 
-1. **Unclearable provenance.** An L3 `CONTAMINATED` record that survived a genuine re-author.
-   `dropshot` is the case: MetaCode re-authored the flagged file, the push validated at that
-   commit, and the verdict held at `matchScore 0.061`. If the pending verdicts confirm it, the
-   record is keyed to task+file and the task name is spent. **Retire the name, not the idea.**
+1. ~~**Unclearable provenance.**~~ **WITHDRAWN 2026-09-30 — provenance IS clearable.** This
+   condition was written on the belief that an L3 record survives any re-author. It does not.
+   Measured across three tasks re-authored the same day:
+
+   | task | `matchScore` after re-author | verdict | gate |
+   |---|---:|---|---|
+   | `rustcrypto-x509` | **0.0298** | SUSPECT | **passes** |
+   | `dropshot` | 0.0631 | CONTAMINATED | fails |
+   | `ruby-auth0` | 0.2020 | CONTAMINATED | fails |
+
+   **The threshold is ~0.05 and the relationship is monotonic.** A re-author is not pass/fail;
+   it must drive residual similarity *below the band*. `presentInCurrent` was `false` on all
+   three regardless, confirming that field is noise — `matchScore` is the determinant.
+
+   So a contaminated task is **not** terminal. It is an iterable repair: re-author from the
+   file's contract rather than by editing, re-push, read the score, repeat. The earlier
+   `dropshot` evidence (a MetaCode re-author that held at 0.061) was real but I read it as
+   proof of impossibility when it was proof of *insufficiency* — it had not diverged far
+   enough. One data point that fails is not a demonstration that the class fails.
 2. **Late `COLLIDES`.** A peer task on the same upstream repo or the same seam
    (`A4`). The work is not salvageable by tuning; it was never novel.
 3. **Already fixed at base.** The reporter's example passes at `base_commit`
