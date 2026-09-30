@@ -49,6 +49,34 @@ git -C ~/swe-bench-pro-agvidit rev-list --count HEAD -- <task>
 This is a forcing question, not an execution limit. A task at 11 commits is not forbidden; it
 is required to justify itself against the fact that nothing has ever been accepted from there.
 
+### The budget applies GOING FORWARD. It is not retroactive.
+
+`STATUS: LIVE`, 2026-09-29 — set the hour the budget was written, because the first version of
+this file got it wrong.
+
+**The distribution above was measured on tasks built without the gates that now exist.** Every
+one of those commits predates `B6` (run the reviewers yourself), `B7` (classify before you
+count), `A4` (search the whole corpus), `C8` (this file), the authorship audit and the Avocado
+templates. A task that took 22 commits was not necessarily a bad task — it was a task iterating
+blind, discovering server-side what a local gate would now catch in one pass.
+
+So:
+
+- **Do not retire an existing task on commit count alone.** The count measures the absence of
+  structure at least as much as it measures the task.
+- The budget binds tasks **built under the current gates**. For those, the count is a real
+  signal, because the cheap discoveries have already been made locally.
+- **Re-derive the distribution** once there are enough post-gate tasks to measure. The numbers
+  above are a baseline from a worse process and should be expected to fall.
+
+The eight tasks currently over budget are **flagged, not condemned**. Review them later, on
+their merits and with the new gates run against them — not on a number produced by the era
+that made them expensive.
+
+There is a general lesson here worth more than the rule: **a threshold fitted to how you used
+to work will condemn exactly the work that taught you to change.** Check what a distribution
+was measured under before you make it a law.
+
 ## Terminal conditions — retire without needing the count
 
 1. **Unclearable provenance.** An L3 `CONTAMINATED` record that survived a genuine re-author.

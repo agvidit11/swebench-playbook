@@ -7,6 +7,10 @@
 # Measured over our own corpus: accepted tasks median 6.5 commits, MAX 10. Failures run to 22.
 # Nothing has ever been accepted past 10, so that is where the runbook forces a retire
 # question (C8). This reports; it never decides.
+#
+# NOT RETROACTIVE. The distribution was measured on tasks built before B6/B7/A4/C8 and the
+# authorship audit existed. A high count on an existing task largely measures the absence of
+# those gates, not the task. Existing over-budget tasks are FLAGGED, not condemned.
 set -uo pipefail
 REPO="${SWEBENCH_REPO:-$HOME/swe-bench-pro-agvidit}"
 [ -d "$REPO/.git" ] || { echo "task-budget: no repo at $REPO" >&2; exit 2; }
@@ -18,6 +22,6 @@ ONE="${1:-}"
   [ "$n" -eq 0 ] && continue
   if   [ "$n" -le 6 ];  then b="normal"
   elif [ "$n" -le 10 ]; then b="TAIL — name what is different"
-  else                       b="OVER — outside the accepted distribution (C8)"; fi
+  else                       b="OVER — flagged, not condemned; pre-gate tasks iterated blind (C8)"; fi
   printf "%-56s %7s  %s\n" "${t:0:56}" "$n" "$b"
 done ; } | sort -k2,2nr | { printf "%-56s %7s  %s\n" "TASK" "COMMITS" "BAND"; cat; }
