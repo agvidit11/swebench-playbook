@@ -1127,3 +1127,81 @@ Note the conflict did **not** decide this run: N04 kills the card independently.
 fully IN-BASE, deterministic, in an operator-facing `@ManagedOperation`, with **four** independent
 branches each carrying a distinguishing mutant. It is recorded in `.e2e/distsys-1/kill-ledger.md`
 with its reproduction output. Owner: Vidit.
+
+---
+
+# `conc-1` — 2026-09-30 — lane: runtime concurrency — apache/mina-sshd — NO SURVIVOR, REPO EXHAUSTED
+
+Full record: `.e2e/conc-1/{A1-shortlist.md,A4-corpus-prior.md,A2-handoff.md,A3-gate-record.md,
+kill-ledger.md}`. Twenty cold implementations kept at `/tmp/conc1/probe{,2,3,4}/impl-{1..5}`.
+
+**A1** screened 33 repos in the concurrency lane. One survivor: `apache/mina-sshd` — Apache-2.0,
+0 peer tasks, **0% AI-attributed authorship** (0 of 295 two-year commits, 0 of 16 remote branches),
+55 real open issues, 161,429 non-test Java LOC, 20,037 LOC of low-churn targetable concurrency
+packages, an 88 s image and a **6-8 s offline graded path that was byte-identical on every one of
+~40 container runs.** Runner-up `grafana/dskit` is blocked at the G2 "Ambiguous" row, `Owner: human`.
+Thirty-one rejects are listed with evidence; the instructive one is **`apache/tomcat`, which the
+28-day-stale local corpus read as 0 peers and the live sweep read as 10** — two authors have mined
+it, including `tomcat-http2-priority-ignore` inside this very lane.
+
+**A-shapes instantiated:** P4 (snapshot vs view) as the primary lens, P3 (ownership/lifetime) as
+secondary. Neither reached a build, so **neither instantiation count advances**. P1 remains at 3.
+
+## The finding: a fork that exists only while a clause is UNSTATED is not a fork
+
+`STATUS: LIVE`, n=10 paired implementations, same generator, same sketch, same repo.
+
+| the discriminating clause | probe result |
+|---|---|
+| unstated (graded, not said) | **2 of 5 pass — in band** |
+| stated, everything else identical | **5 of 5 pass** |
+
+`A3` GATE 4 step 4 says "generate n=5 from `CONSTRAINT` alone", and a card that leaves the
+discriminating clause out of `CONSTRAINT` therefore gets an in-band reading for a task that will
+come back 5/5. `instruction.md` must state it — a silent spec with a pinning test is
+`BAD_GRADING_WRONG` on 4 of 4 peer tasks — so the in-band reading measured a contract that can
+never ship. **The delta between the two runs is the diagnostic, not the first number.** Written
+into `A3` GATE 4.
+
+## The second finding: the error-representation-only repo signature
+
+Across 20 implementations, 2 cards, 2 packages, 2 maven modules, **every divergence was about how
+to represent a failure** — widen an `isClosed()` predicate or not; set the cause before the
+done-flag or after; throw versus return an already-failed handle; a boolean versus a throwable
+versus an unconditional success. **Not one was about mechanism.** Such a fork has two exits and
+both are closed: pin the representation and it collapses to 5/5; leave it unpinned and the graded
+test pins what the prose did not. This is `A3`'s own repo-retirement condition — *"implements a
+published spec and what the spec leaves open is only error reporting"* — reached the expensive
+way, after a full `A2` and four probe rounds. Written into `A1` as **G9b**, a 60-second pre-check.
+
+The kill is **lane × repo**, not repo. Keep the `mina-sshd` shortlist row; its parser and codec
+families were never surveyed.
+
+## The kill audit earned its place
+
+Codex, briefed only to argue the candidates were ALIVE, returned `AUDIT: KILL INVALID` and was
+right: it found two verified **3/2 splits** in the real patches that my sketches never observed
+(capability precedence on a hybrid future; the aggregate truth value on abandonment), and it caught
+that my CARD 1 sketch never read the parent cause the CONSTRAINT demanded. Two more probe rounds
+were spent on its findings. The second round is what produced the measurement above. **Rounds 1
+and 2 were not valid kills, and without the audit this run would have retired the repo on a
+convergence reading.**
+
+## A stale rule nearly decided it
+
+`A3` GATE 8 still states *"Fork ≤2 is an absolute veto. Do not build."* `RULES.md` retires that as
+`S-004`, superseded by `R-005` (**branch count ≥3**). I had written the kill on the veto before
+re-reading the ledger. Re-derived on `R-005` the kill survives — branch count against the real
+solver population is **2**, of which one is representation ambiguity, so the fair count is **1** —
+but GATE 8's prose and the ledger give opposite answers and a future run will hit it too.
+`Owner: Vidit` — the S-005 note is explicit that this rule must not be flipped by an argument.
+
+## Live, unbuilt, and honestly not worth someone's time
+
+`KeyExchangeMessageHandler.shutdown()` abandoning every parked `PendingWriteFuture` is a real
+defect — settled at base by `drainQueueTo` on the flush path and by nothing on the shutdown path,
+one screen from `AbstractSession.preClose()`, which drains `pendingGlobalRequests` with exactly the
+missing idiom. Zero coined tokens, 8 s deterministic graded path, reproduced by execution. It is
+recorded in `.e2e/conc-1/kill-ledger.md` with its reproduction output. It would come back **4/5 or
+5/5** because its only fair discriminator is one placement error in one of five arms. Declined
+deliberately rather than shipped as a single-turn task the server's own rule would have passed.

@@ -382,6 +382,39 @@ grep -rln "<behaviour keyword>" <clone>/src/test | head   # a shipped test = the
 > 5. Want **1–3 of 5**. 0/5 or 5/5 kills the candidate — *and 5/5 after step 3 passed is a real
 >    kill, unlike a GATE 5 convergence reading.*
 >
+>    ### ⚠ THE PROBE MUST STATE EVERY CLAUSE THE SKETCH GRADES. A "STATED DELTA" IS A KILL.
+>
+>    `STATUS: LIVE`, measured 2026-09-30 on `mina-sshd`, n=10 paired implementations.
+>
+>    Step 4 says "from `CONSTRAINT` alone", and a card author who leaves the discriminating clause
+>    out of `CONSTRAINT` gets an **in-band reading for a task that will come back 5/5.** That is
+>    not a hypothetical:
+>
+>    | the discriminating clause | probe result |
+>    |---|---|
+>    | **unstated** (graded, not said) | **2 of 5 pass — in band** |
+>    | **stated**, same clause, same sketch, same generator | **5 of 5 pass** |
+>
+>    The clause was "a member that can carry a failure must end the close carrying the close
+>    failure". Unstated, five implementations split 3/2 on capability precedence entirely
+>    unprompted. Stated, all five got it. `instruction.md` **must** state it — a silent spec with a
+>    pinning test is the configuration that produced `BAD_GRADING_WRONG` on 4 of 4 peer tasks — so
+>    the in-band reading was measuring a contract that can never be shipped.
+>
+>    **So:**
+>
+>    - The probe prompt must contain **every clause the sketch asserts on**, worded as
+>      `instruction.md` will word it. Diff the two before you run, and paste the diff.
+>    - When a candidate reads in band, **re-run it once with every graded clause stated.** The
+>      delta is the diagnostic, not the first number.
+>    - **A clause that discriminates only while unstated is not a fork. It kills the SURFACE, not
+>      just the card** — no re-cut of that surface recovers it, because every re-cut has to state
+>      the thing that was doing the work.
+>    - This is the same mechanism as `reference/R6-fork-patterns.md` §P6's retracted
+>      "cascade probe" rule (0/10 volunteered, 10/10 executed once told). That paragraph is about
+>      cascades; this one is about the primary gate, and the gate never inherited it.
+>
+
 > If the assertion sketch cannot be written without naming the data structure, stop: that is
 > `GATE 1` pre-filter 2 and the fork is already zero.
 >
@@ -519,6 +552,23 @@ Only candidates past GATE 0–7 reach scoring, and a **different** model scores 
 > The single paired observation we have says a local `GATE 4` 3/5 does **not** predict the
 > server's band on a fork-1 candidate. n=1, but it is the only paired data point, and it went
 > against the rule. So:
+>
+> ### ⚠ THIS GATE AND `ledger/RULES.md` GIVE OPPOSITE ANSWERS. `Owner: human`, 2026-09-30.
+>
+> `RULES.md` records **S-004 "fork ≤2 is an absolute veto" as SUPERSEDED by R-005**
+> (branch count ≥3), on three independent lines — population, 51-trial forensics, one
+> dissection — and notes the veto **cost ~17 candidates**. This gate still states the veto as
+> live. Both are `STATUS: LIVE` in their own file.
+>
+> Neither has been flipped, deliberately. The reopening condition below demands *paired
+> local-vs-server data on ≥3 fork-1 candidates, not another argument*, and `RULES.md`'s
+> supersession is argument-plus-forensics, not paired data. `S-005` exists because this exact
+> rule was already flipped twice by reasoning and was wrong both times.
+>
+> **Until Vidit rules:** run **both**. Kill on fork ≤2 *and* record what branch count says. If
+> they disagree, that disagreement is the paired datum the reopening condition is asking for —
+> write it to `ledger/RUNS.md` rather than picking a side. A second run has now hit this
+> head-on; the cost of leaving it is real candidates.
 >
 > **Fork ≤2 is an absolute veto. Do not build.** The text below is retained only so the
 > reasoning is legible and so a future paired measurement can reopen it deliberately rather

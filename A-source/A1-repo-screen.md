@@ -196,6 +196,30 @@ fixtures would be hand-built stubs fails N03 at scaffolding and usually drags R0
 synthetic fakes accept only a narrow shape and reject solutions calling the real API. Reject repos
 whose interesting behaviour is assertable only through a wall clock or a race.
 
+**G9b — the ERROR-REPRESENTATION-ONLY signature. Check it before commissioning a survey.**
+`STATUS: LIVE`, measured 2026-09-30 on `apache/mina-sshd`, 20 cold implementations across 2 cards,
+2 packages and 2 maven modules. **Every single divergence was about how to represent a failure**
+— widen an `isClosed()` predicate or not; set the cause before the done-flag or after; throw
+versus return an already-failed handle; a boolean versus a throwable versus an unconditional
+success. **Not one was about mechanism.** That repo is clean on every other gate — Apache-2.0,
+0 peers, 0% AI authorship, 55 real issues, 161k LOC, an 88 s image and a 6-8 s deterministic
+graded path — and it still yields nothing, because a fork with only two exits has both closed:
+pin the representation in the contract and it collapses to 5/5; leave it unpinned and the graded
+test pins what the prose did not, which is `BAD_GRADING_WRONG`.
+
+A3 already retires a repo when *"it implements a published spec and what the spec leaves open is
+only error reporting"*, but only after a full `A2` + four probe rounds. It is cheaper here:
+
+> For the subsystem family you intend to target, ask: **if two competent engineers implemented
+> this differently, what would differ?** If the honest answer is only *which exception type*,
+> *which boolean*, or *thrown versus returned*, that family is error-representation-only.
+> Score it and move to another family in the same repo — this is a **lane x repo** kill, not a
+> repo kill, so keep the shortlist row.
+
+The signature is strongest in wire-protocol implementations whose internal seams are
+settle / close / drain paths, because the protocol and the codebase between them already fix the
+mechanism.
+
 ## 7. CONFLICT — UNRESOLVED: licence policy
 
 Three sources, two incompatible positions. Two screening agents hit this independently on
