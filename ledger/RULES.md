@@ -64,3 +64,33 @@ RULE-<nnn> | <LIVE | SUPERSEDED-BY RULE-<nnn> | SCOPED-TO <case>> | <file it liv
 measurement — in a file that already said reopening the veto required *"paired local-vs-server data
 on ≥3 fork-1 candidates, not an argument."* That is the failure mode this ledger exists to make
 visible: a rule changed twice in a night is a rule nobody can rely on.
+
+## THE FALSIFICATION STANDARD — added 2026-09-30 after an audit found four live rules wrong
+
+**A rule that would kill a task we have already had accepted is wrong, however good its
+reasoning.** Not "worth revisiting" — wrong, and withdrawn on the spot.
+
+The audit that produced this, run across every blocking rule in the runbook:
+
+| rule | where | verdict |
+|---|---|---|
+| step 2 = "now use what you built in step 1" → REJECT | `A2` §6 | **kills 3 of 3** accepted MT tasks |
+| newly coined record whose names become the task → REJECT | `A2` §6 | **kills 2 of 3** |
+| coined token → almost never buildable | `A3` GATE 0 | **kills 2 of 3** |
+| `instruction.md` must be 100% human-authored | provenance skill | **kills 4 of 4** |
+| a 3rd step buys the single-1.0 exemption | `A3` ladder | 0 for 48 |
+| fork ≤2 is an absolute veto | `A3` GATE 8 | conflicts with `R-005`, cost ~17 candidates |
+
+Every one of these was written from a real failure. That is how they got in: a task failed, the
+cause was identified correctly, and the remedy was generalised **one level too far** — from
+*this configuration failed* to *this category is unbuildable*. Six times.
+
+**The test, before any rule is written:** name a task that has been accepted and check whether
+this rule would have killed it. If it would, the rule is too broad — narrow it to the
+configuration that actually failed. A rule derived from one failure needs a positive control
+as much as a negative one.
+
+The same error has a signature worth recognising: the rule bans a **category** when the
+evidence only indicts a **pairing**. Coining is fine; coining *while the contract stays silent*
+is not. Reusing step 1's output is fine; reusing it *mechanically* is not.
+

@@ -560,7 +560,13 @@ Reject outright, no card written:
   nothing, and the cascade rested on it
 - step 1 whose requirements include *"behaviour and returns are unchanged"* — that is recording what
   the library already does. **A gate, not a step**; no competent model fails it
-- step 2 = "now use what you built in step 1", or step 2 extends the same function step 1 wrote —
+- ~~step 2 = "now use what you built in step 1"~~ **WITHDRAWN 2026-09-30 — this auto-reject
+  killed the only shape that has ever been accepted.** All three accepted MT tasks are exactly
+  it: `related_snapshot → partial_invalidation`, `schema_ir_normalizer → subsumption_decision`,
+  `canonical_print → range_difference`. What it was reaching for is real but narrower — reject
+  step 2 only when it **mechanically calls** what step 1 wrote, i.e. when a competent engineer
+  could do it the moment step 1 exists, or when it could be *stated* to someone who has never
+  seen step 1. Those two tests replace this line. Step 2 extends the same function step 1 wrote —
   that pattern accounts for the four worst cascades
 - step 2 computable from data the codebase already reaches at step 2's own seam. State in one
   sentence what step 2 **cannot** compute without step 1's artifact; no answer → discard (killed
@@ -604,7 +610,7 @@ sharply. **It is this:**
 
 | | Verdict |
 |---|---|
-| A **newly coined record or schema whose field names become the task** | **REJECT.** Its entire contract is vocabulary you coined, so the spec either enumerates every invented field — and the task becomes transcription, not reasoning — or it does not, and the graded tests assert on names the prose never stated. **There is no third option**, which is why widening never rescues it |
+| A **newly coined record or schema whose field names become the task** | ~~REJECT~~ **→ OBLIGATION, 2026-09-30.** Two of three accepted tasks coin and name an API outright (`FieldTracker(related=['author'])`; a full C signature in a fenced block). Coining is not the defect — a *pinned token the contract is silent about* is. Name it in the contract and prove the grader accepts nothing broader. Old text: **REJECT.** Its entire contract is vocabulary you coined, so the spec either enumerates every invented field — and the task becomes transcription, not reasoning — or it does not, and the graded tests assert on names the prose never stated. **There is no third option**, which is why widening never rescues it |
 | An observable **effect** — behaviour visibly changes through an entry point that already exists | **FINE** |
 | A **minimal existing-vocabulary signal** — one counter, one flag, one field the library already defines | **FINE** |
 

@@ -333,3 +333,25 @@ this rule is soft, and `tools/authorship-audit.sh` lists those writes rather tha
 so the exception stays visible. If a provenance failure ever names a path under `audit/`, close
 the carve-out and move evidence out of the bundle.
 
+## RULED 2026-09-30 — Avocado MAY author `instruction.md`
+
+The `verify-task-provenance` skill header carries a 2026-07 line saying `instruction.md` must be
+100% human-authored, *including not 1P/Avocado*. A `B6` reviewer applied it and returned a
+**Critical** on that basis alone.
+
+**Vidit's ruling: that line is outdated and has been superseded.** Avocado authoring is
+permitted, which is what `D2` has always said and what every one of our accepted tasks did.
+
+Two independent reasons it could not have been right as written:
+
+- **it would void all four of our accepted multi-turn tasks**, each Avocado-authored
+- the **server's own gate text** says so, today, on live tasks: *"does not distinguish human
+  from 1p/Avocado authorship — 1p drafting is permitted with human review."* The server is what
+  gates; a local skill header is a rubric that can lag.
+
+What stays unchanged and is the actual rule: **Claude and Codex never write `instruction.md`,
+by any mechanism.** The defect is third-party authorship and laundering, not model authorship.
+
+A reviewer citing the 100%-human line should be answered with this section, not argued with —
+and if a server verdict ever cites it, that is new evidence and this ruling gets revisited.
+
