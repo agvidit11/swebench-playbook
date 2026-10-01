@@ -53,7 +53,13 @@ if [ "$MODE" = plan ]; then
   echo "DISPATCH ONE SUBAGENT PER LINE. Each reads ONLY its own SKILL.md and reviews $TASK."
   echo
   local_missing=0
+  # Format-aware. Dispatching the multi-turn reviewer at a single-turn task produced 82
+  # NO-SIGNAL checks on one run -- noise that buries the signal and burns a reviewer slot.
+  IS_MT=no; [ -d "$TASK/steps" ] && IS_MT=yes
   for s in "${REVIEWERS[@]}"; do
+    if [ "$s" = review-task-swebench-multiturn ] && [ "$IS_MT" = no ]; then
+      printf '  %-34s SKIPPED — single-turn task, reviewer is not applicable\n' "$s"; continue
+    fi
     if p="$(resolve "$s")"; then
       printf '  %-34s %s\n' "$s" "$p"
     else
@@ -86,7 +92,11 @@ fi
 FAIL=0
 declare -a EVIDENCE=()
 
+IS_MT=no; [ -d "$TASK/steps" ] && IS_MT=yes
 for s in "${REVIEWERS[@]}"; do
+  if [ "$s" = review-task-swebench-multiturn ] && [ "$IS_MT" = no ]; then
+    printf '  SKIP  %-34s not applicable to a single-turn task\n' "$s"; continue
+  fi
   f="$OUT/$s.json"
   if ! resolve "$s" >/dev/null 2>&1; then
     printf '  SKIP  %-34s reviewer not installed (recorded gap)\n' "$s"

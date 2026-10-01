@@ -241,3 +241,35 @@ HANDOFF R2
   NEXT:      MEASURED → back to your act-file. UNMEASURED → fix the artifact, recalibrate,
              and do not touch difficulty (`C-drive/C1-read-verdict.md`).
 ```
+
+## The contamination gate is content-addressed to the prompt, and is currently empty
+
+`STATUS: LIVE`, 2026-09-30. Both found by a reviewer told to treat a null result as no signal.
+
+### 1. Editing `instruction.md` voids the stored contamination verdict
+
+The check keys on a `prompt_hash` over the instruction text. On `gzhttp` the stored gate JSON
+recorded a hash over a **2018-byte** prompt; the file had since been rewritten to **2222 bytes**
+with a different hash. **The verdict on disk was void three hours before anyone re-read it**,
+and nothing in the artifact says so — it looks like a result.
+
+This is the same hazard `B7` §4 fixes with `bundle-hash.sh`, one layer down: a stored verdict
+that outlives its input reads as evidence. **Any instruction edit invalidates the contamination
+key.** Re-run it, or record the verdict as stale — never carry it forward.
+
+### 2. The decontamination index itself is empty, so the gate carries no information
+
+The authoritative snapshot returns `{"row_count": 0, "by_prompt_hash": {}, "tasks": {}}`. Two
+consecutive exports three hours apart, both empty; the freshness gate passes (1.25h against a
+48h bound), so **staleness does not explain it — the upstream delta is genuinely empty.** The
+API fallback returns `401` without a provisioned key.
+
+A lookup against an index of length zero misses on *every* key. It cannot distinguish a clean
+task from a contaminated one.
+
+**What follows, and it applies to passes as much as failures:** a server-side
+`Contamination check: passed / Risk: LOW` on any task validated in this window is a **vacuous
+pass**, not a clearance. Treat contamination as **unmeasured** until a non-empty delta exports.
+Do not cite it as evidence in either direction, and do not let a green row on the dashboard
+stand in for a check that did not run.
+
