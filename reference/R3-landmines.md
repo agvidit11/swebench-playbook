@@ -357,3 +357,55 @@ contract from its callers *without reading it*, then rewrite from the contract w
 structure, names and control flow. `presentInCurrent` was `false` in all three cases and is
 noise; `matchScore` is the determinant.
 
+## ⛔ GIT SMUDGE FILTERS NEUTER THE GRADED TESTS — 57 of our 84 `test.sh` files
+
+`STATUS: LIVE`, 2026-09-30. Found by a `B6` reviewer that built its own sandbox and ran twelve
+graded executions. **This is a complete reward hack and it is in our scaffold template, not in
+one task.**
+
+### The attack
+
+`test.sh` materialises every graded test through git — `git checkout <base> -- <paths>` to
+restore gold tests, `git apply` to lay down `test_patch`. **Both honour `.gitattributes` smudge
+filters**, and the Dockerfile runs `git init` in `/app` as root, so the solver owns both
+`.gitattributes` and `.git/config`.
+
+Measured, on `gzhttp`:
+
+| tree | added | result |
+|---|---|---|
+| 72/75 honest | `.gitattributes` + `filter.neuter.smudge 'sed … { return'` | **75/75, reward 1** — restored `compress_test.go` body is `{ return` |
+| **pristine base, zero implementation change** | a filter on the `test_patch` path | **75/75, reward 1** — `git status` shows only ` M .gitattributes`, and `sha256sum` of the source file equals the base blob |
+
+The second row is the one that matters: **full reward, nothing implemented.** `git apply`
+applies the filter when it *creates* the new file, so the `fail_to_pass` tests are themselves
+neuterable.
+
+### Blast radius
+
+```bash
+# vulnerable = materialises through git AND has no filter defence
+grep -l 'git checkout\|git apply' */tests/test.sh */steps/*/tests/test.sh \
+  | xargs grep -L 'cat-file blob\|gitattributes'
+```
+
+**57 of 84 `test.sh` files. Zero defend against it.** Every one of those tasks can be scored
+without an implementation.
+
+### The fix
+
+Materialise graded bytes **outside** git's conversion machinery:
+
+1. delete `/app/.gitattributes` and `/app/.git/info/attributes`
+2. unset every `filter.*` key in the repo config
+3. restore with `git cat-file blob <base>:<path> > <path>` — raw object bytes, no conversion
+4. **fail closed** if any of the above were present: that is a solver that tried, and the run
+   should not be graded at all
+
+### Why no gate caught it
+
+`preflight` reads the task's files; this attack adds a file the task does not contain, in an
+image the task does not build. It is invisible to static inspection by construction. **The
+only thing that found it was a reviewer executing the real `test.sh` against an adversarial
+tree** — which is the argument for `B6` running reviewers that execute rather than read.
+

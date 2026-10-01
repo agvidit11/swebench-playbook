@@ -92,6 +92,25 @@ has 13 graded tests and a branch count of **1**, every arm failing the identical
 Count independent ways a competent implementation can be incomplete, then prove each with a
 mutant.
 
+> ### A HAND-WRITTEN MUTANT PROVES A BRANCH EXISTS. IT DOES NOT PROVE ANYONE FALLS INTO IT.
+>
+> `STATUS: LIVE`, measured 2026-09-30 on `authelia/authelia`. A card carried **nine** branches,
+> each with a hand-written mutant that only that branch's entry rejected — the discipline this
+> section asks for, done properly. Against **five cold implementations of the same contract the
+> real branch count was 0**: all five passed every assertion, three separate times, across
+> three different contracts over the same package.
+>
+> A mutant you write samples the space of *wrong programs*. The branch count that decides the
+> band samples the space of *programs a competent solver actually writes*, and those two spaces
+> barely overlap once the contract is stated — the solver population clusters hard.
+>
+> So the mutant discipline stays (it is still what stops `f2p` padding), with one addition:
+> **a branch is only confirmed when a real cold implementation fails it.** That is `A3`
+> GATE 4's n=5, and it is cheap — the implementations are the same artefacts GATE 4 already
+> produces. Grade your branch list against them before you believe the count. Same lesson as
+> `C6`'s replay rule and `A2` §3b0's transcription finding, moved earlier: measure against real
+> implementations, never against variants you authored.
+
 ## What was CHANGED to make ours land
 
 From the commit logs of the three accepted MT tasks — four moves recur, and none is "tune the

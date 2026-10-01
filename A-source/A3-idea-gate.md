@@ -696,6 +696,34 @@ probe prompts, the raw probe outputs, and the kill write-up. It must answer all 
 **A kill that rests only on a convergence reading, with any of 1–4 unmet, is NOT a kill.** Fix
 the instrument and re-measure. Record the audit verdict in the handoff next to the kill.
 
+> ### ⚠ A Q5 "ALIVE" ANSWER IS ITSELF A PROBE RESULT AND MUST BE RE-MEASURED WITH THE CLAUSE STATED
+>
+> `STATUS: LIVE`, measured 2026-09-30 on `authelia/authelia` `internal/authorization`.
+>
+> The audit is asked to find *"a different constraint on the same surface"*, so it goes looking
+> for divergence among the five implementations — and the easiest divergence to find is always
+> on something the probe **did not state**, because that is precisely where the implementations
+> were free. Nothing in this section told it, or its reader, to re-measure.
+>
+> Measured: a card read **5/5** on eight stated clauses. The audit returned **ALIVE**, citing a
+> genuine **2/5** split on the per-rule report (`!results[0].MatchQuery`, `!results[0].IsMatch()`,
+> `results[1].Skipped` — two of five passing). The split was real and was reproduced
+> independently by a differential probe. **The clause was unstated.** Stating it and re-running
+> n=5 returned **5/5**.
+>
+> That is exactly the `GATE 4` mina-sshd mechanism, arriving through the audit instead of
+> through the card author. **So:**
+>
+> - A Q5 answer of ALIVE is a **hypothesis**, never a resurrection. It names a candidate clause.
+> - Before the card re-enters, **state that clause as `instruction.md` would state it and re-run
+>   GATE 4.** The second number decides; the audit's number never does.
+> - If the audit's divergence is on a surface the probe prompt did not mention at all, expect
+>   collapse — and if it collapses, the finding is upgraded: the **surface** is dead, not the card.
+> - Brief the auditor with this paragraph, so its Q5 answer arrives labelled as a hypothesis.
+>
+> Without this, the audit converts a correct kill into a build. One run was one dispatch away
+> from scaffolding on a card that had measured 5/5 twice.
+
 **Steelman before you kill.** One sentence: the strongest version of this candidate, and whether
 a different constraint on the same surface survives. If you cannot write it, you have not
 understood the candidate well enough to reject it.

@@ -408,8 +408,28 @@ memoization in 4.
 |---|---|
 | Rust | persistence, COW, generational handles, `Arc::make_mut`, path-copying |
 | Ruby | wrapping state in an object with an explicit lifecycle/state machine |
-| Go | *(unmeasured — but eager-copy IS the default, so COW scored 28 before dying on cost)* |
+| Go | **lent-and-released streaming (P3) once the lifetime contract is stated — measured 5/5, see below.** Eager-copy is the default when nothing is said, so COW scored 28 before dying on cost |
 | Java | *(unmeasured)* |
+
+> ### Go: P3 does NOT fork once the contract is stated. `STATUS: LIVE`, measured 2026-09-30.
+>
+> `authelia/authelia internal/authorization`, n=5 cold `codex exec` implementations of a coined
+> visitor over the rule walk. The contract stated three mechanism clauses: stop at the first
+> matching rule and evaluate no criterion of any later rule; a visitor returning false stops
+> immediately; **the handed evaluation is lent for the duration of the call, the walk reuses one
+> value, so a visitor that keeps the pointer and reads it later sees the most recent rule's
+> evaluation, not the one it was given.**
+>
+> **5 of 5 produced the lazy, single-reused-value shape.** The assertion sketch was proven not
+> blind: a hand-written allocate-all-then-loop control failed all three fork assertions
+> (`n2=1 n3=1, want 0 0` twice, and `retained evaluation 0 is a snapshot (Position=1); a lent
+> value would read 3`).
+>
+> This does **not** retract P3 — `open62541` is still the one reproducible accepted mechanism.
+> It bounds it: P3 forked in **C**, where the allocate-all shape is the idiom and the lifetime
+> clause is unusual. In **Go** the single-reused-accumulator loop is already the idiomatic way to
+> write a visitor, so stating the contract asks for what the model would have written anyway.
+> **Before instantiating P3 outside C, cold-probe it in the target language — three calls.**
 
 The generalizable error underneath both: **the inverted premise is true about
 the REPO and false about the MODEL.** "rom has no lifetime semantics, so

@@ -328,6 +328,26 @@ done
 matters, and it must clear the size floor on its own.** A 400k-LOC repo where all the quiet code
 is 9k LOC of helpers is a small repo for our purposes.
 
+> ### THE SUM IS NOT ENOUGH — THE PACKAGE YOU WILL ACTUALLY CHANGE HAS ITS OWN FLOOR
+>
+> `STATUS: LIVE`, measured 2026-09-30 on `authelia/authelia`. The sum passed comfortably:
+> **24,085 LOC** of low-churn targetable subsystems against a 15k floor. The package the task
+> actually landed in was `internal/authorization` at **1,402 non-test LOC**, and that is what
+> killed the lane — three different contracts over it each returned **5/5** from five cold
+> implementations, because the package is six near-identical criterion families behind one
+> public decision and one public report. **Its entire observable surface specifies exhaustively
+> in under 300 words, and at that size a complete specification IS the implementation.**
+>
+> This is the same failure as `cloudnative-pg` above, which the sum was introduced to catch,
+> arriving through a gap the sum does not close: a large quiet *area* can still contain only
+> small quiet *packages*.
+>
+> **So record the LOC of the single package the premise will live in, not only the sum, and
+> treat anything under ~5k non-test LOC as a measured 5/5 risk** — buildable only if the
+> difficulty comes from somewhere other than completeness over that package's own surface. The
+> cost of ignoring it here was three probe rounds and 15 cold implementations after every
+> factual gate had passed.
+
 It costs 60 seconds and it runs **before** you commission a survey. Applied as a pre-check to
 `kustomize` (24,469 LOC targetable, near-zero churn) it cleared in under a minute.
 

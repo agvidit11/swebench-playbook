@@ -1205,3 +1205,96 @@ missing idiom. Zero coined tokens, 8 s deterministic graded path, reproduced by 
 recorded in `.e2e/conc-1/kill-ledger.md` with its reproduction output. It would come back **4/5 or
 5/5** because its only fair discriminator is one placement error in one of five arms. Declined
 deliberately rather than shipped as a single-turn task the server's own rule would have passed.
+
+---
+
+# `policy-1` — authelia, policy/permission/rule evaluation — NO SURVIVOR, REPO EXHAUSTED
+
+`2026-09-30`. Lane: access rules, matchers, filter/selector sets, routing tables, validation
+rule sets, config precedence. `authelia/authelia` @ `23fb2fe4a0`, `internal/authorization`.
+
+## Repo screen held up; the screen's own OPEN item was the kill
+
+Twelve repos screened. `openbao` is the one worth remembering: the local corpus (28 days stale)
+returned **0 filename hits and 1 unrelated content hit** — textbook clean — and the live slug
+sweep returned `openbao-acl-plus-segment-wildcard-must-not-match-empty-path-segments`, a peer
+task on the exact ACL path matcher I was about to target. `A1` §3's "sweeps 1–4 are all
+NAME-based" lesson, reproduced on a second repo. `calico` died at **G2** with `.claude/`,
+`copilot-instructions.md` and 15 agentic branches including `claude/optimize-unique-labels` —
+the selector subsystem. `cerbos`, `openfga`, `alertmanager`, `doorkeeper`, `shiro`, `keto`,
+`coredns` and `fluentd` all died at **G1** with peers directly on this domain.
+
+authelia passed every gate cleanly: Apache-2.0, 57 real open issues, **0%** AI authorship by all
+three §4 signals, 5 peers all off-subsystem, and a **0.028 s** graded path. It was the right
+pick on every measurable axis and it still yielded nothing.
+
+## Three probe rounds, 15 cold implementations, 5/5 every time
+
+| round | contract | n/5 |
+|---|---|---|
+| 1 | 8 clauses — three-valued criterion composition and ordering (R5 axis 5) | **5/5** |
+| 2 | 3 clauses — stop-at-decisive, stop-on-false, lent-and-reused evaluation (R6 P3) | **5/5** |
+| 3 | 11 clauses — round 1 plus the kill audit's report-consistency rescue | **5/5** |
+
+Every sketch was validated against `base_commit` and against a hand-written NON-DESIRED
+control; round 2's control failed all three fork assertions, so the sketch was not blind. One
+false negative was caught and corrected before a reading was taken — a spurious 0/5 where every
+arm failed the identical assertion, which is the `sparql-ruby` signature and is why that check
+exists.
+
+## The premise was good. That was never the problem.
+
+Reproduced by execution at base, three independent paths, all reachable through exported
+constructors: an all-invalid query criterion group becomes an empty conjunction that matches
+every request; an all-invalid subject group is dropped whole, leaving a rule that matches every
+subject; a partially-invalid AND group silently loses a conjunct. A `bypass` rule gated on
+`query token=secret` bypasses a request with no query. Disclosure was the cleanest in any run
+here — **2 commits ever** on one drop site, **1** on the other, **0** PRs, **0** issues.
+
+**A real, undisclosed, security-relevant fail-open on a security boundary, and it is not a hard
+task.** That gap is the whole finding.
+
+## The kill audit overturned the kill, and the overturn was falsified
+
+Briefed to argue ALIVE, Codex returned **CARD 70 ALIVE** on a measured **2/5** split in the
+per-rule report — impl-2 and impl-4 passing, impl-1/3/5 failing. The split was real; I
+reproduced it with an independent differential probe. **Every clause it rested on was unstated.**
+Round 3 stated them: **5/5**.
+
+So the audit, which `conc-1` correctly credits with rescuing two invalid kills, is also able to
+resurrect a correct one — because the divergence easiest to find is always where the probe said
+nothing, and nothing in the act told it to re-measure. That is now written into `A3`
+§KILL AUDIT. Both directions of §8a's loop in one run: the audit caught my reduced sketch, and
+the measurement caught the audit.
+
+## Nine branches, each with a passing mutant, real branch count 0
+
+The card carried nine branches, each proven by a hand-written mutant only that branch's entry
+rejected — the discipline exactly as written. Against five cold implementations the branch count
+was **0**, three times over. A mutant samples wrong programs; the band samples the programs
+solvers actually write, and after the contract is stated those populations barely overlap.
+Written into `R11`.
+
+## Why repo-scoped and not a resurvey
+
+`internal/authorization` is **1,402 non-test LOC** — six near-identical criterion families
+behind one `Level` and seven booleans. Its observable surface specifies exhaustively in under
+300 words, and at that size **the specification is the implementation**. The product gate passed
+on the *sum* (24,085 LOC of low-churn subsystems); the package the premise lived in was 1.4k.
+`A1` §9 now carries a per-package floor, because this run recorded that risk as `OPEN` at
+screening and then spent three probe rounds rediscovering it.
+
+Resurvey budget deliberately left unspent: the kill is a property of the subsystem and of the
+lens, not of any card.
+
+## Carried forward
+
+- `CARD 71` — anonymous verdict as indeterminate. Both survey engines independently ranked it
+  first. Killed on a **reading**, not a measurement: merged PR `#4037` established the
+  `IsAnonymous() -> true` collapse on purpose. `Owner: Vidit` — it is the only live surface left
+  on this repo and the hard-kill list and the disclosure split give opposite answers on it.
+- `CARD 74` — bypass/runtime dependence parity. A strong **single-turn** candidate; the
+  proposing engine itself ruled step 2 mechanical.
+- `pomerium/pomerium` — A1 rank 2, Apache-2.0, 85 real issues, **zero** peer tasks, never
+  surveyed. Worth a lane. But rounds 1 and 2 are properties of the lens and of Go, not of
+  authelia, so do not carry axis 5 or P3 there without re-probing first.

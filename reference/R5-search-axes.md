@@ -129,6 +129,19 @@ Before building any candidate, cold-probe it five times. If at least four attemp
 
 **Worked example:** An illustrative Casbin extension could add `Evaluate(...) (Verdict, error)` and `Combine(effect, []Verdict) Verdict`. A boolean adapter passes ordinary allow/deny tests but fails unknown-under-negation.
 
+> **MEASURED DEAD AS A DIFFICULTY SOURCE.** `STATUS: LIVE`, 2026-09-30, `authelia/authelia`
+> `internal/authorization`, n=5 cold implementations, twice. A fully-stated three-valued
+> contract — eight clauses covering group-AND, family-OR, rule-AND, declaration-order
+> first-match and the undecidable-rule disposition — returned **5/5**. Adding three more clauses
+> on report/decision consistency returned **5/5** again. The novelty claim above still holds;
+> the **difficulty** does not. The lattice is recalled ("three-valued logic" is three words),
+> and once every composition rule is stated there is nothing left to get wrong.
+>
+> Use this axis to find a *premise* — it is excellent at that, and it located a real,
+> undisclosed, security-relevant fail-open here. Do **not** expect the three-valued framing
+> itself to carry the calibration. Pair it with a difficulty source that is hard *even when
+> fully stated*, or expect 5/5.
+
 ---
 
 ## 6. Failure-atomic callback mutation
