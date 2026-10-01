@@ -185,6 +185,43 @@ of §1 having taught you nothing.
 Never call a task "passing locally" on the strength of oracle 3/3 alone. **A base failure and a
 clean oracle establish grader and golden correctness; they say nothing about model difficulty.**
 
+## When calibration cannot run at all — execute variants instead
+
+`STATUS: LIVE`, 2026-09-30. On `gzhttp`, `B7` produced **zero valid terminal attempts** across
+ten trials: the AI-gateway sidecar was not routable from task containers, every trial died
+`FailedToOpenSocket`, and `--allow-bridge-networks` failed identically. No band, no forecast
+confirmation, nothing to classify.
+
+**A reviewer then measured discrimination directly, and got a better answer than a band would
+have given.** It cloned the repo at `base_commit`, applied the `test_patch`, and ran the graded
+package under **13 distinct partial implementations**:
+
+```
+BASE                      8/8 FAIL        ORACLE  8/8 PASS
+10 of 13 partial variants 8/8 PASS        <- the finding
+1 variant                 split 6/2       <- and only by magic-prefix arithmetic
+```
+
+Ten competent-looking partial implementations clear the entire graded set in one step. The
+8 `f2p` collapse to **two equivalence classes separated by one numeric threshold**.
+
+**This is strictly better evidence than a 5-trial band**, and not only as a fallback:
+
+- it is **deterministic** — no sampling noise, no infrastructure to classify
+- it measures **discrimination**, which is what the band is a proxy for
+- each variant **names the behaviour it omits**, so a non-separating variant tells you *which*
+  branch is decorative
+
+**Do this whenever the band is unavailable, and consider it even when it is not.** Write 8–12
+implementations that are each correct-but-incomplete in a *different, nameable* way, run the
+graded set against each, and read the partition. If most pass, the set does not discriminate,
+and no number of trials will change that. → `feedback_swebench_prove_gradient_locally`.
+
+Two things it surfaces that a band never does: a graded entry that **never diverges from
+another** in any variant is redundant (`F6` was `F1` with assertions that cannot fail
+independently), and a behavioural change in the oracle with **no `f2p` coverage at all** shows
+up as a variant that omits it and still scores 8/8.
+
 ## CHECKLIST
 
 ```
