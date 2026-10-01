@@ -123,6 +123,31 @@ number":
 3. **de-recipe and de-scaffold** — *"state the problem, not the answer"*
 4. **unpin** — *"unpin residual counts"*
 
+## What the accepted peer portfolio does that our rules forbid
+
+`STATUS: LIVE`, 2026-09-30. Measured across their 40 accepted tasks. Every row is a practice
+one of our rules rejects, in a portfolio accepted at 77%.
+
+| they do | our rule said |
+|---|---|
+| **33 of 40 instructions exceed 350 words** | we treat length as a calibration risk and ship 154–230 |
+| **57 use bullets, 47 use multiple headings** | our form guidance pushes unstructured prose |
+| **exact API signatures and coined record fields** | `A2` §6 REJECT, `A3` GATE 0 "almost never" — both now withdrawn |
+| **15 contain fenced worked examples** | treated as giving the answer away |
+| **contracts of 29, 35 and 14 words** | our floor rejects a short contract outright |
+| **a sub-20-line second step** (Dominate) | `A2` §6 auto-rejects "fix under ~20 lines" |
+| **7 accepted steps have `p2p` = 1** | we read thin `p2p` as a reward-hacking signal |
+| **20 of 40 are a second or later task on the same upstream repo** | our dedup instinct treats a mined repo as spent |
+
+That last row is the one to sit with. **Half their accepted output comes from repos they had
+already used.** We treat a repo as exhausted after one task and go looking for a new one —
+which is most of why three runs spent themselves on repo screening and produced nothing.
+Re-mining a repo at a *different seam* is not a collision; `A4`'s `COLLIDES` row was narrowed
+to same-seam for exactly this reason.
+
+**None of these is a licence to copy them.** They are evidence that the specific thing our rule
+forbids is not what gets a task rejected.
+
 ## How we make it work
 
 1. **Two steps. Never three.** 0 for 48.

@@ -9,6 +9,38 @@
 
 You measure claims; you do not generate replacements. A candidate that dies here goes back to `A2`, it is not repaired in place. Claude-as-analyst was the wave-1 error source (repo pre-screen wrong on 2 of 4, a false "standards-pinned has no fork" rule, a dedup method returning 0 on a repo with 11 peer tasks); Claude-as-verifier held up across four spot-checks with zero inflated. **A well-evidenced kill is a good outcome** — three of four A/B repos returned zero survivors and those were the correct answers.
 
+## 0. TYPED OUTCOMES — a gate returns a KIND of verdict, not always a kill
+
+`STATUS: LIVE`, 2026-09-30. This replaces the single terminal outcome that made the whole act
+a rejection machine.
+
+**Why it was needed.** 215 cards died across 11 runs and three consecutive end-to-end runs
+returned `NO SURVIVOR`. An audit found the cause is not any one gate: this act mixes **three
+incompatible systems** — factual safety checks, quality-review heuristics, and calibration
+predictors — and **all three returned the same result: kill.** A quality defect and a
+contaminated repo are not the same kind of problem and must not have the same consequence.
+
+| verdict | what produces it | consequence |
+|---|---|---|
+| **KILL** | a **fact**: already fixed at base, cause or remedy publicly disclosed, peer collision at the same seam, licence, contamination | dead. No amendment. |
+| **AMEND** | a **quality defect**: over-pinned, coined-but-unstated, too-thin a graded surface, a name the grader ignores | **narrow the card and re-gate it.** State what the amended card must be. |
+| **DOWNGRADE** | **no viable second step** | ship it **single-turn**. `N04` is a cascade finding, not a death sentence — `B1` §1.2 already sanctions this |
+| **MEASURE** | **calibration uncertainty** — fork, local band, predicted difficulty | **build it and find out.** Local calibration correlates **0.07** with the server; it cannot be an eligibility test |
+
+**Default to the weakest verdict the evidence supports.** A gate that could return `AMEND`
+must not return `KILL`. Record the verdict *kind* with every card — a ledger full of `KILL`
+where `AMEND` was available is the signature this section exists to catch.
+
+### What this changes immediately
+
+- **`N04` / "no second step" → `DOWNGRADE`, never `KILL`.** A run lost a real, reproduced,
+  undisclosed defect to this, having enumerated five candidate second steps.
+- **Fork strength and local band → `MEASURE`.** They are predictors with 0.07 correlation and
+  41 recorded kills.
+- **Coined-but-unstated → `AMEND`** — state the token. That is the whole remedy.
+- **Disclosure of *cause or remedy* stays `KILL`.** Facts kill, and sourcing is the one place
+  erring permissive is expensive.
+
 ## 0a. POSTURE — this act exists to disqualify, not to predict
 
 `STATUS: LIVE`, 2026-09-23. **Changed deliberately after two nights of ~17 kills and zero tasks.**

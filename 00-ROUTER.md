@@ -290,6 +290,10 @@ on an already-acceptable task has pushed it from `BAD_GRADING_WEAK` to `BAD_GRAD
 > **Only Avocado (MetaCode) or Vidit by hand may write those files. There is no exception
 > and no override.**
 
+> **Supersedes the per-path ownership table below and in `R4`.** Any row granting Claude
+> `solution/`, `environment/`, `task.toml` or `README.md` is retired as of 2026-09-30 — an
+> audit found the two files still disagreed. `audit/**` is the only Claude-writable path.
+
 ### THE SECOND IRON-CLAD RULE — Claude writes NOTHING in a task directory
 
 `STATUS: LIVE`, 2026-09-29. Set after two tasks died of it.
