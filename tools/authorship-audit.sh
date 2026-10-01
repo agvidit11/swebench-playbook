@@ -26,6 +26,12 @@
 # Claude Code session transcripts record the full text of every tool call, Bash included.
 # That is a local audit trail for the exact bypass the guard misses.
 #
+# BLIND SPOT, stated so a PASS is not misread: this sees only CLAUDE CODE transcripts. Writes
+# made by MetaCode/Avocado through mc.sh never appear in one, so this tool can say nothing
+# about who authored instruction.md. A PASS here means "no Claude write", never "authorship is
+# clean". Measured 2026-09-30: 297 transcripts, 20 writes into a task dir, zero to
+# instruction.md -- on a file that was 100% model-written.
+#
 # SCOPE, 2026-09-29: Claude writes NOTHING inside a task directory. Codex makes every change
 # except instruction.md, which is Avocado/human only. The single carve-out is <task>/audit/**,
 # which is author-side evidence rather than task content -- reported as ALLOWED but still
@@ -152,7 +158,10 @@ for p in paths:
                         # this, every diagnostic run manufactures the finding it is looking for
                         # and the count grows on each invocation. Measured 2026-09-30: 1 -> 4
                         # hits across three consecutive audit runs, all of them the audit itself.
-                        if "authorship-audit.sh" in cmd or "preflight.sh" in cmd:
+                        # Narrow: skip only a BARE invocation of the auditor itself, not any
+                        # command that happens to mention it. The wide form let a real write
+                        # hide behind a comment naming the tool.
+                        if re.match(r"^\s*\S*(authorship-audit|preflight)\.sh\b[^|;&]*$", cmd):
                             continue
                         if task in cmd and (BASH_WRITE.search(cmd) or PATHLIB_WRITE.search(cmd) or copies_into_task(cmd)):
                             one = " ".join(cmd.split())[:150]

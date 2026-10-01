@@ -1,18 +1,17 @@
-{INVARIANTS}
+RETIRED 2026-09-30. Do not use. Use `initial` instead — it deletes and re-authors.
 
-Revise the existing instruction at {TARGET}. Read it first.
+This template asked Avocado to revise an existing instruction in place. Two problems, both
+measured:
 
-It is correct as far as it goes. It is missing the obligations below — each is a rule that
-something already depends on but the text never states. Add them.
+1. It reads the file it is revising, so a verbatim phrase from an earlier brief survives every
+   subsequent pass. `gzhttp` failed provenance with a Critical on exactly that, and only a
+   from-scratch rewrite that never opened the old file brought the longest verbatim run down.
 
-MISSING OBLIGATIONS:
-{REQUIREMENTS}
+2. Revisions accumulate. Each pass adds a sentence and nothing ever removes one, so the contract
+   inflates until it states enough for every model to pass. That is the ratchet the retry cap
+   exists to prevent, arriving by a different route.
 
-Constraints specific to a revision:
-- Do not restate anything the file already covers.
-- Prefer folding an obligation into an existing sentence over appending a new one, where that
-  reads more naturally. Economy matters more than symmetry.
-- Keep the existing voice exactly. A reader should not be able to tell the file was revised.
-- Do not re-scope, re-order or improve anything you were not asked about.
-
-Reply with the file written to disk and one line on where you put each obligation and why.
+The objection to deleting — that a rewrite may lose a requirement the old version got right —
+is real and is handled by the reverse trace (`B3` §(1b)) after every re-author, not by editing
+in place. If the trace finds an uncovered graded assertion, re-author again with that behaviour
+named at the same high level. Do not patch the gap.

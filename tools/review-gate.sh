@@ -73,6 +73,12 @@ if [ "$MODE" = plan ]; then
       || printf '  %-34s NOT INSTALLED (known gap; note it in the ledger)\n' "$s"
   done
   echo
+  BH=$("$(dirname "${BASH_SOURCE[0]}")/bundle-hash.sh" "$TASK" 2>/dev/null | sed 's/.*bundle_sha256=//;s/ .*//')
+  echo "bundle:   ${BH:-<unavailable>}"
+  echo "  Every verdict MUST record this hash. A verdict against a different bundle is void:"
+  echo "  measured 2026-09-30, five sibling verdicts had reviewed a file edited 53 minutes"
+  echo "  later, and one quoted a sentence that no longer existed."
+  echo
   echo "Each subagent must write $OUT/<reviewer>.json:"
   echo '  {"reviewer":"<name>","verdict":"Accept|Revise|Reject","critical":0,"high":0,'
   echo '   "medium":0,"low":0,"findings":[{"id":"","severity":"","summary":"","evidence":""}]}'
@@ -123,6 +129,11 @@ for x in d.get("findings") or []:
     if ev: print(ev)
 PY
   )
+  vb=$(python3 -c 'import json,sys;print((json.load(open(sys.argv[1])).get("bundle") or "")[:16])' "$f" 2>/dev/null)
+  cb=$("$(dirname "${BASH_SOURCE[0]}")/bundle-hash.sh" "$TASK" 2>/dev/null | sed 's/.*bundle_sha256=//;s/ .*//' | cut -c1-16)
+  if [ -n "$cb" ] && [ "$vb" != "$cb" ]; then
+    printf '  FAIL  %-34s STALE — reviewed bundle %s, current %s\n' "$s" "${vb:-<none>}" "$cb"; FAIL=1; continue
+  fi
   if [ "$verdict" != "Accept" ] || [ "$crit" -gt 0 ] || [ "$high" -gt 0 ]; then
     printf '  FAIL  %-34s verdict=%s critical=%s high=%s\n' "$s" "$verdict" "$crit" "$high"; FAIL=1
   else

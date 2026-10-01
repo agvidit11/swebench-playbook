@@ -2,7 +2,19 @@
 
 Write the task instruction at {TARGET} from the requirements below.
 
+**If a file already exists at that path: delete it first, and do not read it.** Do not open it,
+do not recover it from git, do not consult any earlier draft. Anything carried across from a
+previous version carries its defects across too — a verbatim phrase that failed an authorship
+check, a sentence that pointed at the wrong place, a requirement that was never true. You are
+writing this file for the first time.
+
 GENRE: {GENRE}
+
+You are given deliberately little. Everything not stated below — which package, which entry
+points, what the current code does, which observable outcomes matter and where their boundaries
+lie — you derive by reading the repository. **The detail must come from the code, not from this
+brief.** A brief that supplies the detail gets reproduced, and a reproduced brief fails the
+authorship gate.
 
 The requirements are obligations, not text. They tell you what the reader must come away
 knowing. They are deliberately not written as prose — write the prose yourself, in your own
