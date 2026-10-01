@@ -314,6 +314,30 @@ Repo-level screening does not cover this. Run per surviving candidate on the **s
 > write both verdicts into the handoff with the commit bodies quoted, so the decision is
 > reviewable rather than a judgement call buried in a kill line.
 
+> ### ⚠ THIS LIST AND THE DISCLOSURE SPLIT ABOVE DISAGREE. `Owner: Vidit`, 2026-09-30.
+>
+> The split says judge by **what is disclosed** — symptom allowed, cause and remedy kill. This
+> list says **any merged PR touching the surface**, regardless of content. On a mature repo
+> every function has merged PRs touching it, so the literal reading kills almost everything.
+>
+> **Measured cost: GATE 3 and disclosure are the largest kill category in the corpus — 57 and
+> 37 mentions across 215 killed cards in 11 runs.** Two separate runs lost their best card to
+> it and both escalated rather than resolve it. One recorded its card as *"real, reproduced,
+> and **undisclosed by content**, killed by GATE 3's literal rule (two applied PRs on the exact
+> function)"*.
+>
+> **What is NOT in question and must not be relaxed:** never source a task FROM a public PR —
+> never copy its diff, its tests, or its remedy. That is `feedback_swebench_sourcing_policy`
+> and it is absolute.
+>
+> **What is in question:** whether a merged PR that merely *touches the file* discloses
+> anything. The split says disclosure is about content; this line says it is about proximity.
+> I have not changed it — the sourcing policy is the most safety-critical rule we have and the
+> cost of getting it wrong in the permissive direction is a retired task and a reputational
+> hit, not a wasted cycle. **Until ruled: apply the strict reading, and record every card it
+> kills with the PR and whether that PR disclosed cause or remedy.** That record is the
+> evidence a ruling needs.
+
 Hard kill, no exception for obfuscation, contamination score or post-cutoff timing: any **merged** public PR touching the surface; any **closed-unmerged** PR whose diff or thread contains the remedy; any open issue whose **body or comments** propose the direction, workaround, API or remedy — even informally, even with no code, even if our oracle would be more robust; rewinding `base_commit` to a public PR's parent; a **documented design decision** rejecting the capability, unless explicitly overruled with new justification. **Finding the premise in open issues is a disqualifier, not a confirmation** — it feels like validation and is training-data exposure.
 
 ```bash
