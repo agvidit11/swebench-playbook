@@ -60,6 +60,28 @@ asked Avocado to launder it.
 
 A requirement states **what the reader must come away knowing.** It does not supply the words.
 
+### THE REQUIREMENTS FILE LIVES OUTSIDE THE TASK DIRECTORY
+
+`STATUS: LIVE`, 2026-09-30. A built task failed provenance with a **Critical** for this.
+
+The brief was written to `<task>/audit/requirements.md`. That is a **task file**, so the write
+is logged against the task, and the shipped contract reproduced all seven of its obligations
+1:1 with a 10-word verbatim run. The gate matched the two.
+
+`R9` already says evidence belongs outside the bundle. **A brief is not even evidence — it is
+input, and it is Claude-authored, which is the worst thing to leave inside a directory whose
+every file the provenance gate reads.** Write requirements to `/tmp` or to
+`.e2e/<run>/briefs/`. Never under `<task>/`.
+
+Two things that followed from the same failure and are worth keeping:
+
+- **Fewer, higher-level obligations reproduce less.** The seven-obligation brief came back 1:1.
+  A rewrite from **two sentences of symptom**, with everything else derived from the repository,
+  came back at a 7-word longest run and generic phrasing. The detail must come from the code,
+  not from you. `AVOCADO_CAP` exists so a short brief does not also buy a short cap.
+- **A re-author must not read the file it replaces.** Instruct Avocado to delete it first and
+  not recover it from git. Anything carried across carries the defect across.
+
 ### DIFF THE WHOLE TASK AFTER EVERY AVOCADO DISPATCH. The prompt does not bound it.
 
 `STATUS: LIVE`, 2026-09-29. Measured the first time the templates were used in anger.

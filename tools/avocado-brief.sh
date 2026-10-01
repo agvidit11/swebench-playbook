@@ -78,7 +78,12 @@ ADD=$((N - NEG)); [ "$ADD" -lt 1 ] && ADD=1
 TARGET="$DIR/instruction.md"
 CUR=0; [ -f "$TARGET" ] && CUR=$(wc -w < "$TARGET")
 case "$MODE" in
-  initial|clarity) CAP=$((45*N)); [ "$CAP" -lt 250 ] && CAP=250; [ "$CAP" -gt 600 ] && CAP=600 ;;
+  initial|clarity) CAP=$((45*N)); [ "$CAP" -lt 250 ] && CAP=250; [ "$CAP" -gt 600 ] && CAP=600
+                   # AVOCADO_CAP overrides. The formula scales words with obligation COUNT,
+                   # which is wrong when you deliberately give few, high-level obligations and
+                   # want the model to derive detail from the repo -- the provenance-safest
+                   # brief is the shortest one, and it should not also buy the shortest cap.
+                   [ -n "${AVOCADO_CAP:-}" ] && CAP=$AVOCADO_CAP ;;
   gapfill)         CAP=$((CUR + 40*ADD))
                    # Absolute ceiling. The reference portfolio's median shipped instruction is
                    # 393 words and our accepted ones are 154-230; a brief that invites 900+ is
