@@ -25,3 +25,5 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm23237 | rspec-composable-cycle-safe-fuzzy-match | rspec/rspec | Composable values_match? + FuzzyMatcher recursive graphs | I | CARD | 2026-10-02 | A1 PASS; base SystemStackError reproduced; A4 ADJACENT; 19/28 DOWNGRADE to single-turn, then MEASURE; evidence ledger/cards/rspec-composable-cycle-safe-fuzzy-match.md |
 | devvm6971 | lane-i domain: email/MIME | go-message / enmime / mail-parser | TBD | I | PROBING-REPO | 2026-10-02 | buffer card agent running |
 | devvm6971 | gitdiff-sequential-patch-combine | bluekeyes/go-gitdiff | patch compose | I | RELEASED | 2026-10-02 | KILL same-seam peer mijiang go-gitdiff-3597f72 Compose (not in /tmp/llc; found via gh search code); domain retired today |
+| devvm6971 | lane-i domain: CSS cascade inlining | css-inline / premailer / douceur | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
+| devvm6971 | lane-i domain: i18n message resolution | fluent-rs / babel / go-i18n | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
