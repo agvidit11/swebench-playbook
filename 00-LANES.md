@@ -53,6 +53,15 @@ is built. That judgement *is* the task.
 Why: every card whose contract stated an algorithm saturated (Avocado implements stated algorithms). The
 splits we have measured came from **judgement the contract leaves to the solver** — see §3.
 
+**Before any obligations go to Avocado, Claude reviews them for two things** (measured 2026-10-02, gobgp):
+1. **Every graded public signature is pinned exactly** — name, receiver, parameters, returns — copied from
+   the oracle. Left unstated, Avocado invents one: it wrote `ReducedForm() []*Prefix` and a 2-return
+   `DivergentRoute` while the tests call `Reduced() []Prefix` and `(netip.Prefix, bool, error)`. Every
+   contract-following solver would then fail to compile.
+2. **No obligation spells out the trap.** Codex wrote "reports a mismatch *even if one or both sets accept
+   no routes*" — the exact case every Avocado failure fell into. State the rule ("when both sets hold
+   entries from different families"), never the edge case it catches.
+
 Mechanics: Claude or Codex writes **obligations** ("A reader must come away knowing that …") to `/tmp`,
 never into a task dir. `tools/avocado-brief.sh` lints them and builds the prompt. `~/.claude/skills/swebench-mt/mc2.sh` sends it.
 Avocado deletes any old contract unread and writes the new one. **Diff the whole task afterwards** —
