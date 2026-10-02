@@ -13,7 +13,7 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm23237 | open62541-datetime-strict-civil-validation | open62541/open62541 | UA_DateTime_parse + XML DateTime decode civil/offset validation | P | PROBING | 2026-10-02 | base 8f1965886541269dfb022ec7246d1df967af7f4e; impossible dates/times/offsets normalize at base; trap natural order loses information / permissive helper; A4 ADJACENT; five-cold-implementation probe starting |
 | devvm6971 | lane-i domain: recurring schedules | ice_cube / rrule-go / rust-rrule | TBD | I | PROBING-REPO | 2026-10-02 | card agent running; Claude+Codex pair |
 | devvm6971 | lane-i domain: geospatial | paulmach/orb / georust | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
-| devvm6971 | lane-i domain: layered config | koanf / go-toml / goccy/go-yaml / toml_edit | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
+| devvm6971 | config-rs-writable-layer-delta | rust-cli/config-rs | changes_since / layer_between (writable user layer over layered Config) | P | PROBING | 2026-10-02 | base 970020ad; trap equivalence-over-domain (s1) + natural-order-loses-info (s2); A4 CLEAR repo/ADJACENT shape; 23/28 MEASURE; codex-verified; card ~/scratch/lane-i/cards/ |
 | devvm6971 | lane-i domain: markdown AST | goldmark / comrak / pulldown-cmark / markdown-it-py | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
 | devvm6971 | lane-i domain: python structuring | cattrs / marshmallow / msgspec | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
 | devvm6971 | lane-i domain: rust collections | rangemap / petgraph / indexmap | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
