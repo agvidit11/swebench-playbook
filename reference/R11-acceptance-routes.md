@@ -78,7 +78,7 @@ in one domain. Ours must include our own repo first.
 
 | property | evidence |
 |---|---|
-| **exactly 2 steps** | 4 of 4 ours, 38 of 40 theirs. **0 of 48 accepted tasks have 3+ steps** |
+| ~~exactly 2 steps~~ **2 or 3 steps** | **FALSIFIED 2026-10-01**: kustomize is 3-step and accepted. 3 steps buys the single-1.0 exemption for one NON-final step. The last step must carry a real discriminator |
 | **step 2 is a different KIND of operation** | invalidate / decide / difference — never the same property at a second site, never a reporting layer |
 | **coined API named in the contract** | 2 of 3 ours verbatim; their standing policy |
 | oracle 3/3, structural clean | universal — necessary, never sufficient |
@@ -150,7 +150,7 @@ forbids is not what gets a task rejected.
 
 ## How we make it work
 
-1. **Two steps. Never three.** 0 for 48.
+1. **2 or 3 steps — the last step must be in band.** ~~Never three~~ was falsified by kustomize (3-step, accepted). One non-final step may be at 1.0 under the exemption.
 2. **build-then-use only.** Ask *what representation does this codebase lack* before asking what
    is broken. The other two merge shapes are where our failures live.
 3. **Coin the API and name it.** Not a veto — an obligation (`A3` GATE 0 banner).

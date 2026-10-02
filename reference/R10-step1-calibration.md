@@ -241,7 +241,26 @@ is currently `pending`. This file predicts it returns **step 1 too easy at or ne
 comes back in band, the ≤4 floor is wrong and this section is the evidence that says so — record
 the result here either way. A rule that cannot be embarrassed is not a rule.
 
-## BUILD TWO STEPS. Three has never been accepted, in either corpus.
+## ~~BUILD TWO STEPS. Three has never been accepted~~ — FALSIFIED 2026-10-01
+
+> **Withdrawn the day after it was written.** `kustomize-localize-source-fidelity` is **3-step and
+> ACCEPTED**; `go-zero-flush-accountability` (in review) and `protoc-gen-go-mcp-epoch-tolerant-
+> temporal-io` (passing) are 3-step too. All three cleared via the **single-1.0 exemption**, which
+> exists only at 3+ declared steps: ONE non-final step may sit at 1.0 if the others are in band.
+> **The last step is never exempt.**
+>
+> So the working pattern is *split the hard step*: a cascade with one hard and one easy component
+> can pass as 3 steps with the easy one non-final, where 2 steps cannot. Use the step count the
+> cascade honestly supports; the binding constraint is that **the last step carries a real
+> discriminator.**
+>
+> Why it was wrong: the 0-of-48 count was real but described the past, and it was the *reason*
+> 3-step tasks were rare (we kept building 3-step tasks whose LAST step was the easy one). The
+> evidence indicted a pairing — easy-last-step — and I wrote it as a category. That is exactly the
+> failure the falsification standard in `ledger/RULES.md` exists to catch, and I committed it a day
+> after writing that standard. Original section kept below for the record.
+
+### (original, superseded)
 
 `STATUS: LIVE`, 2026-09-30. Measured the day peer acceptance became readable.
 
