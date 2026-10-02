@@ -34,3 +34,10 @@ Avocado — read it before choosing the next card.
 | 2026-10-02 | devvm23237 | open62541 DateTime strict civil validation (AMEND single-turn) | open62541/open62541 | natural order loses information / permissive helper | 255 | 5/5 | 0 | too easy after one amend → RELEASED. LESSON: calendar/offset validation is a recalled algorithm even when contract is outcome-only |
 | 2026-10-02 | devvm23237 | rspec-backtrace-location-remapping s1+s2 chained (+s2 AMEND) | rspec/rspec | natural order loses information | 166/245/261 | s1 5/5, s2 4/5, s2-amend 5/5 | 1 stated (fallback restored raw generated frames) | too easy → RELEASED |
 | 2026-10-02 | devvm23237 | rspec-composable cycle-safe fuzzy match (built task, exact prompt, local metacode k=5 x2) | rspec/rspec | helper subtly too narrow | — | 5/5, 5/5 | 0 | probe 2/5 came from an earlier Muse draft; exact-prompt saturates → MT reshape. LESSON: re-probe after the final contract is re-authored, before B3-B6 |
+
+## 2026-10-02 devvm6971 — uniform failure = grader bug, twice in one afternoon
+- go-zero step 2: 5/5 failed one subtest. Probe of core/mapping showed `default=` and `options=` are ACCEPTED by the
+  decoder (= absent) while the test demanded rejection. Only `optional=!` (always rejected) was a fair miss (1/5).
+- gobgp step 1: 3/5 failed one assertion; the Avocado answer accepted exactly the same routes with the same entry
+  count as the oracle's -- the contract never chose a canonical form.
+- Rule: when every failing run fails the SAME assertion, probe the authority before counting it as difficulty.
