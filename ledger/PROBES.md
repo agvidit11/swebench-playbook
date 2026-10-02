@@ -41,3 +41,4 @@ Avocado — read it before choosing the next card.
 - gobgp step 1: 3/5 failed one assertion; the Avocado answer accepted exactly the same routes with the same entry
   count as the oracle's -- the contract never chose a canonical form.
 - Rule: when every failing run fails the SAME assertion, probe the authority before counting it as difficulty.
+| 2026-10-02 | devvm23237 | django-model-utils Choices grouped selection s1+s2 chained (+s2 AMEND) | jazzband/django-model-utils | natural order loses information | 260/334/435 | s1 5/5, s2 5/5, s2-amend 5/5 | 0 stated in counted sets; 6 infra (banner-only/stream retries) replaced | too easy → RELEASED. LESSON: AMEND that states the observed failing case converts it to 5/5 — state rules, never cases |
