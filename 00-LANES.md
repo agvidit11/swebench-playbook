@@ -14,6 +14,11 @@ stage — not all 36 files.
 
 Three machines → ~9 READY a day. **Nothing is pushed without Vidit's confirmation.**
 
+**Vidit ruling 2026-10-02: multi-turn is the requirement — at least 4–6 multi-turn READY tasks per day.**
+Single-turn is a deprioritised fallback, never the default rescue. A card whose steps do not land is
+**re-divided** (split the hard step, add a third step, move cases between steps — §3 "Shape"), not
+discarded or downgraded. DOWNGRADE is legal only after a measured 3-step reshape has failed.
+
 **Why we were producing ~0, measured over the week before this file existed:** ideas were generated from
 scratch one repo at a time; most were algorithms, which Avocado implements as soon as they are stated
 (6 of 6 cards in one run); the discriminating check ran *after* hours of building; 2–3 serial agents;
@@ -84,6 +89,14 @@ likely saturate — probe it last, if at all.
 2 or 3 steps. **The last step must split solvers.** With 3 declared steps the server lets one non-final
 step sit at 1.0 (kustomize, accepted, used exactly this). Step 2+ must be a different kind of operation
 over what step 1 built — not the same property at a second site, not a report over step 1.
+
+**Reshape moves (2026-10-02, measured on 6 cards that day):** a saturated step becomes step 1 of a 3-step
+task (the exempt slot); a 0/5 cliff step is split along its failure fault line; a saturated LAST step is
+replaced by a new different-kind operation — never left last. Non-last steps at 0.8 have passed on the
+server (kustomize, net-imap). **Probe chained, like the server:** step N impls start from a *passing*
+step N−1 tree, not from base. A single-turn merge of a 2-step card can destroy the band (config-rs:
+2-step step 2 = 1/5; merged single-turn = 0/5 ×3, bimodal). Working brief:
+`~/scratch/lane-i/MT-RESHAPE-BRIEF.md` on devvm6971.
 
 ## 4. Repo budget
 
