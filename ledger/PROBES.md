@@ -12,3 +12,6 @@ Avocado — read it before choosing the next card.
 | 2026-10-02 | devvm6971 | adaptix-typeddict-union-dump-selection s1 (dump case selection) | reagento/adaptix | permissive helper | 242 | 4/5 real (1/5 graded) | 1 stated (stale __required_keys__); 3 = contract named buggy Literal loader as authority | contract defect; card dropped on s2 |
 | 2026-10-02 | devvm6971 | phprrule-rset-split-reschedule s2 (rescheduleFrom) | rlanvin/php-rrule | permissive helper | 378 | 5/5 | 0 (1 infra hang, code complete) | too easy → drop |
 | 2026-10-02 | devvm6971 | phprrule-rset-split-reschedule s1 (splitAt) | rlanvin/php-rrule | natural order loses information | 312 | 5/5 | 0 | too easy → drop. LESSON: trap is self-checkable by running the library's own iterator; Avocado verifies and escapes |
+| 2026-10-02 | devvm6971 | geojson-antimeridian-bbox s2 (compute_bbox) | georust/geojson | natural order loses information | 311 | 5/5 | 0 | too easy |
+| 2026-10-02 | devvm6971 | geojson-antimeridian-bbox s2b (amend: removed approach hint) | georust/geojson | natural order loses information | 329 | 5/5 | 0 | too easy → drop |
+| 2026-10-02 | devvm6971 | geojson-antimeridian-bbox s1 (collection union) | georust/geojson | natural order loses information | 240 | 5/5 | 0 | too easy; "antimeridian bbox" recalled as largest-gap |
