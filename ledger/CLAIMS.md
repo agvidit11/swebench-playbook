@@ -15,7 +15,7 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm6971 | lane-i domain: geospatial | paulmach/orb / georust | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
 | devvm6971 | config-rs-writable-layer-delta | rust-cli/config-rs | changes_since / layer_between (writable user layer over layered Config) | P | PROBING | 2026-10-02 | base 970020ad; trap equivalence-over-domain (s1) + natural-order-loses-info (s2); A4 CLEAR repo/ADJACENT shape; 23/28 MEASURE; codex-verified; card ~/scratch/lane-i/cards/ |
 | devvm6971 | lane-i domain: markdown AST | goldmark / comrak / pulldown-cmark / markdown-it-py | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
-| devvm6971 | lane-i domain: python structuring | cattrs / marshmallow / msgspec | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
+| devvm6971 | adaptix-typeddict-union-dump-selection | reagento/adaptix | Retort.dump union-with-TypedDict case selection + ambiguity rejection | P | PROBING | 2026-10-02 | base 81594ee0; bare KeyError at base reproduced; trap permissive helper (s1) + equivalence (s2); A4 CLEAR; 22/28 MEASURE; codex-verified; TZ=UTC |
 | devvm6971 | lane-i domain: rust collections | rangemap / petgraph / indexmap | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
 | devvm6971 | lane-i domain: java money/text | jsr354-ri / commons-text / commons-csv / joda-money | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
 | devvm6971 | lane-i domain: physical units | pint / uom / go-units / ruby-units | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
