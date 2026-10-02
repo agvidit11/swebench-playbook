@@ -94,3 +94,10 @@ The same error has a signature worth recognising: the rule bans a **category** w
 evidence only indicts a **pairing**. Coining is fine; coining *while the contract stays silent*
 is not. Reusing step 1's output is fine; reusing it *mechanically* is not.
 
+## Rulings — 2026-10-01 (Vidit)
+
+| id | ruling | supersedes |
+|---|---|---|
+| R-006 | **GATE 3 disclosure is judged by content**: kill only on a disclosed cause or remedy. Touching the same file/function is not disclosure. Never-source-from-a-PR stays absolute. | the "any merged PR touching the surface" proximity reading |
+| R-007 | **Fork ≤2 veto retired.** Fork is recorded-only (MEASURE). Branch count ≥3, confirmed by a real cold implementation failing each branch, decides. | `A3` GATE 8's reinstated absolute veto (already `S-004` here) |
+

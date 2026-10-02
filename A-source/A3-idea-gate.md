@@ -346,29 +346,23 @@ Repo-level screening does not cover this. Run per surviving candidate on the **s
 > write both verdicts into the handoff with the commit bodies quoted, so the decision is
 > reviewable rather than a judgement call buried in a kill line.
 
-> ### ⚠ THIS LIST AND THE DISCLOSURE SPLIT ABOVE DISAGREE. `Owner: Vidit`, 2026-09-30.
+> ### RULED 2026-10-01 (Vidit): disclosure is judged by CONTENT, not proximity.
 >
-> The split says judge by **what is disclosed** — symptom allowed, cause and remedy kill. This
-> list says **any merged PR touching the surface**, regardless of content. On a mature repo
-> every function has merged PRs touching it, so the literal reading kills almost everything.
+> A merged or closed PR, issue, or commit **kills a card only if it discloses the CAUSE or the
+> REMEDY** of the behaviour the task grades. A PR that touched the same file or function for an
+> unrelated reason does **not** kill. Symptom-only threads remain allowed, per the split above.
 >
-> **Measured cost: GATE 3 and disclosure are the largest kill category in the corpus — 57 and
-> 37 mentions across 215 killed cards in 11 runs.** Two separate runs lost their best card to
-> it and both escalated rather than resolve it. One recorded its card as *"real, reproduced,
-> and **undisclosed by content**, killed by GATE 3's literal rule (two applied PRs on the exact
-> function)"*.
+> **Unchanged and absolute:** never source a task FROM a public PR — never copy its diff, tests,
+> or remedy (`feedback_swebench_sourcing_policy`). This ruling narrows what counts as
+> *disclosure*; it does not loosen sourcing.
 >
-> **What is NOT in question and must not be relaxed:** never source a task FROM a public PR —
-> never copy its diff, its tests, or its remedy. That is `feedback_swebench_sourcing_policy`
-> and it is absolute.
+> Why: the proximity reading was the single largest kill category — 57 of 215 killed cards
+> across 11 runs — and two runs each lost their best card, real, reproduced and undisclosed by
+> content, to "two applied PRs on the exact function."
 >
-> **What is in question:** whether a merged PR that merely *touches the file* discloses
-> anything. The split says disclosure is about content; this line says it is about proximity.
-> I have not changed it — the sourcing policy is the most safety-critical rule we have and the
-> cost of getting it wrong in the permissive direction is a retired task and a reputational
-> hit, not a wasted cycle. **Until ruled: apply the strict reading, and record every card it
-> kills with the PR and whether that PR disclosed cause or remedy.** That record is the
-> evidence a ruling needs.
+> In the list below, read every "touching the surface" as "**disclosing the cause or remedy for
+> the graded behaviour on** the surface." Record, for every PR you inspect, which of
+> symptom / cause / remedy / unrelated it contains.
 
 Hard kill, no exception for obfuscation, contamination score or post-cutoff timing: any **merged** public PR touching the surface; any **closed-unmerged** PR whose diff or thread contains the remedy; any open issue whose **body or comments** propose the direction, workaround, API or remedy — even informally, even with no code, even if our oracle would be more robust; rewinding `base_commit` to a public PR's parent; a **documented design decision** rejecting the capability, unless explicitly overruled with new justification. **Finding the premise in open issues is a disqualifier, not a confirmation** — it feels like validation and is training-data exposure.
 
@@ -641,24 +635,16 @@ Only candidates past GATE 0–7 reach scoring, and a **different** model scores 
 > server's band on a fork-1 candidate. n=1, but it is the only paired data point, and it went
 > against the rule. So:
 >
-> ### ⚠ THIS GATE AND `ledger/RULES.md` GIVE OPPOSITE ANSWERS. `Owner: human`, 2026-09-30.
+> ### RULED 2026-10-01 (Vidit): the fork veto is RETIRED. Branch count decides.
 >
-> `RULES.md` records **S-004 "fork ≤2 is an absolute veto" as SUPERSEDED by R-005**
-> (branch count ≥3), on three independent lines — population, 51-trial forensics, one
-> dissection — and notes the veto **cost ~17 candidates**. This gate still states the veto as
-> live. Both are `STATUS: LIVE` in their own file.
+> Fork strength is **recorded only** — a `MEASURE` verdict (§0), never a kill. The gate is
+> `R-005`: **branch count ≥ 3, where a branch counts only when a real cold implementation fails
+> it** (`R11`). A hand-written mutant proves a branch exists; it does not confirm it.
 >
-> Neither has been flipped, deliberately. The reopening condition below demands *paired
-> local-vs-server data on ≥3 fork-1 candidates, not another argument*, and `RULES.md`'s
-> supersession is argument-plus-forensics, not paired data. `S-005` exists because this exact
-> rule was already flipped twice by reasoning and was wrong both times.
->
-> **Until Vidit rules:** run **both**. Kill on fork ≤2 *and* record what branch count says. If
-> they disagree, that disagreement is the paired datum the reopening condition is asking for —
-> write it to `ledger/RUNS.md` rather than picking a side. A second run has now hit this
-> head-on; the cost of leaving it is real candidates.
->
-> **Fork ≤2 is an absolute veto. Do not build.** The text below is retained only so the
+> This resolves the conflict with `ledger/RULES.md`, which already recorded the veto as
+> `S-004`, superseded. The veto cost ~17 candidates. The text below is kept for history only.
+
+> ~~**Fork ≤2 is an absolute veto. Do not build.**~~ *(retired 2026-10-01, above)* The text below is retained only so the
 > reasoning is legible and so a future paired measurement can reopen it deliberately rather
 > than by someone re-deriving the same argument from scratch.
 >
