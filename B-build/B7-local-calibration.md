@@ -222,6 +222,25 @@ another** in any variant is redundant (`F6` was `F1` with assertions that cannot
 independently), and a behavioural change in the oracle with **no `f2p` coverage at all** shows
 up as a variant that omits it and still scores 8/8.
 
+## The cold-implementation pass is the pre-push gate that works
+
+`STATUS: LIVE`, 2026-10-01. First run on `gobgp`, which had passed oracle, replay and preflight:
+
+| step | cold impls passing | confirmed branches | verdict |
+|---|---|---|---|
+| 1 | 3/5 | 1, a genuine reasoning miss | in band |
+| 2 | 5/5 behavioural | 0 | **too easy — caught before the server** |
+
+Five honest implementations per step, written from the contract alone, never seeing the oracle,
+the graded tests, or each other — and **step 2 built on each implementation's own step 1**, since
+that is what the server seeds. It costs one Codex pass and it answers the one question every
+earlier gate leaves open: *does anyone competent actually fall into these branches?*
+
+It also separates difficulty from defects: one step-2 "failure" was a package namespace collision
+(`R3`), which a band would have read as a hard task.
+
+Run it before `B6`, not after — a hardening change makes every reviewer verdict stale.
+
 ## CHECKLIST
 
 ```

@@ -409,3 +409,26 @@ image the task does not build. It is invisible to static inspection by construct
 only thing that found it was a reviewer executing the real `test.sh` against an adversarial
 tree** — which is the argument for `B6` running reviewers that execute rather than read.
 
+## Hidden-test identifiers collide with solver-authored test code (Go, and any shared-namespace language)
+
+`STATUS: LIVE`, 2026-10-01, found by a cold-implementation pass on `gobgp`.
+
+The hidden step-2 test declared `type divergenceSet struct` at package scope. A behaviourally
+correct cold implementation shipped its own test helper `func divergenceSet`. Same Go package →
+**build failure → zero tests run → reward 0** on a solution that passes all 281 required tests once
+the solver's file is moved aside.
+
+This reads as difficulty and is a false negative. Defences: give package-scope hidden-test helpers
+and types collision-resistant names (a distinctive prefix), and/or have `test.sh` remove
+solver-authored `*_test.go` in the graded package before applying the test patch. Applies to any
+language where test files share a namespace with the package under test.
+
+## Non-idempotent verifier: the server runs it twice in one tree
+
+`STATUS: LIVE`, 2026-10-01. `gobgp` passed local oracle 3/3 and failed `preflight` TIER 4b on both
+steps. The server runs verifier-at-base → `solve.sh` → verifier, in one container. The first run
+left its generated test file behind, so the second `git apply` refused and reward was 0. **Local
+oracle never runs the verifier twice, so it cannot see this.** Treat a TIER 4b FAIL as blocking.
+Fix: reverse the test patch in cleanup *after* the reward is written, and reset reward to 0 if
+cleanup fails.
+
