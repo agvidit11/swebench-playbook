@@ -19,4 +19,4 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm6971 | imbl-hashmap-version-diff | jneem/imbl | src/hash HashMap diff | I | RELEASED | 2026-10-02 | KILL: remedy sketched in upstream bodil/im-rs #110; HAMT diff recallable; step1 250-450 LOC. rangemap/petgraph crowded or disclosed |
 | devvm6971 | lane-i domain: terminal text layout | textwrap / reflow / uniseg | TBD | I | PROBING-REPO | 2026-10-02 | replacement card agent running |
 | devvm6971 | lane-i domain: java money/text | jsr354-ri / commons-text / commons-csv / joda-money | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
-| devvm6971 | lane-i domain: physical units | pint / uom / go-units / ruby-units | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
+| devvm6971 | unyt-pint-bridge-semantic-fidelity | yt-project/unyt | to_pint/from_pint + _pint_conversions.py | P | PROBING | 2026-10-02 | base 7e4f482e; 38 silent meaning swaps on export, 338/435 import raises; trap permissive helper + natural order (base-unit fallback loses unit); A4 ADJACENT (peers to_compact/histograms = exclusion zone); 23/28 MEASURE; codex-verified; pin pint 0.26.1 |
