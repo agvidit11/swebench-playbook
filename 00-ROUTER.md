@@ -569,6 +569,7 @@ mechanism.
 | `B-build/B7-local-calibration.md` | forecast, freeze, ladder. Classify every failure and read WHY before the band counts. PROVISIONAL — contradicts A3 §399 on purpose. |
 | `assets/avocado/` + `tools/avocado-brief.sh` | the four Avocado prompt templates, a computed word cap, and a lint that refuses to send drafted prose. → `B2`. |
 | `B-build/B6-review-gate.md` | run the server's own reviewers locally before pushing. The self-scored 17-axis walk is not a review. |
+| `00-LANES.md` | **START HERE to run the pipeline.** Lanes I/P/B/W, roles, contract style, idea sources, repo budget, infra-failure table, 3-machine coordination, what READY means. |
 | `reference/R11-acceptance-routes.md` | **every way a task has actually been accepted**, ours and peers'. Read before ideating. |
 | `reference/R10-step1-calibration.md` | **MT priority.** step-1 f2p floor, the bimodal band, and why instruction length is not a calibration dial. |
 | `C-drive/C8-retire.md` | park is not retire. The commit budget (accepted: median 6.5, **max 10**) and the terminal conditions. |

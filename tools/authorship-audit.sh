@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# authorship-audit.sh — did Claude write ANYTHING inside this task directory?
+# authorship-audit.sh — did Claude write instruction.md or anything under tests/?
 #
 #   ./authorship-audit.sh <task-name> [--since YYYY-MM-DD]
 #
@@ -32,11 +32,10 @@
 # clean". Measured 2026-09-30: 297 transcripts, 20 writes into a task dir, zero to
 # instruction.md -- on a file that was 100% model-written.
 #
-# SCOPE, 2026-09-29: Claude writes NOTHING inside a task directory. Codex makes every change
-# except instruction.md, which is Avocado/human only. The single carve-out is <task>/audit/**,
-# which is author-side evidence rather than task content -- reported as ALLOWED but still
-# listed, because we do not actually know the server's full scan set and an unlisted
-# exception is how the last two got through.
+# SCOPE, corrected 2026-10-02: every instruction.md is Muse-only and everything under tests/
+# is Codex/Muse-only. Claude may write solve.sh, Dockerfile, task.toml, README, CLIs, and
+# author-side audit evidence. This scan is an early warning; the server provenance report for
+# the submitted commit is authoritative.
 
 set -uo pipefail
 TASK="${1:?usage: authorship-audit.sh <task-name>}"
@@ -139,9 +138,11 @@ def outside_repo_only(text):
     return all(outside(t) for t in toks)
 
 def classify(text):
-    """audit/ is author-side evidence, not task content. Everything else is a violation."""
-    return "ALLOWED(audit)" if f"{task}/audit/" in text and "/tests/" not in text \
-                               and "/solution/" not in text else "VIOLATION"
+    """Only instruction.md and tests/** are restricted for Claude."""
+    normalized = text.replace("\\\\", "/")
+    if "/tests/" in normalized or "instruction.md" in normalized:
+        return "VIOLATION"
+    return "ALLOWED(other)"
 
 hits = []
 for p in paths:
@@ -150,7 +151,7 @@ for p in paths:
     try:
         with open(p, errors="replace") as fh:
             for ln, line in enumerate(fh, 1):
-                if task not in line or "tests/" not in line:
+                if task not in line or ("tests/" not in line and "instruction.md" not in line):
                     continue
                 try: rec = json.loads(line)
                 except Exception: continue
@@ -188,10 +189,10 @@ violations = [h for h in hits if h[4] == "VIOLATION"]
 allowed    = [h for h in hits if h[4] != "VIOLATION"]
 
 if allowed:
-    print(f"note: {len(allowed)} write(s) to <task>/audit/ — permitted carve-out, not counted\n")
+    print(f"note: {len(allowed)} write(s) to permitted task files — not counted\n")
 
 if not violations:
-    print("PASS — no Claude write inside the task directory (outside audit/).")
+    print("PASS — no Claude write to instruction.md or tests/**.")
     print()
     print("This is an EARLY WARNING, not a clearance. The server's agent write log is")
     print("authoritative and covers sessions this scan cannot see. A clean result here")
