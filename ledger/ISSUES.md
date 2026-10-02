@@ -13,3 +13,5 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-01 | devvm6971 | B | AgentInstallError, /opt/metacode/metacode missing | one trial lost | Harbor pull race; exclude + replace the trial — KNOWN
 2026-10-02 | devvm6971 | B | authorship-audit flagged /tmp review copies containing the task name | clean task blocked | anchored to repo paths (c6a1f28) — FIXED
 2026-10-02 | devvm6971 | all | team-aai guard blocks any Bash heredoc containing the text "instruction.md" | brief build blocked | write briefs with the Write tool, not heredocs — KNOWN
+2026-10-02 03:31 | devvm23237 | I | Codex card subagents flagged ordinary Lane-I repository-review briefs as possible cybersecurity risk (3/3 first attempts) | no card evidence produced; all three contexts required re-briefing | retry same card with plain maintenance language and no security framing — OPEN
+2026-10-02 03:35 | devvm23237 | I | Codex safety filter stopped two read-only card surveys before returning evidence | kustomize and open62541 Lane-I contexts lost | retry as fresh one-card contexts with neutral briefs; route integrity-shaped checks to Muse if repeated — OPEN
