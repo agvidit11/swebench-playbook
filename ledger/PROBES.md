@@ -15,3 +15,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-02 | devvm6971 | geojson-antimeridian-bbox s2 (compute_bbox) | georust/geojson | natural order loses information | 311 | 5/5 | 0 | too easy |
 | 2026-10-02 | devvm6971 | geojson-antimeridian-bbox s2b (amend: removed approach hint) | georust/geojson | natural order loses information | 329 | 5/5 | 0 | too easy → drop |
 | 2026-10-02 | devvm6971 | geojson-antimeridian-bbox s1 (collection union) | georust/geojson | natural order loses information | 240 | 5/5 | 0 | too easy; "antimeridian bbox" recalled as largest-gap |
+| 2026-10-02 | devvm6971 | config-rs-writable-layer-delta s2 (layer_between) | rust-cli/config-rs | natural order loses information | 294 | 1/5 | 3 stated (array shrink under upper index override copies upper value), 1 unstated (absent=no-opinion not restated) | IN BAND (fragile, rides on one case) → ACTIVE single-turn |
+| 2026-10-02 | devvm6971 | config-rs-writable-layer-delta s1 (changes_since) | rust-cli/config-rs | equivalence over a large domain | 302 | 5/5 | 0 | too easy → folded |
