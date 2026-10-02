@@ -26,4 +26,5 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm6971 | mime-email (domain) | apache/james-mime4j, wneessen/go-mail | RFC2231 / parse-write fidelity / EML import | I | RELEASED | 2026-10-02 | KILL x3: mime4j PR #76 discloses 2231 fix; MIME4J-112 sketches fidelity remedy; go-mail fixes <20 lines + issues; heavy AI authorship across domain |
 | devvm6971 | gitdiff-sequential-patch-combine | bluekeyes/go-gitdiff | patch compose | I | RELEASED | 2026-10-02 | KILL same-seam peer mijiang go-gitdiff-3597f72 Compose (not in /tmp/llc; found via gh search code); domain retired today |
 | devvm6971 | lane-i domain: CSS cascade inlining | css-inline / premailer / douceur | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
-| devvm6971 | lane-i domain: i18n message resolution | fluent-rs / babel / go-i18n | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
+| devvm6971 | i18n-message-resolution (domain) | fluent-rs / go-i18n | fallback on format error / per-message locale fallback / plural options | I | RELEASED | 2026-10-02 | KILL x3: fluent-rs #244 quotes cause; go-i18n #349/#30 intentional; fluent-bundle XXX + issues/PRs |
+| devvm6971 | lane-i domain: format-preserving config edits | toml_edit / goccy-go-yaml / tomlkit / configupdater | TBD | I | PROBING-REPO | 2026-10-02 | card agent running |
