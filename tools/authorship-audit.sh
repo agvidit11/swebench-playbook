@@ -123,6 +123,21 @@ PATHLIB_WRITE = re.compile(
     r"Path\(\s*['\"][^'\"]*" + re.escape(task) + r"[^'\"]*['\"]\s*\)[^\n]{0,80}?\.write_",
 )
 
+def outside_repo_only(text):
+    """True when EVERY path naming the task lives outside the task repo -- a /tmp review copy or a
+    scratch checkout. Measured 2026-10-02: reviewers working on /tmp/pairb/review/<task>/... were
+    reported as writes into the task and blocked a clean task. Anchor to the repo, not the name."""
+    # Only PATH-LIKE mentions count. A task name inside a JSON string or a log message is not a
+    # write target; counting it re-blocked the same clean task on the first fix attempt.
+    # Pull out the PATH itself, even when it is embedded in code like open('/tmp/x/<task>/f','w').
+    toks = [m for m in re.findall(r"[\w.~/-]*" + re.escape(task) + r"[\w./-]*", text) if "/" in m]
+    if not toks:
+        return False
+    def outside(t):
+        return t.startswith(("/tmp/", "/var/tmp/", "/home/agvidit/scratch/")) or \
+               ("/" in t.split(task)[0] and "swe-bench-pro" not in t.split(task)[0] and t.startswith("/"))
+    return all(outside(t) for t in toks)
+
 def classify(text):
     """audit/ is author-side evidence, not task content. Everything else is a violation."""
     return "ALLOWED(audit)" if f"{task}/audit/" in text and "/tests/" not in text \
@@ -149,7 +164,7 @@ for p in paths:
                     name = blk.get("name"); inp = blk.get("input") or {}
                     if name in WRITE_TOOLS:
                         fp = str(inp.get("file_path", ""))
-                        if task in fp:
+                        if task in fp and not outside_repo_only(fp):
                             hits.append((sess, ln, name, fp, classify(fp)))
                     elif name == "Bash":
                         cmd = str(inp.get("command", ""))
@@ -163,7 +178,7 @@ for p in paths:
                         # hide behind a comment naming the tool.
                         if re.match(r"^\s*\S*(authorship-audit|preflight)\.sh\b[^|;&]*$", cmd):
                             continue
-                        if task in cmd and (BASH_WRITE.search(cmd) or PATHLIB_WRITE.search(cmd) or copies_into_task(cmd)):
+                        if task in cmd and not outside_repo_only(cmd) and (BASH_WRITE.search(cmd) or PATHLIB_WRITE.search(cmd) or copies_into_task(cmd)):
                             one = " ".join(cmd.split())[:150]
                             hits.append((sess, ln, "Bash", one, classify(cmd)))
     except Exception as e:
