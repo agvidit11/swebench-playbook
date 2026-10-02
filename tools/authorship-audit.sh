@@ -179,7 +179,17 @@ for p in paths:
                         # hide behind a comment naming the tool.
                         if re.match(r"^\s*\S*(authorship-audit|preflight)\.sh\b[^|;&]*$", cmd):
                             continue
-                        if task in cmd and not outside_repo_only(cmd) and (BASH_WRITE.search(cmd) or PATHLIB_WRITE.search(cmd) or copies_into_task(cmd)):
+                        # Judge only the WRITE TARGET of each matched write. Heredoc bodies and log
+                        # text routinely contain relative paths naming the task; counting those
+                        # re-blocked a clean task whose only writes went to /tmp review copies.
+                        # Keep heredoc bodies: a python open(..., 'w') inside one is a real write
+                        # (ruby-auth0's contamination was exactly that). Only the TARGET of each
+                        # matched write expression is judged, never surrounding text.
+                        body = cmd
+                        targets = [m.group(0) for m in BASH_WRITE.finditer(body)] + \
+                                  [m.group(0) for m in PATHLIB_WRITE.finditer(body)]
+                        inside = [t for t in targets if not outside_repo_only(t)]
+                        if task in cmd and (inside or copies_into_task(body)):
                             one = " ".join(cmd.split())[:150]
                             hits.append((sess, ln, "Bash", one, classify(cmd)))
     except Exception as e:
