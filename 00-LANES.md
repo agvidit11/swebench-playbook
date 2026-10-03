@@ -101,8 +101,8 @@ over what step 1 built — not the same property at a second site, not a report 
 
 **Reshape moves (2026-10-02, measured on 6 cards that day):** a saturated step becomes step 1 of a 3-step
 task (the exempt slot); a 0/5 cliff step is split along its failure fault line; a saturated LAST step is
-replaced by a new different-kind operation — never left last. Non-last steps at 0.8 have passed on the
-server (kustomize, net-imap). **Probe chained, like the server:** step N impls start from a *passing*
+replaced by a new different-kind operation — never left last. A non-last step at 0.8 passes ONLY as the single exemption: 0.8 and 1.0
+both spend it (server-quoted 2026-10-03, unyt 0.8|0.8|0.6 failed). At most one step >3/5. **Probe chained, like the server:** step N impls start from a *passing*
 step N−1 tree, not from base. A single-turn merge of a 2-step card can destroy the band (config-rs:
 2-step step 2 = 1/5; merged single-turn = 0/5 ×3, bimodal). Working brief:
 `~/scratch/lane-i/MT-RESHAPE-BRIEF.md` on devvm6971.
