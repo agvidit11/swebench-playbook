@@ -62,3 +62,6 @@ Avocado — read it before choosing the next card.
   witness). Codex's own natural impl fell into it; Avocado did NOT -- 5/5 computed (lhs XOR rhs) AND scope directly.
   The contract's symptom sentence ("the first witness comes back from uninteresting space") may have helped.
 - Lesson: a falsifier written by Codex is not evidence Avocado falls into the trap (cf. fork-strength 11-for-11).
+| 2026-10-02 | devvm23237 | jsoup W3C mirror reconciliation s1+s2+s3 chained | jhy/jsoup | natural order loses information | 242/223/240 | s1 3/5, s2 5/5, s3 3/5 | s1 2 stated; s3 2 stated; 0 unstated; 0 infra in sample | IN BAND (valid 3-step: one non-final 1.0) → ACTIVE |
+| 2026-10-02 | devvm23237 | ruby-terraform option layers s3 completion | infrablocks/ruby_terraform | natural order loses information | — | s3 5/5 (n=5 valid) | 0 | saturated → RELEASED |
+| 2026-10-02 | devvm23237 | state-machines AR rollback s1+s2+s3 chained | state-machines/state_machines-activerecord | constraint fights natural edit site | 290/305/266 | 5/5, 5/5, 0/5 | s3: 5 stated, all the same inherited step-1 assertion | shape invalid + single-assertion cliff → RELEASED |
