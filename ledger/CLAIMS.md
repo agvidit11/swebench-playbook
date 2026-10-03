@@ -52,3 +52,6 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm23237 | go-playground-validator-tbd | go-playground/validator | repo survey; exact seam pending | I | CARD | 2026-10-03 13:30 | Fresh Lane-I worker; new repo; one evidence-backed MT card maximum; no task-dir writes. Evidence /tmp/lane-i-new-20261003/go-validator/ |
 | devvm23237 | yarl-tbd | aio-libs/yarl | repo survey; exact seam pending | I | CARD | 2026-10-03 13:30 | Fresh Lane-I worker; new repo; one evidence-backed MT card maximum; no task-dir writes. Evidence /tmp/lane-i-new-20261003/yarl/ |
 | devvm23237 | league-commonmark-tbd | thephpleague/commonmark | repo survey; exact seam pending | I | CARD | 2026-10-03 13:30 | Fresh Lane-I worker; new repo; one evidence-backed MT card maximum; no task-dir writes. Evidence /tmp/lane-i-new-20261003/league-commonmark/ |
+| devvm6971 | lane-i MT domain: access-control policy evaluation | casbin / ladon / action_policy | TBD | I | PROBING-REPO | 2026-10-03 | 3-step card agent running |
+| devvm6971 | lane-i MT domain: template inheritance | pongo2 / tera / minijinja / osteele-liquid | TBD | I | PROBING-REPO | 2026-10-03 | 3-step card agent running |
+| devvm6971 | lane-i MT domain: spreadsheet recalculation | formulas / pycel / IronCalc | TBD | I | PROBING-REPO | 2026-10-03 | 3-step card agent running |
