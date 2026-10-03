@@ -70,3 +70,12 @@ Avocado — read it before choosing the next card.
 | 2026-10-02 | devvm6971 | stjsonschema MT s2 Unbundle | santhosh-tekuri/jsonschema | — | — | 5/5 | 0 | exempt slot |
 | 2026-10-02 | devvm6971 | stjsonschema MT s3 Flatten (v1 error on mixed) | santhosh-tekuri/jsonschema | — | — | 4/5 | 1 stated ($ref in const) | too easy → amend |
 | 2026-10-02 | devvm6971 | stjsonschema MT s3 Flatten mixed-dialect (amend A) | santhosh-tekuri/jsonschema | equivalence over large domain | — | 3/5 rescoped (4/5 w/o contrived fixture; 0/5 full w/ uniform cliffs) | genuine: draft-07 contains/minContains, 2020-only keywords | finding realistic 2nd discriminator |
+
+## 2026-10-02 devvm6971 — go-zero pushed; three things worth reusing
+- No-abort probe: copy the task to an untracked zz-probe-* dir with steps 1..N-1 at min_reward 0.0 to measure
+  every step on all k trials from the model's own tree (the server's seeding). `--start-step N` is broken for
+  metacode (no auth minted in jump-to mode -> invalid_api_key -> fake 0/5). Delete the copy before pushing.
+- Uniform 5/5 failure on one edge happened 4 times today (default=, options=, NaN bound, header-only response);
+  each was a gotcha. Never ADD a graded test late without replaying the existing trial trees against it.
+- push-task.sh non-fast-forward with a dirty shared tree: cherry-pick into a clean `git worktree` on FETCH_HEAD
+  and push from there; then mixed-reset the local dup commit. Never rebase/autostash the shared tree.
