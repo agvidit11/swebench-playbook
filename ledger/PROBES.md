@@ -102,6 +102,9 @@ Avocado — read it before choosing the next card.
 | 2026-10-03 | devvm23237 | django 3-step FRESH full-chain local Avocado k=5 + s3 checkpoint replays (bundle d6bfd01a) | jazzband/django-model-utils | — | — | s1 5/5, s2 2/5, s3 2/2 reached; replays 5/5 + 1/5 | all stated (s2 equal-label merge; s3 to_python vs clean) | READY (s3 at upper band edge, checkpoint-conditioned) |
 | 2026-10-03 | devvm23237 | django s3 hardened grader, fresh cold 12 runs across 4 agent s2 states | jazzband/django-model-utils | permissive helper (to_python vs field.clean) + atomicity | 221 | 3/12 | stated | in band → fresh full-chain k=5 |
 | 2026-10-03 | devvm23237 | redb 3-step MT chained Muse probe | cberner/redb | constraint fights natural edit site | 188/142/123 | 5/5, 5/5, 5/5 | 0 stated; 17 infra timeouts excluded | saturated |
+| 2026-10-03 | devvm23237 | Prism relocation reshape: identity safety + unique shift recovery | ruby/prism | numeric identity too permissive / safe ambiguity rejection | — | 3/5, 1/5 | s1 two stated lazy-semantics failures; s2 four stated non-unique-counterpart rejections; 0 infra | IN BAND → ACTIVE 2-step |
+| 2026-10-03 | devvm23237 | jsoup Session structural reshape | jhy/jsoup | mutable isolation / policy-resolved adoption | — | 5/5, 5/5, 5/5 | 0 genuine; 3 infra replaced | saturated after one reshape → RELEASED |
+| 2026-10-03 | devvm23237 | AFDKO output-plan + atomic publication | adobe-type-tools/afdko | filesystem identity / failure atomicity | — | 5/5, 5/5 | 0 genuine; 6 infra excluded/replaced | saturated → one structural reshape, then RELEASE if repeated |
 | 2026-10-03 | devvm23237 | django 3-step FRESH full-chain k=5 (frozen e735fb03) | jazzband/django-model-utils | — | — | 5/5, 3/5, 0/3 | 5 stated (2 s2 equal-label merge; 3 s3 not field.clean()-authoritative) | s3 overall 3/15 with hardening runs → borderline-hard |
 
 ## 2026-10-03 devvm6971 — go-zero redesign lessons
