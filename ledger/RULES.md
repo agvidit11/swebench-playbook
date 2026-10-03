@@ -101,3 +101,5 @@ is not. Reusing step 1's output is fine; reusing it *mechanically* is not.
 | R-006 | **GATE 3 disclosure is judged by content**: kill only on a disclosed cause or remedy. Touching the same file/function is not disclosure. Never-source-from-a-PR stays absolute. | the "any merged PR touching the surface" proximity reading |
 | R-007 | **Fork ≤2 veto retired.** Fork is recorded-only (MEASURE). Branch count ≥3, confirmed by a real cold implementation failing each branch, decides. | `A3` GATE 8's reinstated absolute veto (already `S-004` here) |
 
+- 2026-10-02 (devvm23237, measured): a multi-turn card needs TWO traps from day one — one for the last step and one for an earlier step. Operations over a representation step 1 already built and graded saturate (django union 5/5, rebind 5/5; ruby-terraform s1+s2 5/5). A one-trap card is a 2-step card whose step 1 must still produce a miss (<=4/5).
+- 2026-10-02 (devvm23237, measured): probe obligations must state rules, never the edge cases the grader probes (django s2: enumerated → 5/5, rule-only → 2/5).
