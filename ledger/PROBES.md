@@ -56,3 +56,9 @@ Avocado — read it before choosing the next card.
 | 2026-10-02 | devvm6971 | configupdater MT3 (chained) | pyscaffold/configupdater | permissive helper / own reader hides damage | 345/466/356 | 5/5 / 3/5 prov / 0/5 | s3: hidden trigger (; comment line dropped) | S3 amend |
 | 2026-10-02 | devvm23237 | django grouped selection s2 = rebind(source) (on passing s1) | jazzband/django-model-utils | none named (re-resolution) | — | 5/5 | 0 | saturated middle step; union candidate stopped earlier on a Muse draft that prescribed strategy. LESSON: a middle step with no named trap saturates |
 | 2026-10-02 | devvm23237 | ruby-terraform option layers s1+s2+s3 chained | infrablocks/ruby_terraform | natural order loses information | — | s1 5/5, s2 5/5, s3 3/3 valid (n incomplete) | 0 stated; 8 infra (sandbox read-only ~/.config/muse) | completing s3 n=5 |
+
+## 2026-10-02 devvm6971 — gobgp third-step rescue measured 5/5/5
+- Step 3 'earliest disagreement within a scope' (information-losing natural order: post-filter the global first
+  witness). Codex's own natural impl fell into it; Avocado did NOT -- 5/5 computed (lhs XOR rhs) AND scope directly.
+  The contract's symptom sentence ("the first witness comes back from uninteresting space") may have helped.
+- Lesson: a falsifier written by Codex is not evidence Avocado falls into the trap (cf. fork-strength 11-for-11).
