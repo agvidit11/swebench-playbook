@@ -117,3 +117,4 @@ Avocado — read it before choosing the next card.
 - push-task.sh on a task that already exists on remote: the local commit adds files as NEW and cherry-pick conflicts.
   Build the commit in a clean worktree on FETCH_HEAD: rm -rf dir, cp the local dir, git add -A, check name-status.
 | 2026-10-03 | devvm6971 | css-inline reshape: s2 widened (all: revert-layer) / s3 keep_at_rules | Stranger6667/css-inline | — | — | 1/5 replay / 5/5 cold | s2 genuine (only impl4 handles all) | PARKED |
+| 2026-10-03 | devvm23237 | kustomize replacement validate/atomic/compose 3-step chained | kubernetes-sigs/kustomize | constraint fights edit site (s2) + helper too strict (s3) | — | 5/5, 5/5, 5/5 | 0 | saturated → RELEASED (natural-impl failures in card evidence did not transfer to Avocado once rules stated) |
