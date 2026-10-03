@@ -79,3 +79,5 @@ Avocado — read it before choosing the next card.
   each was a gotcha. Never ADD a graded test late without replaying the existing trial trees against it.
 - push-task.sh non-fast-forward with a dirty shared tree: cherry-pick into a clean `git worktree` on FETCH_HEAD
   and push from there; then mixed-reset the local dup commit. Never rebase/autostash the shared tree.
+| 2026-10-02 | devvm6971 | fsutil as carded S1/S2/S3 (chained) | tonistiigi/fsutil | natural order + permissive helper | — | 5/5, 5/5, 2/5 | S3 genuine: x** over-prune, [ab] under-prune, order shadow | two 1.0s → reshape |
+| 2026-10-02 | devvm6971 | fsutil reshape 2: merged / include pruning / exclusion pruning | tonistiigi/fsutil | natural order loses information | 249 (last) | 1.0 / 3/5 / 3/5 | all genuine | GATE-VIABLE → ACTIVE |
