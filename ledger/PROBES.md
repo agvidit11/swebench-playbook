@@ -119,3 +119,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-03 | devvm6971 | css-inline reshape: s2 widened (all: revert-layer) / s3 keep_at_rules | Stranger6667/css-inline | — | — | 1/5 replay / 5/5 cold | s2 genuine (only impl4 handles all) | PARKED |
 | 2026-10-03 | devvm23237 | kustomize replacement validate/atomic/compose 3-step chained | kubernetes-sigs/kustomize | constraint fights edit site (s2) + helper too strict (s3) | — | 5/5, 5/5, 5/5 | 0 | saturated → RELEASED (natural-impl failures in card evidence did not transfer to Avocado once rules stated) |
 | 2026-10-03 15:12 | devvm6971 | server partials | unleash 1|1 (s1,s2 both 1.0 so far → will spend exemption twice); unyt d475038 0.8|0 (s2 now 0 after widening) | — | — | — | — | — | watch for final; prep reshape |
+| 2026-10-03 | devvm23237 | connect-go prefixed mount 3-step chained | connectrpc/connect-go | constraint fights edit site + helper too permissive | — | 5/5, 5/5, 5/5 | 0 | saturated → RELEASED |
+| 2026-10-03 | devvm23237 | django 3-step SERVER validation @4d23928 | jazzband/django-model-utils | — | — | avocado 1/0.8/0; gpt 1/1/1 | — | step gate failed: s2 4/5 (local 2/5, 3/5) |
