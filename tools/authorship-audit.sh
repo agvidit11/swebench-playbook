@@ -133,7 +133,7 @@ def outside_repo_only(text):
     if not toks:
         return False
     def outside(t):
-        return t.startswith(("/tmp/", "/var/tmp/", "/home/agvidit/scratch/")) or \
+        return t.startswith(("/tmp/", "/var/tmp/", "/home/agvidit/scratch/", "~/scratch/")) or \
                ("/" in t.split(task)[0] and "swe-bench-pro" not in t.split(task)[0] and t.startswith("/"))
     return all(outside(t) for t in toks)
 
