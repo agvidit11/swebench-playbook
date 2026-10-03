@@ -121,3 +121,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-03 15:12 | devvm6971 | server partials | unleash 1|1 (s1,s2 both 1.0 so far → will spend exemption twice); unyt d475038 0.8|0 (s2 now 0 after widening) | — | — | — | — | — | watch for final; prep reshape |
 | 2026-10-03 | devvm23237 | connect-go prefixed mount 3-step chained | connectrpc/connect-go | constraint fights edit site + helper too permissive | — | 5/5, 5/5, 5/5 | 0 | saturated → RELEASED |
 | 2026-10-03 | devvm23237 | django 3-step SERVER validation @4d23928 | jazzband/django-model-utils | — | — | avocado 1/0.8/0; gpt 1/1/1 | — | step gate failed: s2 4/5 (local 2/5, 3/5) |
+| 2026-10-03 | devvm6971 | beancount MT chained | beancount/beancount | natural order + permissive balance check | — | 1/5 / 5/5 / 2/5 | s1: repeating cost unbalanced, costless holdings; s3: CIL price leaked as market price, 3.999 rounding | ACTIVE |
