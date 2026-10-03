@@ -103,3 +103,13 @@ Avocado — read it before choosing the next card.
 | 2026-10-03 | devvm23237 | django s3 hardened grader, fresh cold 12 runs across 4 agent s2 states | jazzband/django-model-utils | permissive helper (to_python vs field.clean) + atomicity | 221 | 3/12 | stated | in band → fresh full-chain k=5 |
 | 2026-10-03 | devvm23237 | redb 3-step MT chained Muse probe | cberner/redb | constraint fights natural edit site | 188/142/123 | 5/5, 5/5, 5/5 | 0 stated; 17 infra timeouts excluded | saturated |
 | 2026-10-03 | devvm23237 | django 3-step FRESH full-chain k=5 (frozen e735fb03) | jazzband/django-model-utils | — | — | 5/5, 3/5, 0/3 | 5 stated (2 s2 equal-label merge; 3 s3 not field.clean()-authoritative) | s3 overall 3/15 with hardening runs → borderline-hard |
+
+## 2026-10-03 devvm6971 — go-zero redesign lessons
+- The server read the previous version 1|0.8|1 (local 5/4/3): conservative 'any type change breaks' rules made step 3
+  trivial. Restoring the TRUE runtime rule and stating only principle + authority gave local 3|1|1 with fair misses.
+- Gotchas resurface when a brief lists them as requirements (header-only response member came back from my own
+  redesign brief). Keep a per-task 'removed gotchas' list and paste it into every Codex brief.
+- Step timeouts: 4/5 step-3 runs hit 1800s, 3/5 hit 3600s while still converging (edits + own tests to the end).
+  Timeout-driven zeros are not difficulty; raise the budget rather than count them.
+- push-task.sh on a task that already exists on remote: the local commit adds files as NEW and cherry-pick conflicts.
+  Build the commit in a clean worktree on FETCH_HEAD: rm -rf dir, cp the local dir, git add -A, check name-status.
