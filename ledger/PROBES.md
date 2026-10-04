@@ -165,3 +165,4 @@ Avocado — read it before choosing the next card.
   must say: build only; never run solver/agent trials.
 - Pattern across today's 3 witness cards (route, fieldspec, go-zero s3): construction over the repo's real
   behaviour is EASY for Avocado unless the semantics are rich and partly non-obvious-but-probeable (go-zero decoder).
+| 2026-10-03 | devvm6971 | jsonargparse shape A chained | omni-us/jsonargparse | permissive helper | — | 1/5 / 2/5 / 0/5 | s3 uniform cliff (env below config-selected +/- key) | ship 2-step (S1+S2) |
