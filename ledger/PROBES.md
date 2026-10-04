@@ -202,3 +202,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | pyhms RFC 9421 server | pyauth/http-message-signatures | — | — | server 1|1|1 = local bench 5|5|4, NOT probe 3|4|1 | — | bench is the predictor (correction) |
 | 2026-10-04 | devvm6971 | robotstxt chained cold probe (+S4) | temoto/robotstxt | — | — | 4/5, 5/5, 4-5/5, S4 4/5 | single-impl misses only | PARKED |
 | 2026-10-04 | devvm6971 | franz-go server diagnosis | twmb/franz-go | — | — | history 5|5|4 → 5|5|5 → de-scaffold 0 (all models) | s1 all fairness: unstated dedup/skip/nil, unnamed signature, empty-name contradicts Kafka | reshape: s1 fair exempt, s2/s3 own Kafka-defined difficulty |
+| 2026-10-04 | devvm23237 | oclif parsed flag-spelling provenance 3-step chained | oclif/core | parser is the authority | 248/—/— | 5/5, 0/5, 5/5 | s2: 5 stated (one shared miss); s3 none | NOT BUILD (last step saturated) → RELEASED; reuse s2 trap |
