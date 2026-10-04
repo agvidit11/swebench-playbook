@@ -176,3 +176,4 @@ Avocado — read it before choosing the next card.
 - Score for the day's witness cards (fair): route 5/5, fieldspec 4/5, inherit-schema 5/5; only go-zero decoder
   compat witness split (server 0.6). Construction over repo behaviour is easy for Avocado unless the authority has
   many interacting, non-obvious rules. Next batch: target rich-semantics authorities (strategic merge patch, etc.).
+| 2026-10-04 | devvm6971 | beancount server history | beancount/beancount | — | — | v1 1|0|NA (gpt 1|.6|1); v2 1|1|.6; v3 .6|0|NA (gpt 1|1|1) | s2 cliff on stating plugin interaction | reshape routes A+B |
