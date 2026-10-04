@@ -200,3 +200,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm23237 | i18next hierarchy cache 3-step chained | i18next/i18next | existing component is the authority (fresh LanguageUtils) | 184/181/229 | 5/5, 5/5, 5/5 | 0 | saturated → RELEASED |
 | 2026-10-04 | devvm23237 | Ecto semantic changeset merge 3-step chained | elixir-ecto/ecto | existing component is the authority (Ecto.Type.equal?, relation metadata) | 249/216/244 | 3/5, 1/5, 0/5 | stated, multiple modes per step | IN BAND (server-calibrated) → BUILD |
 | 2026-10-04 | devvm6971 | pyhms RFC 9421 server | pyauth/http-message-signatures | — | — | server 1|1|1 = local bench 5|5|4, NOT probe 3|4|1 | — | bench is the predictor (correction) |
+| 2026-10-04 | devvm6971 | robotstxt chained cold probe (+S4) | temoto/robotstxt | — | — | 4/5, 5/5, 4-5/5, S4 4/5 | single-impl misses only | PARKED |
