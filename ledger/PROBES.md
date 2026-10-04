@@ -133,3 +133,4 @@ Avocado — read it before choosing the next card.
   time. The actionable text (rubric fails + Author Feedback) is ONLY in `codimango job review <task>`.
 - go-zero: calibration passed 1|0.2|0.6 but AFR failed on one untested golden bug (response *string -> any treated
   as breaking). Coverage gaps where the oracle is conservative are graded as BAD_GRADING_WEAK + BAD_GOLDEN.
+| 2026-10-03 | devvm23237 | card3 'existing component is the authority' screen (franz-go, jsonschema, net-imap) | — | authority trap | — | NO-CARD | franz-go authority already production logic; jsonschema A4 same-seam collision + public disclosure; net-imap authority contract contrary | no card |
