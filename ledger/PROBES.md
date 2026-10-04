@@ -143,3 +143,13 @@ Avocado — read it before choosing the next card.
 | 2026-10-03 | devvm6971 | eventsourcing MT chained (+extra tests, 2 replacement last steps) | pyeventsourcing/eventsourcing | — | — | S1 5/5, S2v2 3/5, S3 5/5, alt-S3 5/5 x2 | S2 genuine (raise CompactedVersionError instead of using readable snapshot) | one last try (archive step) then park |
 | 2026-10-03 | devvm6971 | jsonargparse MT (persistent / dump_overrides+removal / layer order by selection) | omni-us/jsonargparse | permissive helper | — | 5/5 / 3/5 / 4/5 | s1 0/5 earlier = ambiguous --config clause (fixed); s3 1 genuine | last too easy → reorder (profile step last) |
 | 2026-10-03 | devvm6971 | tera K-to-N local | Keats/tera | — | — | S1 3/5, S2 5/5, S3 5/5 (7/7 indep) | S1: cross-template binding (wording unfair) + implicit params | last saturated → one bounded reshape else park |
+
+## 2026-10-03 devvm6971 — route-table-difference died 5/5/5: probe the hard step BEFORE building
+- Codex's obvious implementation (one sample per pattern) missed differences behind a shared literal; Avocado did
+  not -- it enumerated per-position literals + one fresh value, which covers every region of a small route
+  language. Third time a Codex falsifier mispredicted Avocado (gobgp x2, route). Treat falsifiers as necessary,
+  never sufficient.
+- Constructive-witness only splits solvers when the authority is RICH (go-zero decoder semantics -> server 0.6);
+  over a small language the search is easy. Prefer witness steps over rich runtime semantics.
+- Skipping Lane P cost ~1.5h. Lane P = build ONLY the candidate hard step as a zz-probe task (oracle seeds earlier
+  steps), Avocado contract, k=5, before any full build.
