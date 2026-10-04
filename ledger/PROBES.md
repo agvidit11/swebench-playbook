@@ -213,3 +213,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm23237 | oclif s3 LAY-voice re-probe (on passing s2) | oclif/core | — | lay | 5/5 | 0 | lay voice did not help: step-3 operation itself is easy → needs a new last step |
 | 2026-10-04 | devvm6971 | actix-files bench (internet on) | actix/actix-web | — | — | S1 15/15, S2 7/15 (HEAD), S3 7/8 | S2 HEAD miss via compat clause | one move-4 attempt (merged S1, new S3) |
 | 2026-10-04 | devvm6971 | jgit cold chained | eclipse-jgit/jgit | — | — | 5/5 (fair) / 5/5 / 5/5 | none | PARKED |
+| 2026-10-04 | devvm23237 | trio s3 LAY re-probe | python-trio/trio | — | lay | 5/5 (strict 4/5) | 0-1 | lay voice did not help; operation easy → new last step |
+| 2026-10-04 | devvm23237 | graphql s2 LAY re-probe | rmosolgo/graphql-ruby | — | 146 | 4/5 | 1 fair (custom directive definition omitted) | still too easy for middle step |
