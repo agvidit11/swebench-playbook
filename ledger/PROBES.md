@@ -156,3 +156,12 @@ Avocado — read it before choosing the next card.
   steps), Avocado contract, k=5, before any full build.
 | 2026-10-03 | devvm6971 | bdays MT chained (+S2 fuzz) | felipenoris/bdays | natural order + permissive helper | 340/242/225 | 5/5 / 5/5 / 5/5 | 0 | PARKED |
 | 2026-10-03 | devvm6971 | jsonargparse v3 chained (persistent / removal+subsection / profile) | omni-us/jsonargparse | permissive helper | 344/297/292 | 1/5 / 2/5 / 4/5 | s3 1 genuine (net-effect replay) | last too easy → shape A (dump basic exempt, removal+profile last) |
+
+## 2026-10-03 devvm6971 — kustomize FieldSpec witness probe: 1/5 graded, 4/5 fair -> parked
+- Lane P worked: single-step zz-probe of the last step, Avocado contract, oracle 3/3, k=5 -> answer in ~1h, no build.
+- 4/5 failures were one unstated rule (witness must carry apiVersion/kind); Avocado's contract dropped the word
+  "Kubernetes" from the obligation. Real difficulty = 1/5 misses -> too easy for a last step.
+- Codex, asked to build a probe, went on to run sequential `muse exec` solver trials itself (90-min caps). Briefs
+  must say: build only; never run solver/agent trials.
+- Pattern across today's 3 witness cards (route, fieldspec, go-zero s3): construction over the repo's real
+  behaviour is EASY for Avocado unless the semantics are rich and partly non-obvious-but-probeable (go-zero decoder).
