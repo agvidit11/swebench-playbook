@@ -127,6 +127,7 @@ Avocado — read it before choosing the next card.
 | 2026-10-03 | devvm6971 | cancancan reshape 3 (accessible_by Range/nil S3) + single-turn fallback | CanCanCommunity/cancancan | — | 336 (ST) | S3 vacuous (9/9 at seed); ST 3/5 | ST genuine: exclusive Range end, nil in Array, attribute cases | DOWNGRADE → single-turn build |
 | 2026-10-03 | devvm23237 | django rewrite: Muse s1 re-author + 2nd s2 branch (same label object reused by two group occurrences), fresh full-chain k=5 | jazzband/django-model-utils | — | — | s1 5/5, s2 0/5 (all fail only the new test), s3 unreached | 5 stated (single assertion) | single-branch cliff + fairness risk → awaiting Vidit (recommend drop new test, keep s1 rewrite) |
 | 2026-10-03 | devvm23237 | crossplane hardened (2 stated fatal-response rules, Muse re-author, frozen graders) fresh k=5 | crossplane/crossplane | — | — | 5/5 | 0 | still too easy → awaiting Vidit (multi-step conversion vs park) |
+| 2026-10-03 | devvm23237 | Prism frozen final bundle cross-model k=5 | ruby/prism | semantic identity / unique recovery | — | — | Avocado 5/5,0/5; Claude Opus 1/5,0/5; cold Codex 5/5,5/5 | final-step semantic miss genuine; reviewer found uniqueness-precedence ambiguity and stale step1 grader residue | Agentic review REVISE 0C/0H/5M; clarify contract/test hygiene then fresh rerun |
 
 ## 2026-10-03 devvm6971 — read the Agentic Full-Task Review with `codimango job review <task>`
 - `task errors` only says "Agentic full-task review: BAD_GRADING_WEAK"; the TBR bot comment can say PASS at the same
