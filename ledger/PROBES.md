@@ -206,3 +206,7 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | franz-go reshape benches | twmb/franz-go | — | — | bench2 5|5|4, bench3 3|3/3|2/2 (+replay harder cases still pass) | avocado webfetches Kafka source | PARKED |
 | 2026-10-04 | devvm23237 | trio lossless close failures 3-step chained | python-trio/trio | BaseExceptionGroup/CancelScope authority | — | 5/5, 1/5, 5/5 | s2: 2 independent stated modes | last step saturated → single-turn s1+s2 fallback |
 | 2026-10-04 | devvm23237 | graphql-ruby profile-aware export 3-step chained | rmosolgo/graphql-ruby | Visibility::Profile authority | — | 5/5, 5/5, 2/5 | s3 stated | middle saturated → single-turn fallback |
+
+## 2026-10-04 devvm6971 — contract-style experiment on merge3 (same tests, two contracts)
+- Case-listing contract: 5/5. Principle + authority only: 4/5 (one broad incomplete impl). Style matters a little;
+  the semantics decide. The in-band go-zero step 2 combines BOTH: principle-only AND a rich decoder.
