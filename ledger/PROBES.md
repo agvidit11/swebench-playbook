@@ -196,3 +196,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | jsonpath cycle X: S2d issue-level / S3x document-free | jg-rp/python-jsonpath | permissive helper | 223/178 | S2d 1/5, S3x 0/5 (grader unsound) | S2d genuine §4.6 test equality | single-turn apply+S2d |
 | 2026-10-04 | devvm6971 | pyhms RFC 9421 shape R | pyauth/http-message-signatures | spec authority | — | probe 3/5|4/5|1/5; local bench (internet on) 5/5|5/5|4/5 | bench reads RFC | push for server after reviewers |
 | 2026-10-04 | devvm6971 | dropshot single-turn | oxidecomputer/dropshot | — | 319 | 0/5 | all reject alpha,,beta (wording-sensitive: 1/4, 3/5, 5/5) | one more ST with S3b wording |
+| 2026-10-04 | devvm6971 | jsonpath single-turn (apply + to_merge_patch S2d) | jg-rp/python-jsonpath | — | 262 | 0/5 | all §4.6 test equality | PARKED |
