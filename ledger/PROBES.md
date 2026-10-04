@@ -187,3 +187,4 @@ Avocado — read it before choosing the next card.
   specify vocabulary construction and visit order, i.e. the brute-force procedure, which runs in 0.6s.
 - Rule: a witness/counterexample step whose completeness can only be graded inside a stated finite space is
   mechanical by construction. Check this at card time (time the naive enumeration) before any probe.
+| 2026-10-04 | devvm6971 | rfc3986 3-step new S3 (legacy charset → URI §3.1) | python-hyper/rfc3986 | spec authority | — | 0/5 (v1), 0/5 (v2) | genuine: no NFC for legacy input / NFC applied to Unicode input | PARKED |
