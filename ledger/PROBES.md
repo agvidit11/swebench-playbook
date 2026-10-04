@@ -168,3 +168,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-03 | devvm6971 | jsonargparse shape A chained | omni-us/jsonargparse | permissive helper | — | 1/5 / 2/5 / 0/5 | s3 uniform cliff (env below config-selected +/- key) | ship 2-step (S1+S2) |
 | 2026-10-03 | devvm6971 | tera reshape R chained | Keats/tera | — | — | R1 2/5, R2 v1 5/5 / v2 4/5, R3 v2 5/5 | R2 genuine super()-reached set; R3 saturates once @ params named | PARKED |
 | 2026-10-04 | devvm6971 | rfc3986 MT chained (+fuzz, fallback S3) | python-hyper/rfc3986 | permissive helper / spec authority | — | S1 4/5, S2 3/5 (after §4.1 authority amend; 0/5 before), S3 5/5 (6390-pair fuzz agrees), S3' 5/5 fair | S2 genuine §4.1 bidi | MT no; single-turn fallback probe |
+| 2026-10-04 | devvm6971 | rfc3986 single-turn (normalize + to_iri) | python-hyper/rfc3986 | spec authority | 248 | 0/5 | all miss §4.1 (MT chain S2 was 3/5 with same wording) | PARKED — evidence MT > ST |
