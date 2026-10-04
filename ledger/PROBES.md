@@ -154,3 +154,4 @@ Avocado — read it before choosing the next card.
   over a small language the search is easy. Prefer witness steps over rich runtime semantics.
 - Skipping Lane P cost ~1.5h. Lane P = build ONLY the candidate hard step as a zz-probe task (oracle seeds earlier
   steps), Avocado contract, k=5, before any full build.
+| 2026-10-03 | devvm6971 | bdays MT chained (+S2 fuzz) | felipenoris/bdays | natural order + permissive helper | 340/242/225 | 5/5 / 5/5 / 5/5 | 0 | PARKED |
