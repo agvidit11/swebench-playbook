@@ -191,3 +191,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | jsonpath merge-patch chained | jg-rp/python-jsonpath | permissive helper | — | S1 5/5; S2 v1 4/5, v2b 0/5, v2c 5/5 (cliff on naming §4.6); S3 5/5 x2 | S2 genuine test-op equality | levers: issue-level S2 + document-free S3 |
 | 2026-10-04 | devvm6971 | jsonargparse shape B S3 (removal+subsection, no env cliff) | omni-us/jsonargparse | — | — | 4/4 | 0 | saturated; try S3 with env cliff + third-party (codex) check |
 | 2026-10-04 | devvm6971 | jsonargparse S3 + env case, third-party check | omni-us/jsonargparse | — | — | avocado 0/5, codex 5/5 | avocado: +/- applied over default not env | PARKED |
+| 2026-10-04 | devvm6971 | dropshot-websocket phase-2 probes | oxidecomputer/dropshot | — | — | S2 5/5, S2b 5/5; S3 0/4, S3b 0/5 (uniqueness cliff); validity subset 2/5; codex S3 1/2 | partial-list trap explained S1 0/10 | try macro-declaration middle, validity last |
