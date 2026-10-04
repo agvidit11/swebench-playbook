@@ -188,3 +188,4 @@ Avocado — read it before choosing the next card.
 - Rule: a witness/counterexample step whose completeness can only be graded inside a stated finite space is
   mechanical by construction. Check this at card time (time the naive enumeration) before any probe.
 | 2026-10-04 | devvm6971 | rfc3986 3-step new S3 (legacy charset → URI §3.1) | python-hyper/rfc3986 | spec authority | — | 0/5 (v1), 0/5 (v2) | genuine: no NFC for legacy input / NFC applied to Unicode input | PARKED |
+| 2026-10-04 | devvm6971 | jsonpath merge-patch chained | jg-rp/python-jsonpath | permissive helper | — | S1 5/5; S2 v1 4/5, v2b 0/5, v2c 5/5 (cliff on naming §4.6); S3 5/5 x2 | S2 genuine test-op equality | levers: issue-level S2 + document-free S3 |
