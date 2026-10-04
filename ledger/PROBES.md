@@ -135,3 +135,4 @@ Avocado — read it before choosing the next card.
 - go-zero: calibration passed 1|0.2|0.6 but AFR failed on one untested golden bug (response *string -> any treated
   as breaking). Coverage gaps where the oracle is conservative are graded as BAD_GRADING_WEAK + BAD_GOLDEN.
 | 2026-10-03 | devvm23237 | card3 'existing component is the authority' screen (franz-go, jsonschema, net-imap) | — | authority trap | — | NO-CARD | franz-go authority already production logic; jsonschema A4 same-seam collision + public disclosure; net-imap authority contract contrary | no card |
+| 2026-10-03 | devvm6971 | eventsourcing MT chained (+extra tests, 2 replacement last steps) | pyeventsourcing/eventsourcing | — | — | S1 5/5, S2v2 3/5, S3 5/5, alt-S3 5/5 x2 | S2 genuine (raise CompactedVersionError instead of using readable snapshot) | one last try (archive step) then park |
