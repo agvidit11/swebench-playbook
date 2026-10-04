@@ -192,3 +192,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | jsonargparse shape B S3 (removal+subsection, no env cliff) | omni-us/jsonargparse | — | — | 4/4 | 0 | saturated; try S3 with env cliff + third-party (codex) check |
 | 2026-10-04 | devvm6971 | jsonargparse S3 + env case, third-party check | omni-us/jsonargparse | — | — | avocado 0/5, codex 5/5 | avocado: +/- applied over default not env | PARKED |
 | 2026-10-04 | devvm6971 | dropshot-websocket phase-2 probes | oxidecomputer/dropshot | — | — | S2 5/5, S2b 5/5; S3 0/4, S3b 0/5 (uniqueness cliff); validity subset 2/5; codex S3 1/2 | partial-list trap explained S1 0/10 | try macro-declaration middle, validity last |
+| 2026-10-04 | devvm6971 | dropshot M2 (#[channel] decl) / V2 variant | oxidecomputer/dropshot | — | — | 5/5 / 5/5 | 0 | only one non-cliff weak spot (empty-element leniency ~2/5) → single-turn fallback |
