@@ -36,7 +36,16 @@ Claude rates every card and every build against **one sheet fixed before the fir
 (`.e2e/pair-b/RATING-SHEET.md` is the template: premise, seam novelty, branches, statability, cascade,
 grading integrity, calibration). Same sheet all day, so scores are comparable across lanes and machines.
 
-## 2. How a contract is written — the rule that changes ideation
+## 2. How a contract is written
+
+> **R-008 (Vidit, 2026-10-04) — NON-TECHNICAL USER VOICE, NEVER OVER-SPECIFIED.** Write the contract as a user who
+> is not technically proficient and only says what is wrong and what they want. Name the one entry point (exact
+> signature) and the existing authority; nothing else technical unless a user would say it. Do the over-specification
+> check (reread as the user; delete enumerated cases, output-shape minutiae, internal ordering, how-to-avoid-a-mistake
+> sentences) EVERY time a contract is authored or re-authored, and FIRST whenever a harness/validation fails or a
+> review is raised. Muse receives this rule through assets/avocado/_INVARIANTS.txt on every avocado-brief.sh call.
+> Measured: spec-like contracts saturated ~20 cards; rule-only/lay contracts moved django 5/5→2/5→1/5 (server).
+ — the rule that changes ideation
 
 **The contract is a user describing a problem and the outcome they want. It never prescribes the
 method.** The solver decides the algorithm, the data structures, how the code is split, and how well it

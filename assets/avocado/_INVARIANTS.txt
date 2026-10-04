@@ -10,16 +10,21 @@ any other path. The repository is available for inspection; read it before you w
 
 Hard limit: do not exceed {WORDCAP} words. Length is itself a grading risk on this benchmark.
 
-State observable outcomes precisely. Do not reveal implementation strategy, name private
-helpers, describe storage layout, or narrate edit history. Mention only behaviour that is
-reachable and testable from outside.
+Write it the way a NON-TECHNICAL user would: say what is going wrong for them and what they want to
+happen, in plain words. Do NOT write a specification. Do not enumerate rules, corner cases, return-shape
+details, error-precedence policies or lifecycle tables unless an ordinary user would naturally say them.
+The reader is expected to work out the precise behaviour from the user's goal and from how this
+repository's existing components already behave (name the existing component that is the authority
+when it matters).
 
-Exact public API names, signatures, return shapes, exception types and observable state
-transitions ARE contract details and belong in the text. The boundary is between WHAT is
-observable and HOW it is achieved, not between named and unnamed.
+Do name the one public entry point the user will call, with its exact name and signature, so the work
+can be checked. Do not reveal implementation strategy, name private helpers, describe storage layout,
+or narrate edit history.
 
-Where two validation conditions can both apply, say which one wins. Distinguish lifecycle
-states only where their observable behaviour differs.
+OVER-SPECIFICATION CHECK before you finish: reread your text as the user. Delete any sentence that
+lists cases, prescribes an ordering of internal work, spells out an exact output shape the user would
+not care about, or tells the reader how to avoid a mistake. Keep only the problem, the desired outcome,
+the entry point, genuine constraints, and the authority.
 
 Do not manufacture behaviour to reach a quota. Every requirement must have independent
 maintainer value visible in this repository.
