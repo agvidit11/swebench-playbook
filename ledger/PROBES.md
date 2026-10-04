@@ -181,3 +181,9 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | rfc3986 2-step (S2 = §4.1 only) | python-hyper/rfc3986 | spec authority | — | S2 5/5 | — | sole-ask saturates; §4.1 splits only embedded (3/5) → try 3-step with new S3 IRI→URI |
 | 2026-10-04 | devvm6971 | beancount replay on server trees (routes A+B) | beancount/beancount | — | — | s1 new exactness tests: v2 5→4/5, v3 3→1/5; s3 new cases: gpt 5→3/5, avocado unchanged | genuine residues / phantom share / decimal crash | install both, no s1 re-author |
 | 2026-10-04 | devvm6971 | jsonargparse 2-step local k5 | omni-us/jsonargparse | — | — | S1 5/5 (probe 1/5), S2 ~1-3/5 | S2 genuine subcommand-reproduce + borderline env-config case | → 3-step: S1 exempt, S2 dump, S3 removal+subsection (v3 2/5) |
+
+## 2026-10-04 devvm6971 — SPARQL counterexample card killed before probe: fair contract = the algorithm
+- Grading "no counterexample" fairly requires stating the finite search space; Codex's fair obligations then had to
+  specify vocabulary construction and visit order, i.e. the brute-force procedure, which runs in 0.6s.
+- Rule: a witness/counterexample step whose completeness can only be graded inside a stated finite space is
+  mechanical by construction. Check this at card time (time the naive enumeration) before any probe.
