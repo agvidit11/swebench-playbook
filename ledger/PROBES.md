@@ -194,3 +194,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | dropshot-websocket phase-2 probes | oxidecomputer/dropshot | — | — | S2 5/5, S2b 5/5; S3 0/4, S3b 0/5 (uniqueness cliff); validity subset 2/5; codex S3 1/2 | partial-list trap explained S1 0/10 | try macro-declaration middle, validity last |
 | 2026-10-04 | devvm6971 | dropshot M2 (#[channel] decl) / V2 variant | oxidecomputer/dropshot | — | — | 5/5 / 5/5 | 0 | only one non-cliff weak spot (empty-element leniency ~2/5) → single-turn fallback |
 | 2026-10-04 | devvm6971 | jsonpath cycle X: S2d issue-level / S3x document-free | jg-rp/python-jsonpath | permissive helper | 223/178 | S2d 1/5, S3x 0/5 (grader unsound) | S2d genuine §4.6 test equality | single-turn apply+S2d |
+| 2026-10-04 | devvm6971 | pyhms RFC 9421 shape R | pyauth/http-message-signatures | spec authority | — | probe 3/5|4/5|1/5; local bench (internet on) 5/5|5/5|4/5 | bench reads RFC | push for server after reviewers |
