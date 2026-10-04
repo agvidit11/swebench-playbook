@@ -215,3 +215,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | jgit cold chained | eclipse-jgit/jgit | — | — | 5/5 (fair) / 5/5 / 5/5 | none | PARKED |
 | 2026-10-04 | devvm23237 | trio s3 LAY re-probe | python-trio/trio | — | lay | 5/5 (strict 4/5) | 0-1 | lay voice did not help; operation easy → new last step |
 | 2026-10-04 | devvm23237 | graphql s2 LAY re-probe | rmosolgo/graphql-ruby | — | 146 | 4/5 | 1 fair (custom directive definition omitted) | still too easy for middle step |
+| 2026-10-04 | devvm23237 | trio new s3 aclose_forcefully on StapledStream | python-trio/trio | StapledStream close authority | — | 5/5 | 0 | saturated (4th s3 design) → 2-step pivot |
