@@ -79,5 +79,6 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm23237 | card4-authority-1 | concourse, chromem-go, + 1 | authority-trap screen | I | RELEASED | 2026-10-04 | NO-CARD: concourse VarSourceConfigs A4 peer + disclosed; chromem-go same-upstream peers; see ~/scratch/lane-pb/workers/card4-authority-1/result.md |
 | devvm23237 | card4-authority-2 | webauthn-ruby, jsoup, RustCrypto/formats | authority-trap screen | I | RELEASED | 2026-10-04 | NO-CARD: webauthn backup flags prior tasks; jsoup destination parser hollow; formats issuer resolution A4 X.509 chain task; ~/scratch/lane-pb/workers/card4-authority-2/result.md |
 | devvm6971 | dropshot-websocket-subprotocol-negotiation | oxidecomputer/dropshot | MT2: negotiate subprotocol / declare subprotocols in OpenAPI | B | ACTIVE | 2026-10-04 | server 697fe40: avocado 0|NA, gpt 1|1 (no gradient); diagnosis now, rebuild after beancount (Vidit) |
-| devvm23237 | card5-1 (tbd) | tbd (Source A shape port) | authority card | I | CARD-PENDING | 2026-10-04 | overnight refresh |
-| devvm23237 | card5-2 (tbd) | tbd (new ecosystems) | authority card | I | CARD-PENDING | 2026-10-04 | overnight refresh |
+| devvm23237 | card5-1 | quick-xml, dry-schema, go-containerregistry | Source-A shape port | I | RELEASED | 2026-10-04 | NO-CARD: quick-xml + dry-schema A4 collisions; go-containerregistry authority disclosed (#2410/#2411) |
+| devvm23237 | card5-2 | — | new-ecosystem screen | I | RELEASED | 2026-10-04 | infra: Codex cyber filter stopped the worker (not a repo verdict) |
+| devvm23237 | seeds6-1 / seeds6-2 | shortlists (Py/Go/TS; Rust/Ruby/Java/Kotlin/Elixir) | authority seeds | I | CARD-PENDING | 2026-10-04 | overnight: up to 5 A4-first vetted seeds each |
