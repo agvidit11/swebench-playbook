@@ -87,3 +87,5 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm23237 | seed backlog (seeds6-2) | ecto / gson / tracing / graphql-ruby / commons-compress | authority seeds (5 vetted) | I | CARD | 2026-10-04 | ~/scratch/lane-pb/workers/seeds6-2/seeds.md |
 | devvm23237 | ecto-semantic-changeset-merge | elixir-ecto/ecto | changeset merge via Ecto.Type.equal? authority | P | PROBING | 2026-10-04 | seed (CLEAR A4); two-phase probe lane-pb probe-ecto; obligations approved (1 edit) → phase B |
 | devvm23237 | i18next-option-coherent-language-hierarchy-cache | i18next/i18next | LanguageUtils authority vs memoized cache | P | PROBING | 2026-10-04 | seed #2 (seeds6-1); two-phase probe lane-pb probe-i18next |
+| devvm6971 | lane-i MT domain: robots.txt RFC 9309 | protego / robotstxt / texting_robots | TBD | I | PROBING-REPO | 2026-10-04 | 3-step spec card agent |
+| devvm6971 | lane-i MT domain: cookie storage RFC 6265bis | cookie_store / http-cookie | TBD | I | PROBING-REPO | 2026-10-04 | 3-step spec card agent |
