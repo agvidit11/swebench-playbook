@@ -77,3 +77,4 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm6971 | sparql-query-difference-witness (Lane P probe) | ruby-rdf/sparql | lib/sparql/algebra result semantics / query difference / counterexample repository | P | PROBING | 2026-10-04 01:50 | card ~/scratch/lane-i/cards-1004/; backups: kustomize merge3 conflict reporting, kyaml patch equivalence |
 | devvm23237 | card4-authority-1 (tbd) | tbd (Python/Go reuse repo) | authority-trap card | I | CARD-PENDING | 2026-10-04 | overnight lane-pb card worker |
 | devvm23237 | card4-authority-2 (tbd) | tbd (Ruby/Rust/Java reuse repo) | authority-trap card | I | CARD-PENDING | 2026-10-04 | overnight lane-pb card worker |
+| devvm6971 | dropshot-websocket-subprotocol-negotiation | oxidecomputer/dropshot | MT2: negotiate subprotocol / declare subprotocols in OpenAPI | B | ACTIVE | 2026-10-04 | server 697fe40: avocado 0|NA, gpt 1|1 (no gradient); diagnosis now, rebuild after beancount (Vidit) |
