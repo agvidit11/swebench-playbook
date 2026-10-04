@@ -105,7 +105,9 @@ replaced by a new different-kind operation — never left last. A non-last step 
 both spend it (server-quoted 2026-10-03, unyt 0.8|0.8|0.6 failed). At most one step >3/5. **Probe chained, like the server:** step N impls start from a *passing*
 step N−1 tree, not from base. A single-turn merge of a 2-step card can destroy the band (config-rs:
 2-step step 2 = 1/5; merged single-turn = 0/5 ×3, bimodal). Working brief:
-`~/scratch/lane-i/MT-RESHAPE-BRIEF.md` on devvm6971.
+`~/scratch/lane-i/MT-RESHAPE-BRIEF.md` on devvm6971 (its "WHAT PRODUCED SERVER PASSES" section lists the 6 moves behind
+the 2026-10-04 passes: server-tree calibration, one exempt absorber, split along measured fault lines, distinct
+difficulty per step, issue-level contracts, cliff-step as the exempt step).
 
 ## 4. Repo budget
 
