@@ -93,4 +93,4 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm23237 | oclif-parsed-flag-spelling-provenance | oclif/core | parser provenance authority vs raw argv scan | P | PROBING | 2026-10-04 | seed (seeds6-1 #3); lane-pb probe-oclif; obligations approved (3 edits) → phase B |
 | devvm23237 | tracing-reload-state-reconciliation | tokio-rs/tracing | callsite interest cache authority vs reload lock value | P | RELEASED | 2026-10-04 | seed (seeds6-2 #3); lane-pb probe-tracing; infra: cyber filter stopped phase A |
 | devvm6971 | lane-i MT domain: HTTP range requests RFC 9110 §14 | http-range-header / rack / starlette | TBD | I | PROBING-REPO | 2026-10-04 | 3-step spec card agent |
-| devvm6971 | lane-i MT domain: content negotiation RFC 9110 §12 | contenttype / fluent-langneg / mimeparse | TBD | I | PROBING-REPO | 2026-10-04 | 3-step spec card agent |
+| devvm6971 | actix-web-proactive-negotiation-rfc9110 | actix/actix-web | Accept-Encoding / Accept / Accept-Language negotiate | I | RELEASED | 2026-10-04 | not built: steps independent (P5=1, no cascade), RFC 4647 lookup recallable, active maintainer RFC sweep in actix-http |
