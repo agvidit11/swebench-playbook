@@ -211,3 +211,4 @@ Avocado — read it before choosing the next card.
 - Case-listing contract: 5/5. Principle + authority only: 4/5 (one broad incomplete impl). Style matters a little;
   the semantics decide. The in-band go-zero step 2 combines BOTH: principle-only AND a rich decoder.
 | 2026-10-04 | devvm23237 | oclif s3 LAY-voice re-probe (on passing s2) | oclif/core | — | lay | 5/5 | 0 | lay voice did not help: step-3 operation itself is easy → needs a new last step |
+| 2026-10-04 | devvm6971 | actix-files bench (internet on) | actix/actix-web | — | — | S1 15/15, S2 7/15 (HEAD), S3 7/8 | S2 HEAD miss via compat clause | one move-4 attempt (merged S1, new S3) |
