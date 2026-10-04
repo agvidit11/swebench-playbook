@@ -179,3 +179,4 @@ Avocado — read it before choosing the next card.
   many interacting, non-obvious rules. Next batch: target rich-semantics authorities (strategic merge patch, etc.).
 | 2026-10-04 | devvm6971 | beancount server history | beancount/beancount | — | — | v1 1|0|NA (gpt 1|.6|1); v2 1|1|.6; v3 .6|0|NA (gpt 1|1|1) | s2 cliff on stating plugin interaction | reshape routes A+B |
 | 2026-10-04 | devvm6971 | rfc3986 2-step (S2 = §4.1 only) | python-hyper/rfc3986 | spec authority | — | S2 5/5 | — | sole-ask saturates; §4.1 splits only embedded (3/5) → try 3-step with new S3 IRI→URI |
+| 2026-10-04 | devvm6971 | beancount replay on server trees (routes A+B) | beancount/beancount | — | — | s1 new exactness tests: v2 5→4/5, v3 3→1/5; s3 new cases: gpt 5→3/5, avocado unchanged | genuine residues / phantom share / decimal crash | install both, no s1 re-author |
