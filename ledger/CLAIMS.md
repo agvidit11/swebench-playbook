@@ -84,3 +84,5 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm23237 | seeds6-1 / seeds6-2 | shortlists (Py/Go/TS; Rust/Ruby/Java/Kotlin/Elixir) | authority seeds | I | CARD-PENDING | 2026-10-04 | overnight: up to 5 A4-first vetted seeds each |
 | devvm23237 | seed backlog (seeds6-1) | certmagic / i18next / oclif-core / trio | authority seeds (5 vetted, A4 first, base repros) | I | CARD | 2026-10-04 | morning backlog: ~/scratch/lane-pb/workers/seeds6-1/seeds.md |
 | devvm23237 | certmagic-restorative-storage-transactions | caddyserver/certmagic | storage.go storeTx + Storage/Locker authority | P | PROBING | 2026-10-04 | seed #1 from seeds6-1; two-phase probe lane-pb probe-certmagic |
+| devvm23237 | seed backlog (seeds6-2) | ecto / gson / tracing / graphql-ruby / commons-compress | authority seeds (5 vetted) | I | CARD | 2026-10-04 | ~/scratch/lane-pb/workers/seeds6-2/seeds.md |
+| devvm23237 | ecto-semantic-changeset-merge | elixir-ecto/ecto | changeset merge via Ecto.Type.equal? authority | P | PROBING | 2026-10-04 | seed (CLEAR A4); two-phase probe lane-pb probe-ecto |
