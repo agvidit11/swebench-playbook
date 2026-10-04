@@ -166,3 +166,4 @@ Avocado — read it before choosing the next card.
 - Pattern across today's 3 witness cards (route, fieldspec, go-zero s3): construction over the repo's real
   behaviour is EASY for Avocado unless the semantics are rich and partly non-obvious-but-probeable (go-zero decoder).
 | 2026-10-03 | devvm6971 | jsonargparse shape A chained | omni-us/jsonargparse | permissive helper | — | 1/5 / 2/5 / 0/5 | s3 uniform cliff (env below config-selected +/- key) | ship 2-step (S1+S2) |
+| 2026-10-03 | devvm6971 | tera reshape R chained | Keats/tera | — | — | R1 2/5, R2 v1 5/5 / v2 4/5, R3 v2 5/5 | R2 genuine super()-reached set; R3 saturates once @ params named | PARKED |
