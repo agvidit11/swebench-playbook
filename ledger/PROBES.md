@@ -230,3 +230,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm23237 | trio-split | Muse impls | 5/5, 2/5, 5/5 | final step saturates → retired |
 | 2026-10-04 | devvm23237 | typesetting-amend | continuation metacode k=5 | 5/5, 0/5, — | S2 single-mode cliff → wording-only remeasure |
 | 2026-10-04 | devvm6971 | actix-files final reshape bench r3 | actix/actix-web | — | — | 5/5 / 5/5 / 5/5 | none | PARKED |
+| 2026-10-04 | devvm23237 | typesetting-amend-w | continuation metacode k=5 | 5/5, 0/5, — | released |
+| 2026-10-04 | devvm23237 | pendulum | continuation metacode k=5 | 5/5, 0/5, — | S2 fold-collapse cliff → one wording amend |
