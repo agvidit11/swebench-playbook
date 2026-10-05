@@ -256,3 +256,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | picocli detached parse overlay amend | server-faithful K-to-N metacode k=5 | raw 5/5, 2/5, 3/5; effective S2 5/5 | three S2 false negatives rely on unstated converter-count/root-identity checks; one S3 verifier pass retains regression; independent review REVISE, sole amend consumed; RELEASED |
 | 2026-10-05 | devvm23237 | deno_graph | K-to-N metacode k=5 | 5/5, 5/5, 5/5 | released |
 | 2026-10-05 | devvm23237 | open-feature | K-to-N metacode k=5 | 5/5, 5/5, — | released (S2 stop) |
+| 2026-10-05 | devvm23237 | rope | K-to-N metacode k=5 (4-5 distinct seeds) | 4/5, 5/5, 2/5 | S1+S2 both >3 → amend (merge), S3 in band |
