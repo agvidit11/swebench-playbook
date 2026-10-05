@@ -232,3 +232,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm6971 | actix-files final reshape bench r3 | actix/actix-web | — | — | 5/5 / 5/5 / 5/5 | none | PARKED |
 | 2026-10-04 | devvm23237 | typesetting-amend-w | continuation metacode k=5 | 5/5, 0/5, — | released |
 | 2026-10-04 | devvm23237 | pendulum | continuation metacode k=5 | 5/5, 0/5, — | S2 fold-collapse cliff → one wording amend |
+| 2026-10-05 | devvm6971 | lektor bench3 (pile stated) | lektor/lektor | — | 246 (S3) | 5/5 / 4/5 / 4/4 | S2 attachment old-URL; pile 0/8 unstated → 4/4 stated | PARKED (revival path noted) |
