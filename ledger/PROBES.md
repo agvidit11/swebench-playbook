@@ -262,3 +262,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | pendulum-salvage | K-to-N metacode k=5 | 5/5, 2/5, 2/5 | IN BAND → build |
 | 2026-10-05 | devvm6971 | isogit stash bench | isomorphic-git | — | 239/232/189 | 3/5 / 3/3 / 3/3 | S1 symlink only split; S2/S3 no web, saturated | PARKED |
 | 2026-10-05 | devvm23237 | sequelize-journal | K-to-N metacode k=5 | 1/5 raw (fair 5/5), 5/5, 2/5 raw (grader FN) | released (S2 saturates) |
+| 2026-10-05 | devvm23237 | rope-amend | K-to-N metacode k=5 | step2 (old S3 byte-identical) 5/5 | released — same contract went 2/5 → 5/5 across runs |
