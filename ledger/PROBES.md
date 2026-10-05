@@ -265,3 +265,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | rope-amend | K-to-N metacode k=5 | step2 (old S3 byte-identical) 5/5 | released — same contract went 2/5 → 5/5 across runs |
 | 2026-10-05 | devvm23237 | plotnine | K-to-N metacode | 5/5, 4/4, — | released |
 | 2026-10-05 | devvm23237 | yjs | K-to-N metacode | 5/5, 0/5 (one mode: no transaction origin), — | wording amend |
+| 2026-10-05 | devvm23237 | pendulum (frozen bundle) | K-to-N metacode k=5 x2 | 10/10, 3/10, 6/10 | READY; S3 at-risk 3/5 |
