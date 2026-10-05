@@ -268,3 +268,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | pendulum (frozen bundle) | K-to-N metacode k=5 x2 | 10/10, 3/10, 6/10 | READY; S3 at-risk 3/5 |
 
 | 2026-10-05 | devvm6971 | commons-vfs tree snapshot/delta/publish | apache/commons-vfs | live handles + blind copy-back | 316/371/339 | chained K-to-N mc2.sh: Muse 3/5, 5/5, 5/5 (S3 raw 4/5, 1 grader FN); Codex 5/5, 5/5, 5/5 | S1 2 stated (stale VFS child cache on re-capture); S2/S3 0 genuine; naive S2 13/13 | saturated -> RELEASED, no amend (single Muse-only mode in S1) |
+| 2026-10-05 | devvm23237 | yjs-amend | K-to-N metacode k=5 | 5/5, 5/5, 5/5 | released (wording flip 0→5) |
