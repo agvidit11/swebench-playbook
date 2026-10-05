@@ -53,6 +53,7 @@ RULE-<nnn> | <LIVE | SUPERSEDED-BY RULE-<nnn> | SCOPED-TO <case>> | <file it liv
 | R-022 | LIVE | `00-LANES` §5 Phase B | jsoup last step: probe grader 4/5 vs full-breadth frozen grader failing 6 assertions | trust a saturation verdict only on a full-breadth grader (every contract sentence reverse-traced) — thin probe graders over-report passes |
 | R-023 | LIVE | `00-LANES` §5 Phase B / §8 | sequelize 2026-10-05: S1 1/5 raw was 4 grader false negatives; S3 3 zeros from an unstated TS constructor check | before any bench run, grade 2-3 cold Codex implementations per step written from the contract alone; any contract-meeting implementation that fails an assertion means the assertion is too narrow or unstated — fix it before measuring |
 | R-024 | LIVE | `00-LANES` §5 reshape moves | rope 2026-10-05: byte-identical step measured 2/5 seeded from old-S2 trees, 5/5 seeded from merged-step-1 trees | after any reshape that changes step N-1's contract, every downstream step must be re-measured from seeds produced under the NEW upstream contract; grader equivalence of old seeds is not enough |
+| R-025 | LIVE | `00-LANES` §3 amend moves | 2026-10-05 single-mode wording amends: pendulum landed (0/5→2/5), typesetting stayed 0/5, yjs flipped 0/5→5/5 | a wording-only amend of a single-mode cliff succeeds ~1 in 3; prefer adding an independent second mode at Phase A, and skip the wording amend when the step's other modes already saturate |
 
 ## Superseded
 
