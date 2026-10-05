@@ -218,3 +218,6 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm23237 | trio new s3 aclose_forcefully on StapledStream | python-trio/trio | StapledStream close authority | — | 5/5 | 0 | saturated (4th s3 design) → 2-step pivot |
 | 2026-10-04 | devvm23237 | jsoup s3 LAY re-author (full-chain fresh local k=5) | jhy/jsoup | — | lay | s3 4/5 | 1 | lay voice made this step EASIER (spec version ~1/3 locally) → not pushed. LESSON: R-008 is not a universal difficulty lever; measure before pushing |
 | 2026-10-04 | devvm23237 | oclif new s3 jsonEnabled() follows parser | oclif/core | parser authority | 196 | 5/5 | 0 | saturated → 2-step pivot |
+| 2026-10-04 | devvm23237 | graphql NEW middle (operational-envelope projection) + s3 re-check | rmosolgo/graphql-ruby | printer full SDL authority | 173 | s2 2/5, s3 3/5 | s2: 2 independent modes | IN BAND → BUILD |
+| 2026-10-04 | devvm23237 | trio 2-step (lay s1) | python-trio/trio | — | lay | s1 5/5, s2 0/5 | s2: 2 modes | lay s1 still saturated → split s2 |
+| 2026-10-04 | devvm23237 | oclif 2-step (lay s1) | oclif/core | — | lay | s1 5/5 | — | lay s1 saturated → test split |
