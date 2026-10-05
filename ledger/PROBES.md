@@ -225,3 +225,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm23237 | Ecto fresh full chain with LAY s1+s2 | elixir-ecto/ecto | — | lay | 5/5, 5/5, 0/5 | s3: 3 semantic areas | lay rewrite made s2 easy (was 1/5) → restore original s2. LESSON (2nd case after jsoup): R-008 can REMOVE difficulty from a step that already split solvers — keep measured in-band contracts, apply lay voice only to new or saturated steps |
 | 2026-10-04 | devvm23237 | typesetting-caret-hit-testing | chained metacode k=5 | 5/5, 4/5, 4/4 | saturated S3 → amend |
 | 2026-10-04 | devvm23237 | mathjs-replay-under-other-instance | chained metacode k=5 | 5/5, 5/5, 5/5 | saturated → amend or release |
+| 2026-10-04 | devvm6971 | http-cookie chained cold + internet proxy | sparklemotion/http-cookie | spec authority | — | S1 0/5→5/5 amended; S2 0/5 cold, 5/5 internet; S3 5/5 | S2 cold misses: exact-bucket only | PARKED |
