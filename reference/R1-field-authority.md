@@ -213,8 +213,10 @@ most often missed and it is frequently the binding constraint.
 - **The ceiling is 3/5 per step.** In-band is **1–3 of 5**; `4/5` fails. OURS records the
   ceiling as observed on **2026-09-17**; the server's own string calls the prior regime *"the
   pre-9/15 rules"*. Both phrasings appear verbatim in the sources; they are the same tightening.
-- **`NA` is not zero.** It means that model never reached the step. Step-2 effective n is
-  bounded by step-1 successes, so an `NA` column says nothing about that step's difficulty.
+- **`NA` is not zero.** It means that model has no trials for the step. Each step is run as a
+  fresh session seeded from a passing step N−1 trial (K-to-N, verified 2026-10-05 on jsoup
+  f535a46; see 00-LANES §5), so a step with no passing predecessor has nothing to seed from and
+  shows `NA`; an `NA` column says nothing about that step's difficulty.
 - **`minimum_steps_for_nonfinal_all_pass_exception = 3`.** A two-step task gets **no**
   saturation exemption. The exemption is **one per task**, and **the last step is never exempt**
   regardless of step count.
