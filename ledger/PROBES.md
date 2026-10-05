@@ -223,3 +223,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm23237 | trio 2-step (lay s1) | python-trio/trio | — | lay | s1 5/5, s2 0/5 | s2: 2 modes | lay s1 still saturated → split s2 |
 | 2026-10-04 | devvm23237 | oclif 2-step (lay s1) | oclif/core | — | lay | s1 5/5 | — | lay s1 saturated → test split |
 | 2026-10-04 | devvm23237 | Ecto fresh full chain with LAY s1+s2 | elixir-ecto/ecto | — | lay | 5/5, 5/5, 0/5 | s3: 3 semantic areas | lay rewrite made s2 easy (was 1/5) → restore original s2. LESSON (2nd case after jsoup): R-008 can REMOVE difficulty from a step that already split solvers — keep measured in-band contracts, apply lay voice only to new or saturated steps |
+| 2026-10-04 | devvm23237 | typesetting-caret-hit-testing | chained metacode k=5 | 5/5, 4/5, 4/4 | saturated S3 → amend |
+| 2026-10-04 | devvm23237 | mathjs-replay-under-other-instance | chained metacode k=5 | 5/5, 5/5, 5/5 | saturated → amend or release |
