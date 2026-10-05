@@ -259,3 +259,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | rope | K-to-N metacode k=5 (4-5 distinct seeds) | 4/5, 5/5, 2/5 | S1+S2 both >3 → amend (merge), S3 in band |
 | 2026-10-05 | devvm6971 | jotdown fix5 route A | hellux/jotdown | — | 309 (S3) | 3/5 / 2/3 / 0/2 (codex S3 5/5) | S3 cliff on inherited attrs sentence | PARKED |
 | 2026-10-05 | devvm23237 | pendulum-salvage | K-to-N metacode k=5 | 5/5, 2/5, 2/5 | IN BAND → build |
+| 2026-10-05 | devvm6971 | isogit stash bench | isomorphic-git | — | 239/232/189 | 3/5 / 3/3 / 3/3 | S1 symlink only split; S2/S3 no web, saturated | PARKED |
