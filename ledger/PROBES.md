@@ -227,3 +227,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-04 | devvm23237 | mathjs-replay-under-other-instance | chained metacode k=5 | 5/5, 5/5, 5/5 | saturated → amend or release |
 | 2026-10-04 | devvm6971 | http-cookie chained cold + internet proxy | sparklemotion/http-cookie | spec authority | — | S1 0/5→5/5 amended; S2 0/5 cold, 5/5 internet; S3 5/5 | S2 cold misses: exact-bucket only | PARKED |
 | 2026-10-04 | devvm6971 | lektor bench1 (internet on) | lektor/lektor | — | — | S1 5/5, S2 3/5, S3 3/3 | S2 attachment old-URL; S3 sat; 1 discriminator found (old-version leftover thumbnail, 9/10 miss) | revert order + add S3 discriminator |
+| 2026-10-04 | devvm23237 | trio-split | Muse impls | 5/5, 2/5, 5/5 | final step saturates → retired |
+| 2026-10-04 | devvm23237 | typesetting-amend | continuation metacode k=5 | 5/5, 0/5, — | S2 single-mode cliff → wording-only remeasure |
