@@ -253,5 +253,6 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | tinycss2 | K-to-N metacode k=5 | 5/5, 5/5, 5/5 | OUT |
 | 2026-10-05 | devvm23237 | mathjs | K-to-N metacode k=5 | 5/5, 5/5, 5/5 | OUT |
 | 2026-10-05 | devvm23237 | mockito checkpoint structural amend | fresh-session analogue from 5 distinct real passing parents | foundation 5/5; final 5/5 (continued), 5/5 (fresh seeded) | 15 genuine passes, 0 genuine misses or exclusions; independent review PASS; RELEASED |
+| 2026-10-05 | devvm23237 | picocli detached parse overlay amend | server-faithful K-to-N metacode k=5 | raw 5/5, 2/5, 3/5; effective S2 5/5 | three S2 false negatives rely on unstated converter-count/root-identity checks; one S3 verifier pass retains regression; independent review REVISE, sole amend consumed; RELEASED |
 | 2026-10-05 | devvm23237 | deno_graph | K-to-N metacode k=5 | 5/5, 5/5, 5/5 | released |
 | 2026-10-05 | devvm23237 | open-feature | K-to-N metacode k=5 | 5/5, 5/5, — | released (S2 stop) |
