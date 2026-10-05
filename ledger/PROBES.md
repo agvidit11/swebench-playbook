@@ -248,3 +248,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm6971 | lektor v2 bench4 | lektor/lektor | — | — | 4/5 / 1/4 / ≥4 proj | S2 upgrade-leftover misses; S3 solved incidentally in S1 trees | RESHAPE → 2-step |
 | 2026-10-05 | devvm23237 | pendulum-amend | K-to-N metacode k=5 (2 seed trees) | S1 5/5, S2 in band, S3 4/5 | OUT (final step too easy) |
 | 2026-10-05 | devvm6971 | lektor v3 bench5 | lektor/lektor | — | — | 4/5 / 0/4 / NA | S2 cliff on old-folder leftovers | PARKED |
+| 2026-10-05 | devvm23237 | typesetting-original | K-to-N metacode k=5 (5 S1 trees, 3 S2 trees) | 5/5, 3/5, 5/5 | OUT (final step saturates) |
