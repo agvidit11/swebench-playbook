@@ -245,3 +245,4 @@ Avocado — read it before choosing the next card.
   graded case before authoring, not just the ones that motivated it.
 - Remove (1) -> 5/5; keep it -> 0/5. AND-composed tests + one uniform insight = bimodal, never in band.
 | 2026-10-05 | devvm6971 | lektor v2 bench4 | lektor/lektor | — | — | 4/5 / 1/4 / ≥4 proj | S2 upgrade-leftover misses; S3 solved incidentally in S1 trees | RESHAPE → 2-step |
+| 2026-10-05 | devvm23237 | pendulum-amend | K-to-N metacode k=5 (2 seed trees) | S1 5/5, S2 in band, S3 4/5 | OUT (final step too easy) |
