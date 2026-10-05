@@ -235,3 +235,11 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm6971 | lektor bench3 (pile stated) | lektor/lektor | — | 246 (S3) | 5/5 / 4/5 / 4/4 | S2 attachment old-URL; pile 0/8 unstated → 4/4 stated | PARKED (revival path noted) |
 | 2026-10-05 | devvm23237 | tinycss2 | continuation metacode k=5 | 5/5, 4/5, 4/4 | released |
 | 2026-10-05 | devvm23237 | pendulum-amend | continuation metacode k=5 | 5/5, 1/5, 1/1 | S2 in band; S3 measuring |
+
+## 2026-10-04 devvm6971 — protobuf-go compatibility probe: bimodal, parked
+- Two probes, 0/5 each. With the JSON meaning stated precisely, ALL five trials failed exactly two assertions and
+  passed everything else: (1) open enum gains a name for a number the old schema could still produce (uniform
+  insight miss); (2) bytes->string JSON, where my 'round-trip identical' definition was satisfied but the test wanted
+  incompatible -- a definition I wrote that contradicted the grader. Check every stated definition against EVERY
+  graded case before authoring, not just the ones that motivated it.
+- Remove (1) -> 5/5; keep it -> 0/5. AND-composed tests + one uniform insight = bimodal, never in band.
