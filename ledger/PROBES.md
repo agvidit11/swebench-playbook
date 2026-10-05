@@ -244,3 +244,4 @@ Avocado — read it before choosing the next card.
   incompatible -- a definition I wrote that contradicted the grader. Check every stated definition against EVERY
   graded case before authoring, not just the ones that motivated it.
 - Remove (1) -> 5/5; keep it -> 0/5. AND-composed tests + one uniform insight = bimodal, never in band.
+| 2026-10-05 | devvm6971 | lektor v2 bench4 | lektor/lektor | — | — | 4/5 / 1/4 / ≥4 proj | S2 upgrade-leftover misses; S3 solved incidentally in S1 trees | RESHAPE → 2-step |
