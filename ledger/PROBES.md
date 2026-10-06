@@ -274,4 +274,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | pendulum (server) | server avocado | 1, 0.2, 0.4 | PASSING (local K-to-N 1.0/0.3/0.6 predicted it) |
 | 2026-10-05 | devvm23237 | sequelize-cls | K-to-N metacode | 5/5, 0/5 raw (unstated assertion; fair 5/5), — | released; repo closed |
 | 2026-10-05 | devvm6971 | vobject route A | sabre-io/vobject | — | — | 5/5 / 3/5 / avo 0/4, codex 5/5 | S3 one-rule cliff (WKST) | PARKED |
-| 2026-10-05 | devvm23237 | django-deletion | K-to-N metacode | 5/5, 0/5 (one mode), — | released |
+| 2026-10-05 | devvm23237 | django-deletion | K-to-N metacode | 5/5, 0/5 (one mode), — | released; possible unstated rule (PROTECT child), same signature as yjs |
