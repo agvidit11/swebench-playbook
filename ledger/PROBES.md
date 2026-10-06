@@ -283,3 +283,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-06 | devvm6971 | djmu r3 pinned 5.16 | django-model-utils | — | — | 5/5 / 1/5 / 1/1 | single fault line S2 | PARKED |
 
 | 2026-10-05/06 | nanodbc-async-operation-epochs | Lane P (last step only, single-step probe) | avocado x5 @ job 2026-10-05__02-10-11__6f8cca | 0/5 reward; 4/5 fail only event_handle_change (same-handle reapply over-rejected), 1/5 fails 9 ("active" = connected() vs unconnected mock) | real failure, not a harness artifact; both splits come from unclear wording, not design | RELEASE: single boundary, would saturate once worded clearly |
+
+| 2026-10-06 | devvm6971 | commons-geometry transforming facet import | apache/commons-geometry | mirrored winding + read-then-weld | ~230/~190/~250 | chained K-to-N mc2.sh: Muse 5/5, 5/5, - (1 S1 agent timeout, tree 9/9); Codex 5/5, 5/5, - | 0 genuine in 20; all solvers used preservesOrientation + geometric normal; naive S2 6/6, naive S3 on correct S1 8/8 | saturated (S1+S2 at 1.0) -> RELEASED, S3 not run, no amend |
