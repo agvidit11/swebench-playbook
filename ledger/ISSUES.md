@@ -103,3 +103,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 - 2026-10-05 15:05 devvm23237 rope old-S3 contract 2/5 → 5/5: most likely a SEED effect (amended run seeded from merged-step-1 sessions, a different upstream prompt), not pure variance (5/5 at p≈0.4 is ~1%). See R-024.
 2026-10-05 15:20 | devvm6971 | P | closure_tree probe agent stalled (no activity since 13:41, no process) | — | STOP sent, replacement agent launched — OPEN
 2026-10-05 19:20 | devvm6971 | B | README-only review fix (commons-text 7da90ee, by a Codex session) re-triggers full server calibration; partial avocado 1|1 vs passed 0.8|0.4|0 | — | LANE-B checklist item 11: README 4 required sections before first push — RULE
+2026-10-05 21:20 | devvm6971 | P | vobject probe agent stalled (no activity since 18:55, no process) | — | STOP sent, replacement launched — OPEN
