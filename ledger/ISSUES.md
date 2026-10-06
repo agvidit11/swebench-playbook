@@ -111,3 +111,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-06 06:00 | devvm6971 | B | jsonc: local bench harder than server (local 0.6/0.67/0.5 → server 0.8/0.8/0.8) | gate fail | reshape from server trees; require local ≤2/5 on S2/S3 — OPEN
 2026-10-06 07:20 | devvm6971 | P/I | taggit probe + counters card agents stalled (05:52/05:55, no process) | — | STOP sent, both replaced — OPEN
 - 2026-10-06 08:15 devvm23237 FIRST ACCEPT from the corrected pipeline: pendulum-editable-interval-schedules (salvaged 4/5 near-miss; K-to-N local 1.0/0.3/0.6 → server 1/0.2/0.4 → human ACCEPTED ~12h after push).
+2026-10-06 09:20 | devvm6971 | B | LOCAL BENCH NOW HARDER THAN SERVER: jsonc local .6/.67/.5 → server .8/.8/.8; reversion local .9/.44/.25 → server 1/.8/.8 (server avocado-code-flex-5.16) | 2 server fails | require local non-exempt ≤1/5; investigate local model/harness version — OPEN
