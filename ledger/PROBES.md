@@ -277,3 +277,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | django-deletion | K-to-N metacode | 5/5, 0/5 (one mode), — | released; possible unstated rule (PROTECT child), same signature as yjs |
 | 2026-10-05 | devvm6971 | jsonc bench | dprint/jsonc-parser | — | 208/239/220 | 5/5 / 5/5 / 1/5 | S3 nest_dotted splits | RESHAPE |
 | 2026-10-06 | devvm6971 | btree bench | tidwall/btree | — | — | 4/5 / 4/4 / 4/4 | all fault lines handled | PARKED |
+| 2026-10-06 | devvm6971 | otio r1-r6 pooled | OpenTimelineIO | — | — | 14/15 / 3/14 / 3/3 | S2 single fault; S3 saturated | PARKED |
