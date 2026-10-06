@@ -271,3 +271,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm23237 | yjs-amend | K-to-N metacode k=5 | 5/5, 5/5, 5/5 | released (wording flip 0→5) |
 | 2026-10-05 | devvm23237 | wagtail | K-to-N metacode k=5 | 2/5, 5/5, 3/5 | released (S2 saturates) |
 | 2026-10-05 | devvm6971 | closure_tree r1+fold r2 | ClosureTree/closure_tree | — | 269/187 | 5/5 / 5/5 / 4/4 | saturated all steps | PARKED |
+| 2026-10-05 | devvm23237 | pendulum (server) | server avocado | 1, 0.2, 0.4 | PASSING (local K-to-N 1.0/0.3/0.6 predicted it) |
