@@ -110,3 +110,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-06 03:20 | devvm6971 | P/I | otio + sched agents stalled (00:58 / 01:32); formula stalled twice | — | STOP sent; otio + sched replaced; formula dropped — OPEN
 2026-10-06 06:00 | devvm6971 | B | jsonc: local bench harder than server (local 0.6/0.67/0.5 → server 0.8/0.8/0.8) | gate fail | reshape from server trees; require local ≤2/5 on S2/S3 — OPEN
 2026-10-06 07:20 | devvm6971 | P/I | taggit probe + counters card agents stalled (05:52/05:55, no process) | — | STOP sent, both replaced — OPEN
+- 2026-10-06 08:15 devvm23237 FIRST ACCEPT from the corrected pipeline: pendulum-editable-interval-schedules (salvaged 4/5 near-miss; K-to-N local 1.0/0.3/0.6 → server 1/0.2/0.4 → human ACCEPTED ~12h after push).
