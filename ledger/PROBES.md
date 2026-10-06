@@ -270,3 +270,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-05 | devvm6971 | commons-vfs tree snapshot/delta/publish | apache/commons-vfs | live handles + blind copy-back | 316/371/339 | chained K-to-N mc2.sh: Muse 3/5, 5/5, 5/5 (S3 raw 4/5, 1 grader FN); Codex 5/5, 5/5, 5/5 | S1 2 stated (stale VFS child cache on re-capture); S2/S3 0 genuine; naive S2 13/13 | saturated -> RELEASED, no amend (single Muse-only mode in S1) |
 | 2026-10-05 | devvm23237 | yjs-amend | K-to-N metacode k=5 | 5/5, 5/5, 5/5 | released (wording flip 0→5) |
 | 2026-10-05 | devvm23237 | wagtail | K-to-N metacode k=5 | 2/5, 5/5, 3/5 | released (S2 saturates) |
+| 2026-10-05 | devvm6971 | closure_tree r1+fold r2 | ClosureTree/closure_tree | — | 269/187 | 5/5 / 5/5 / 4/4 | saturated all steps | PARKED |
