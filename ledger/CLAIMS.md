@@ -166,4 +166,4 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm6971 | auditlog-point-in-time-reconstruction | jazzband/django-auditlog | MT3: state_at / rows_at / related_at m2m | P | PROBING | 2026-10-06 | base 607000d8; audited gem stale -> auditlog; codex-verified; S2 3+ / S3 4 fault lines; open PR #849 near S3(d); 22/28 |
 | devvm6971 | lane-i MT domain: PG-trigger history | logidze / pghistory | — | I | KILLED | 2026-10-06 | pghistory stale (2026-02); logidze gaps disclosed (#266 #232 #253 #214) or undeterminable; 15/28 best |
 | devvm6971 | lane-i MT domain: refactoring/scope libs (jedi / astroid) | TBD | MT3 | I | PROBING-REPO | 2026-10-06 | card agent dispatched (strict bar) |
-| devvm6971 | lane-i MT domain: lockfile/resolver incremental state (resolvelib / unearth / pdm) | TBD | MT3 | I | PROBING-REPO | 2026-10-06 | card agent dispatched (strict bar) |
+| devvm6971 | lane-i MT domain: lockfile/resolver | pdm / poetry | — | I | KILLED | 2026-10-06 | pdm 4 peers; poetry 13/13 scenarios correct at base; relock = resolver self-check |
