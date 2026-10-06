@@ -281,3 +281,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-06 | devvm23237 | wagtail-salvage | P5 cold Muse x3 (no bench) | mode A 0/3 identical, mode B 3/3 | released at Phase A |
 | 2026-10-06 | devvm23237 | rope-salvage (lineage) | cold Muse S3 x3 per pivot | original 2/5 (K-to-N); after S2 pivot 3/3 pass; after S1 pivot 0/3 identical | canonical lineage-sensitive last step: S3 rate belonged to the upstream lineage, not the S3 contract |
 | 2026-10-06 | devvm6971 | djmu r3 pinned 5.16 | django-model-utils | — | — | 5/5 / 1/5 / 1/1 | single fault line S2 | PARKED |
+
+| 2026-10-05/06 | nanodbc-async-operation-epochs | Lane P (last step only, single-step probe) | avocado x5 @ job 2026-10-05__02-10-11__6f8cca | 0/5 reward; 4/5 fail only event_handle_change (same-handle reapply over-rejected), 1/5 fails 9 ("active" = connected() vs unconnected mock) | real failure, not a harness artifact; both splits come from unclear wording, not design | RELEASE: single boundary, would saturate once worded clearly |
