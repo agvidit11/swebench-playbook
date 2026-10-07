@@ -287,3 +287,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-06 | devvm6971 | commons-geometry transforming facet import | apache/commons-geometry | mirrored winding + read-then-weld | ~230/~190/~250 | chained K-to-N mc2.sh: Muse 5/5, 5/5, - (1 S1 agent timeout, tree 9/9); Codex 5/5, 5/5, - | 0 genuine in 20; all solvers used preservesOrientation + geometric normal; naive S2 6/6, naive S3 on correct S1 8/8 | saturated (S1+S2 at 1.0) -> RELEASED, S3 not run, no amend |
 | 2026-10-06 | devvm23237 | open-feature (EDGE-MINE S2 tightening) | K-to-N metacode k=5 | 5/5, 2/5, 2/5 | IN BAND → build; S2 single mode C2, S3 single mode (notice before retirement), S3 seed-correlated 0/3 vs 2/2 |
 | 2026-10-06 | devvm23237 | mikro-orm flush planner | K-to-N metacode k=5 | 0/5, —, — | released (S1 cliff) |
+| 2026-10-06 | devvm23237 | open-feature (frozen bundle) | K-to-N x2 | 5/5,0/5,— ; 5/5,1/5,0/5 | pooled with probe S2 3/15, S3 2/10 — low/at-risk |
