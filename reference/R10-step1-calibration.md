@@ -1,5 +1,7 @@
 # R10 — Step 1 is the task
 
+> **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
+
 `STATUS: LIVE`, 2026-09-29. Measured across 13 multi-turn tasks with server verdicts — every MT
 task in the portfolio that has been graded. This file exists because **multi-turn is the priority
 format and step 1 is where it dies.**

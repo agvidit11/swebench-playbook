@@ -1,5 +1,7 @@
 # R2 — Signal integrity: is this number real?
 
+> **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
+
 ```
 OWNER:  Claude (reference — pulled on demand)
 INPUT:  a pass rate, a gate string, or a trial count you are about to act on
@@ -272,4 +274,3 @@ task from a contaminated one.
 pass**, not a clearance. Treat contamination as **unmeasured** until a non-empty delta exports.
 Do not cite it as evidence in either direction, and do not let a green row on the dashboard
 stand in for a check that did not run.
-

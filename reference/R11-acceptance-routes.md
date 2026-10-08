@@ -1,5 +1,7 @@
 # R11 — Every way a task has actually been accepted
 
+> **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
+
 `STATUS: LIVE`, 2026-09-30. Built from all 8 of our accepted tasks and 40 accepted peer tasks
 (peer status is readable — `codimango task show <name>` works on other authors' tasks; only
 `task list` narrows to you).

@@ -1,5 +1,7 @@
 # R3 — Landmines: scaffold and packaging traps
 
+> **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
+
 ```
 OWNER:  Claude (reference — pulled on demand; §A is also the B1 patch list)
 INPUT:  a freshly scaffolded task dir, OR a red `Structural checks` row, OR a packaging
@@ -431,4 +433,3 @@ left its generated test file behind, so the second `git apply` refused and rewar
 oracle never runs the verifier twice, so it cannot see this.** Treat a TIER 4b FAIL as blocking.
 Fix: reverse the test patch in cleanup *after* the reward is written, and reset reward to 0 if
 cleanup fails.
-
