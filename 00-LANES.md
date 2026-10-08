@@ -1,5 +1,7 @@
 # 00-LANES — running the pipeline as lanes, on any number of machines
 
+> **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
+
 `STATUS: LIVE`, 2026-10-02. This is the operating manual. The act-files (`A*`, `B*`, `C*`) are the
 reference it points into. An agent running a lane reads THIS file and the act-file for its current
 stage — not all 36 files.

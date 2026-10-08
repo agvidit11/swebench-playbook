@@ -1,5 +1,7 @@
 # RULES — every live rule, its status, and the run that produced it
 
+> **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
+
 This is the **precedence channel**. Both source pipelines rotted the same way: a rule was
 corrected in one file and left standing in another, with no marker saying which was current.
 Peer's stage 07 still mandated cumulative patches that stage 05 had retracted; our

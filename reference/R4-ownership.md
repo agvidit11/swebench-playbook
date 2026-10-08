@@ -1,5 +1,7 @@
 # R4 — Ownership: who may write what, and what to do when it is violated
 
+> **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
+
 ```
 OWNER:  Claude (reference — pulled on demand; §4 is an executable protocol)
 INPUT:  a planned write to a task file, OR the discovery that a protected file was written
@@ -354,4 +356,3 @@ by any mechanism.** The defect is third-party authorship and laundering, not mod
 
 A reviewer citing the 100%-human line should be answered with this section, not argued with —
 and if a server verdict ever cites it, that is new evidence and this ruling gets revisited.
-
