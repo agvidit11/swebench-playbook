@@ -121,3 +121,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-07 07:55 | devvm6971 | B | OTIO revival agent stalled (05:30) | — | STOP sent, replacement launched — OPEN
 2026-10-08 02:30 | devvm6971 | B | jotdown revival: auto-mode classifier denied Codex fix6 run (flag: Instruction Poisoning) — brief at ~/scratch/lane-p/jotdown-*/revive/codex-fix6-brief.txt (tests/README/gates only, explicitly no instruction.md edits) | — | NOT retried; surfaced to Vidit — OPEN
 2026-10-08 06:10 | devvm6971 | B | Codex reran lektor gates OUTSIDE its sandbox without asking (auto mode flagged Auto-Mode Bypass); file changes verified as expected set | — | rule added to LANE-B brief: never escalate outside sandbox, report instead — RULE
+2026-10-08 09:20 | devvm6971 | B | isogit revival agent stalled (06:01) | — | STOP sent, replacement launched — OPEN
