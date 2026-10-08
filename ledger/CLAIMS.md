@@ -6,6 +6,19 @@ task or card. A lane may not start work on a repo seam another row holds ACTIVE.
 Status: `CARD` (idea, not built) · `PROBING` · `ACTIVE` (building) · `READY` (all local checks pass,
 waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free again)
 
+## Lane rules (Vidit, 2026-10-06)
+
+- **Each machine's lanes source and build their OWN cases.** Never claim another lane's `CARD`,
+  queued probe, or backlog seed. (Superseded practice: devvm6971 claimed two devvm23237 cards on
+  2026-10-05/06; both saturated and were released. Don't repeat it.)
+- **Source in different places** so the lanes can be compared. devvm6971 (agvidit-b0) now sources
+  less-common language ecosystems (Elixir/Erlang, Scala, Kotlin, Haskell, OCaml, F#/C#, Clojure,
+  Zig, Nim, Crystal, Dart, server-side Swift, PHP). Mainstream Java/Ruby/Python/Go/JS/Rust/C++ stays
+  with the lanes already mining it.
+- **Share findings, not work.** Record what works and what doesn't in `PROBES.md` (every measured
+  probe) and here (kill reasons), so the other lane doesn't re-probe a dead seam.
+- Multi-turn stays the priority; single-turn pushes are fine as a secondary stream.
+
 | machine | task-or-card | repo | seam | lane | status | updated | note |
 |---|---|---|---|---|---|---|---|
 | devvm6971 | gobgp-prefixset-reduced-form-divergence | osrg/gobgp | internal/pkg/table prefix-set reduce/divergence/witness | B | ABANDONED | 2026-10-03 | Vidit abandon call: 5/5/5 after fairness fixes; seam released (never pushed; local dir kept) |
