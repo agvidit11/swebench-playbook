@@ -303,3 +303,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-09 | devvm6971 | dejafu DPOR throwTo wake-up (single-turn) | barrucadu/dejafu | IO-anchored, 22 checks | Muse 8/10, Codex 4/5 | - | over stop rule | RELEASED |
 
 | 2026-10-09 | devvm6971 | nebulex listener/cache lifecycle (single-turn) | elixir-nebulex/nebulex (MIT) | listeners outlive cache on restart/crash | real-harness avocado 4/4 | - | over ceiling | RELEASED |
+
+| 2026-10-09 | devvm6971 | shake resource cancel capacity (single-turn) | ndmitchell/shake (BSD-3) | capacity leak after cancelled run with queued waiter | v1 harness avocado 3/5 (fails = unstated scope; passers used broken hack) | v2 scope stated: harness avocado 4/4 | stating the scope removed the only difficulty | RELEASED |
