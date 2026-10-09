@@ -1,0 +1,231 @@
+diff --git a/dropshot-option-return-nullable-openapi/README.md b/dropshot-option-return-nullable-openapi/README.md
+index 9965727..63821c3 100644
+--- a/dropshot-option-return-nullable-openapi/README.md
++++ b/dropshot-option-return-nullable-openapi/README.md
+@@ -15,30 +15,36 @@ than an inline type union), and the OpenAPI 3.0 rule that a `$ref` may not carry
+ properties. A naive approach — setting `nullable: true` next to the `$ref`, or turning the type
+ into `["object", "null"]` as one would for OpenAPI 3.1 — produces either a document that violates
+ the 3.0 schema or one where the flag is silently discarded on the way out. The reference solution
+-wraps the reference in an `allOf` and lifts `nullable` onto the wrapper, which is the position
+-OpenAPI 3.0 actually honours, but the graded test asserts observable document content rather than
+-that specific shape, so other conformant encodings pass.
++now emits an `anyOf` containing the bare reference and a typed, nullable, null-only alternative;
++the same conversion also handles the nullable one-reference `allOf` form that `schemars` places in
++component definitions, while retaining its metadata.
++
++The previous reference used `nullable: true` on a typeless wrapper containing `allOf: [$ref]`,
++which still rejects null under OpenAPI 3.0.3. Grading now applies a small 3.0.3 acceptance evaluator
++to null, valid, and invalid instances instead of recognizing a keyword shape, so any genuinely
++valid encoding passes.
+ 
+ ## Completion Rates (LOCAL replay, not server calibration)
+ 
+ | Model | Passed / Trials |
+ |---|---|
+ | Oracle | 3/3 (local `codimango bench run -a oracle -k 3`) |
+-| Avocado (avocado-code-flex-5.16) | 17/25 replayed real implementations |
+-| gpt-6-sol | 14/15 replayed real implementations |
+-| Avocado before the new test (context) | 34/35 server |
++| Avocado (avocado-code-flex-5.16) | 0/45 replayed real implementations from nine past server jobs |
++| gpt-6-sol | 10/15 replayed real implementations from three past server jobs |
+ 
+ Baseline verification (graded suite at `base_commit` with `test_patch` applied, no oracle):
+ there are 6 `fail_to_pass` and 7 `pass_to_pass` graded ids. At `base_commit` with `test_patch`
+-applied, all 6 `fail_to_pass` ids fail and all 7 `pass_to_pass` ids pass (measured 2026-10-02).
++applied, all 6 `fail_to_pass` ids fail and all 7 `pass_to_pass` ids pass (measured 2026-10-08).
+ 
+ ## Model Analysis
+ 
+-Model implementations of the fix vary widely. Every current failure mode is either making a
+-non-optional documented reference change shape by wrapping or annotating every `$ref` instead of
+-only nullable ones, which the new test catches, or making an `Option` response header nullable,
+-which the golden snapshot tests catch. Local replay produced avocado 17/25, gpt-6-sol 14/15, and
+-oracle 3/3; these are not server calibration results.
++Under the 3.0.3-semantic grader, every replayed avocado implementation emits `nullable: true` on a
++typeless `allOf: [$ref]` wrapper, the same encoding the old reference used, which still rejects null,
++so all fail. The passing gpt-6-sol implementations emit an `anyOf` of the reference and a typed
++null-only branch, as the reference now does. The failing gpt-6-sol implementations used the typeless
++`allOf` wrapper. The null-only branch `{"type": "string", "nullable": true, "enum": [null]}` mirrors
++the schema dropshot already emits for `()` responses (`{"title": "Null", "type": "string", "enum":
++[null]}`).
+ 
+ ## Anti-Cheating Analysis
+ 
+@@ -46,9 +52,9 @@ oracle 3/3; these are not server calibration results.
+   and inspects the schema reached by path, method, status and content type. Emitting a fixed JSON
+   blob would have to reproduce a complete, internally consistent document for a registered
+   endpoint, which requires going through the real generation path.
+-- **Overfitting to visible tests:** the assertion is that the 200-response schema conveys
+-  nullability in a form an OpenAPI consumer can observe, not that a particular key appears in a
+-  particular position, so conformant alternatives to the reference `allOf` encoding also pass.
++- **Overfitting to visible tests:** the evaluator checks whether the schema accepts null and a valid
++  named value while rejecting an invalid value, not whether a particular keyword layout appears,
++  so conformant alternatives to the reference `anyOf` encoding also pass.
+ - **Modifying test files:** `before_repo_set_cmd` restores `dropshot/tests` from the sanitized commit
+   before grading, so edits a solver makes to the existing test tree are discarded; the graded test
+   itself is then applied fresh from `test_patch`. The restore is path-scoped to the test directory,
+diff --git a/dropshot-option-return-nullable-openapi/solution/solve.sh b/dropshot-option-return-nullable-openapi/solution/solve.sh
+index ec38541..eda601e 100755
+--- a/dropshot-option-return-nullable-openapi/solution/solve.sh
++++ b/dropshot-option-return-nullable-openapi/solution/solve.sh
+@@ -8,35 +8,127 @@ trap 'rm -f "$PATCH_FILE"' EXIT
+ 
+ cat > "$PATCH_FILE" << '__SOLUTION__'
+ diff --git a/dropshot/src/schema_util.rs b/dropshot/src/schema_util.rs
+-index a3f4008..bd17a6d 100644
++index c406c7d..4cef91c 100644
+ --- a/dropshot/src/schema_util.rs
+ +++ b/dropshot/src/schema_util.rs
+-@@ -374,6 +374,25 @@ fn j2oas_schema_object(
++@@ -374,19 +374,20 @@ fn j2oas_schema_object(
+      obj: &schemars::schema::SchemaObject,
+  ) -> openapiv3::ReferenceOr<openapiv3::Schema> {
+      if let Some(reference) = &obj.reference {
+-+        let is_nullable = obj
+-+            .extensions
+-+            .get("nullable")
+-+            .and_then(serde_json::Value::as_bool)
+-+            .unwrap_or(false);
+-+        if is_nullable {
+-+            let reference_schema = openapiv3::ReferenceOr::Reference {
+-+                reference: reference.clone(),
+-+            };
+-+            return openapiv3::ReferenceOr::Item(openapiv3::Schema {
+-+                schema_data: openapiv3::SchemaData {
+-+                    nullable: true,
+-+                    ..openapiv3::SchemaData::default()
+-+                },
+-+                schema_kind: openapiv3::SchemaKind::AllOf {
+-+                    all_of: vec![reference_schema],
+-+                },
+-+            });
+++        if schema_is_nullable(obj) {
+++            return nullable_reference_schema(
+++                reference,
+++                openapiv3::SchemaData::default(),
+++            );
+ +        }
+          return openapiv3::ReferenceOr::Reference {
+              reference: reference.clone(),
+          };
++     }
++ 
++-    let kind = j2oas_schema_object_kind(obj);
++-
++     let mut data = openapiv3::SchemaData::default();
++ 
++-    if matches!(
++-        &obj.extensions.get("nullable"),
++-        Some(serde_json::Value::Bool(true))
++-    ) {
+++    if schema_is_nullable(obj) {
++         data.nullable = true;
++     }
++ 
++@@ -414,12 +415,90 @@ fn j2oas_schema_object(
++         data.example = Some(example.clone());
++     }
++ 
+++    if let Some(reference) = nullable_all_of_reference(obj) {
+++        data.nullable = false;
+++        return nullable_reference_schema(reference, data);
+++    }
+++
+++    let kind = j2oas_schema_object_kind(obj);
+++
++     openapiv3::ReferenceOr::Item(openapiv3::Schema {
++         schema_data: data,
++         schema_kind: kind,
++     })
++ }
++ 
+++fn schema_is_nullable(obj: &schemars::schema::SchemaObject) -> bool {
+++    matches!(
+++        obj.extensions.get("nullable"),
+++        Some(serde_json::Value::Bool(true))
+++    )
+++}
+++
+++fn nullable_all_of_reference(
+++    obj: &schemars::schema::SchemaObject,
+++) -> Option<&String> {
+++    if !schema_is_nullable(obj)
+++        || obj.reference.is_some()
+++        || obj.instance_type.is_some()
+++        || obj.format.is_some()
+++        || obj.enum_values.is_some()
+++        || obj.const_value.is_some()
+++        || obj.number.is_some()
+++        || obj.string.is_some()
+++        || obj.array.is_some()
+++        || obj.object.is_some()
+++        || obj.extensions.len() != 1
+++    {
+++        return None;
+++    }
+++
+++    let subschemas = obj.subschemas.as_ref()?;
+++    if subschemas.any_of.is_some()
+++        || subschemas.one_of.is_some()
+++        || subschemas.not.is_some()
+++        || subschemas.if_schema.is_some()
+++        || subschemas.then_schema.is_some()
+++        || subschemas.else_schema.is_some()
+++    {
+++        return None;
+++    }
+++
+++    let [schemars::schema::Schema::Object(schema)] =
+++        subschemas.all_of.as_ref()?.as_slice()
+++    else {
+++        return None;
+++    };
+++    schema.reference.as_ref()
+++}
+++
+++fn nullable_reference_schema(
+++    reference: &str,
+++    schema_data: openapiv3::SchemaData,
+++) -> openapiv3::ReferenceOr<openapiv3::Schema> {
+++    let reference_schema =
+++        openapiv3::ReferenceOr::Reference { reference: reference.to_string() };
+++    let null_schema = openapiv3::ReferenceOr::Item(openapiv3::Schema {
+++        schema_data: openapiv3::SchemaData {
+++            nullable: true,
+++            ..openapiv3::SchemaData::default()
+++        },
+++        schema_kind: openapiv3::SchemaKind::Type(openapiv3::Type::String(
+++            openapiv3::StringType {
+++                enumeration: vec![None],
+++                ..openapiv3::StringType::default()
+++            },
+++        )),
+++    });
+++
+++    openapiv3::ReferenceOr::Item(openapiv3::Schema {
+++        schema_data,
+++        schema_kind: openapiv3::SchemaKind::AnyOf {
+++            any_of: vec![reference_schema, null_schema],
+++        },
+++    })
+++}
+++
++ fn j2oas_schema_object_kind(
++     obj: &schemars::schema::SchemaObject,
++ ) -> openapiv3::SchemaKind {
+ __SOLUTION__
+ 
+ apply_options=(--verbose "$PATCH_FILE")
+diff --git a/dropshot-option-return-nullable-openapi/tests/config.json b/dropshot-option-return-nullable-openapi/tests/config.json
+index 4d2c48b..60a1fae 100644
+--- a/dropshot-option-return-nullable-openapi/tests/config.json
++++ b/dropshot-option-return-nullable-openapi/tests/config.json
+@@ -41,6 +41,6 @@
+     "openapi::test_openapi_non_option_positions_unchanged",
+     "openapi::test_openapi_plain_documented_ref_unchanged"
+   ],
+-  "patch": "diff --git a/dropshot/src/schema_util.rs b/dropshot/src/schema_util.rs\nindex a3f4008..bd17a6d 100644\n--- a/dropshot/src/schema_util.rs\n+++ b/dropshot/src/schema_util.rs\n@@ -374,6 +374,25 @@ fn j2oas_schema_object(\n     obj: &schemars::schema::SchemaObject,\n ) -> openapiv3::ReferenceOr<openapiv3::Schema> {\n     if let Some(reference) = &obj.reference {\n+        let is_nullable = obj\n+            .extensions\n+            .get(\"nullable\")\n+            .and_then(serde_json::Value::as_bool)\n+            .unwrap_or(false);\n+        if is_nullable {\n+            let reference_schema = openapiv3::ReferenceOr::Reference {\n+                reference: reference.clone(),\n+            };\n+            return openapiv3::ReferenceOr::Item(openapiv3::Schema {\n+                schema_data: openapiv3::SchemaData {\n+                    nullable: true,\n+                    ..openapiv3::SchemaData::default()\n+                },\n+                schema_kind: openapiv3::SchemaKind::AllOf {\n+                    all_of: vec![reference_schema],\n+                },\n+            });\n+        }\n         return openapiv3::ReferenceOr::Reference {\n             reference: reference.clone(),\n         };\n",
+-  "test_patch": "diff --git a/dropshot/tests/integration-tests/openapi.rs b/dropshot/tests/integration-tests/openapi.rs\nindex 170297f..415995e 100644\n--- a/dropshot/tests/integration-tests/openapi.rs\n+++ b/dropshot/tests/integration-tests/openapi.rs\n@@ -809,3 +809,401 @@ fn test_openapi_custom_error_types_trait_based() -> anyhow::Result<()> {\n     );\n     Ok(())\n }\n+#[derive(JsonSchema, Serialize, Deserialize)]\n+#[allow(dead_code)]\n+struct OptionPositionItem {\n+    name: String,\n+}\n+\n+#[derive(JsonSchema)]\n+#[allow(dead_code)]\n+struct OptionPositionBodySchema {\n+    optional_field: Option<OptionPositionItem>,\n+    optional_items: Vec<Option<OptionPositionItem>>,\n+    optional_values: HashMap<String, Option<OptionPositionItem>>,\n+    nested_optional: Option<Option<OptionPositionItem>>,\n+    plain_field: OptionPositionItem,\n+    plain_items: Vec<OptionPositionItem>,\n+    plain_values: HashMap<String, OptionPositionItem>,\n+}\n+\n+#[derive(Serialize, Deserialize)]\n+#[allow(dead_code)]\n+struct OptionPositionBody {\n+    optional_field: Option<OptionPositionItem>,\n+    optional_items: Vec<Option<OptionPositionItem>>,\n+    optional_values: HashMap<String, Option<OptionPositionItem>>,\n+    nested_optional: Option<Option<OptionPositionItem>>,\n+    plain_field: OptionPositionItem,\n+    plain_items: Vec<OptionPositionItem>,\n+    plain_values: HashMap<String, OptionPositionItem>,\n+}\n+\n+impl JsonSchema for OptionPositionBody {\n+    fn schema_name() -> String {\n+        String::from(\"OptionPositionBody\")\n+    }\n+\n+    fn is_referenceable() -> bool {\n+        false\n+    }\n+\n+    fn json_schema(\n+        generator: &mut schemars::r#gen::SchemaGenerator,\n+    ) -> schemars::schema::Schema {\n+        OptionPositionBodySchema::json_schema(generator)\n+    }\n+}\n+\n+#[endpoint {\n+    method = GET,\n+    path = \"/test/option_positions\",\n+    tags = [\"it\"],\n+}]\n+async fn handler_option_positions(\n+    _rqctx: RequestContext<()>,\n+) -> Result<HttpResponseOk<OptionPositionBody>, HttpError> {\n+    unimplemented!()\n+}\n+\n+#[endpoint {\n+    method = POST,\n+    path = \"/test/option_request\",\n+    tags = [\"it\"],\n+}]\n+async fn handler_option_request(\n+    _rqctx: RequestContext<()>,\n+    _body: TypedBody<Option<OptionPositionItem>>,\n+) -> Result<HttpResponseUpdatedNoContent, HttpError> {\n+    unimplemented!()\n+}\n+\n+#[endpoint {\n+    method = GET,\n+    path = \"/test/option_return_item\",\n+    tags = [\"it\"],\n+}]\n+async fn handler_option_return(\n+    _rqctx: RequestContext<()>,\n+) -> Result<HttpResponseOk<Option<OptionPositionItem>>, HttpError> {\n+    unimplemented!()\n+}\n+\n+fn nullable_test_document() -> serde_json::Value {\n+    let mut description = ApiDescription::new();\n+    description.register(handler_option_positions).unwrap();\n+    description.register(handler_option_request).unwrap();\n+    description.register(handler_option_return).unwrap();\n+\n+    let mut bytes = Cursor::new(Vec::new());\n+    description\n+        .openapi(\"nullable-positions\", semver::Version::new(1, 0, 0))\n+        .write(&mut bytes)\n+        .unwrap();\n+\n+    let document: serde_json::Value =\n+        serde_json::from_slice(bytes.get_ref()).unwrap();\n+    let typed: openapiv3::OpenAPI =\n+        serde_json::from_value(document.clone()).unwrap();\n+    assert_eq!(typed.openapi, \"3.0.3\");\n+    assert_ref_objects_have_no_siblings(&document);\n+    document\n+}\n+\n+fn assert_ref_objects_have_no_siblings(node: &serde_json::Value) {\n+    match node {\n+        serde_json::Value::Array(elements) => {\n+            for element in elements {\n+                assert_ref_objects_have_no_siblings(element);\n+            }\n+        }\n+        serde_json::Value::Object(fields) => {\n+            if fields.get(\"$ref\").is_some() {\n+                assert_eq!(\n+                    fields.len(),\n+                    1,\n+                    \"reference object contains sibling keys: {}\",\n+                    serde_json::to_string_pretty(node).unwrap(),\n+                );\n+            }\n+            for element in fields.values() {\n+                assert_ref_objects_have_no_siblings(element);\n+            }\n+        }\n+        _ => {}\n+    }\n+}\n+\n+fn referenced_schema<'a>(\n+    schema: &'a serde_json::Value,\n+    document: &'a serde_json::Value,\n+) -> Option<&'a serde_json::Value> {\n+    let reference = schema.get(\"$ref\")?.as_str()?;\n+    document.pointer(reference.strip_prefix('#')?)\n+}\n+\n+fn schema_indicates_null(\n+    schema: &serde_json::Value,\n+    document: &serde_json::Value,\n+    depth: usize,\n+) -> bool {\n+    if depth > 16 {\n+        return false;\n+    }\n+    if schema.get(\"nullable\").and_then(serde_json::Value::as_bool) == Some(true) {\n+        return true;\n+    }\n+    for key in [\"allOf\", \"anyOf\", \"oneOf\"] {\n+        if let Some(alternatives) =\n+            schema.get(key).and_then(serde_json::Value::as_array)\n+        {\n+            if alternatives.iter().any(|candidate| {\n+                schema_indicates_null(candidate, document, depth + 1)\n+            }) {\n+                return true;\n+            }\n+        }\n+    }\n+    referenced_schema(schema, document).is_some_and(|target| {\n+        schema_indicates_null(target, document, depth + 1)\n+    })\n+}\n+\n+fn schema_preserves_option_position_item(\n+    schema: &serde_json::Value,\n+    document: &serde_json::Value,\n+    depth: usize,\n+) -> bool {\n+    if depth > 16 {\n+        return false;\n+    }\n+    let has_item_shape = schema.get(\"type\").and_then(serde_json::Value::as_str)\n+        == Some(\"object\")\n+        && schema\n+            .get(\"required\")\n+            .and_then(serde_json::Value::as_array)\n+            .is_some_and(|required| required.iter().any(|field| field == \"name\"))\n+        && schema\n+            .pointer(\"/properties/name/type\")\n+            .and_then(serde_json::Value::as_str)\n+            == Some(\"string\");\n+    if has_item_shape {\n+        return true;\n+    }\n+    for key in [\"allOf\", \"anyOf\", \"oneOf\"] {\n+        if let Some(alternatives) =\n+            schema.get(key).and_then(serde_json::Value::as_array)\n+        {\n+            if alternatives.iter().any(|candidate| {\n+                schema_preserves_option_position_item(\n+                    candidate,\n+                    document,\n+                    depth + 1,\n+                )\n+            }) {\n+                return true;\n+            }\n+        }\n+    }\n+    referenced_schema(schema, document).is_some_and(|target| {\n+        schema_preserves_option_position_item(target, document, depth + 1)\n+    })\n+}\n+\n+fn schema_at<'a>(\n+    document: &'a serde_json::Value,\n+    pointer: &str,\n+) -> &'a serde_json::Value {\n+    document.pointer(pointer).unwrap_or_else(|| {\n+        panic!(\n+            \"schema pointer {pointer} was absent:\\n{}\",\n+            serde_json::to_string_pretty(document).unwrap(),\n+        )\n+    })\n+}\n+\n+fn assert_schema_nullable(document: &serde_json::Value, pointer: &str) {\n+    let schema = schema_at(document, pointer);\n+    assert!(\n+        schema_indicates_null(schema, document, 0),\n+        \"schema at {pointer} does not permit null:\\n{}\",\n+        serde_json::to_string_pretty(schema).unwrap(),\n+    );\n+    assert!(\n+        schema_preserves_option_position_item(schema, document, 0),\n+        \"schema at {pointer} no longer describes OptionPositionItem:\\n{}\",\n+        serde_json::to_string_pretty(schema).unwrap(),\n+    );\n+}\n+\n+fn assert_schema_not_nullable(document: &serde_json::Value, pointer: &str) {\n+    let schema = schema_at(document, pointer);\n+    assert!(\n+        !schema_indicates_null(schema, document, 0),\n+        \"schema at {pointer} permits null unexpectedly:\\n{}\",\n+        serde_json::to_string_pretty(schema).unwrap(),\n+    );\n+}\n+\n+const OPTION_POSITIONS_SCHEMA: &str = concat!(\n+    \"/paths/~1test~1option_positions/get/responses/200/\",\n+    \"content/application~1json/schema\",\n+);\n+\n+#[test]\n+fn test_openapi_option_response_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        \"/paths/~1test~1option_return_item/get/responses/200/content/application~1json/schema\",\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_option_struct_field_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        &format!(\"{OPTION_POSITIONS_SCHEMA}/properties/optional_field\"),\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_option_sequence_item_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        &format!(\"{OPTION_POSITIONS_SCHEMA}/properties/optional_items/items\"),\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_option_map_value_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        &format!(\n+            \"{OPTION_POSITIONS_SCHEMA}/properties/optional_values/additionalProperties\"\n+        ),\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_nested_option_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        &format!(\"{OPTION_POSITIONS_SCHEMA}/properties/nested_optional\"),\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_option_request_body_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        \"/paths/~1test~1option_request/post/requestBody/content/application~1json/schema\",\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_non_option_positions_unchanged() {\n+    let document = nullable_test_document();\n+    for pointer in [\n+        format!(\"{OPTION_POSITIONS_SCHEMA}/properties/plain_field\"),\n+        format!(\"{OPTION_POSITIONS_SCHEMA}/properties/plain_items/items\"),\n+        format!(\n+            \"{OPTION_POSITIONS_SCHEMA}/properties/plain_values/additionalProperties\"\n+        ),\n+    ] {\n+        assert_schema_not_nullable(&document, &pointer);\n+        assert!(\n+            schema_preserves_option_position_item(\n+                schema_at(&document, &pointer),\n+                &document,\n+                0,\n+            ),\n+            \"non-optional schema at {pointer} lost the OptionPositionItem shape\",\n+        );\n+    }\n+}\n+\n+#[derive(JsonSchema, Serialize, Deserialize)]\n+#[allow(dead_code)]\n+struct PlainDocumentedRefLeaf {\n+    value: String,\n+}\n+\n+#[derive(JsonSchema)]\n+#[allow(dead_code)]\n+struct PlainDocumentedRefBodySchema {\n+    /// This documentation must not become a sibling of the reference.\n+    documented_leaf: PlainDocumentedRefLeaf,\n+}\n+\n+#[derive(Serialize, Deserialize)]\n+#[allow(dead_code)]\n+struct PlainDocumentedRefBody {\n+    documented_leaf: PlainDocumentedRefLeaf,\n+}\n+\n+impl JsonSchema for PlainDocumentedRefBody {\n+    fn schema_name() -> String {\n+        String::from(\"PlainDocumentedRefBody\")\n+    }\n+\n+    fn is_referenceable() -> bool {\n+        false\n+    }\n+\n+    fn json_schema(\n+        generator: &mut schemars::r#gen::SchemaGenerator,\n+    ) -> schemars::schema::Schema {\n+        PlainDocumentedRefBodySchema::json_schema(generator)\n+    }\n+}\n+\n+#[endpoint {\n+    method = GET,\n+    path = \"/test/plain_documented_ref\",\n+    tags = [\"it\"],\n+}]\n+async fn handler_plain_documented_ref(\n+    _rqctx: RequestContext<()>,\n+) -> Result<HttpResponseOk<PlainDocumentedRefBody>, HttpError> {\n+    unimplemented!()\n+}\n+\n+#[test]\n+fn test_openapi_plain_documented_ref_unchanged() {\n+    let mut description = ApiDescription::new();\n+    description.register(handler_plain_documented_ref).unwrap();\n+\n+    let mut bytes = Cursor::new(Vec::new());\n+    description\n+        .openapi(\"plain-documented-ref\", semver::Version::new(1, 0, 0))\n+        .write(&mut bytes)\n+        .unwrap();\n+    let document: serde_json::Value =\n+        serde_json::from_slice(bytes.get_ref()).unwrap();\n+    let _: openapiv3::OpenAPI =\n+        serde_json::from_value(document.clone()).unwrap();\n+\n+    assert_ref_objects_have_no_siblings(&document);\n+    let field_schema = schema_at(\n+        &document,\n+        \"/paths/~1test~1plain_documented_ref/get/responses/200/content/application~1json/schema/properties/documented_leaf\",\n+    );\n+    assert_eq!(\n+        field_schema,\n+        &serde_json::json!({\n+            \"$ref\": \"#/components/schemas/PlainDocumentedRefLeaf\"\n+        }),\n+    );\n+    assert!(\n+        document\n+            .pointer(\"/components/schemas/PlainDocumentedRefLeaf\")\n+            .is_some(),\n+        \"the documented field's named component was not emitted\",\n+    );\n+}\n"
++  "patch": "diff --git a/dropshot/src/schema_util.rs b/dropshot/src/schema_util.rs\nindex c406c7d..4cef91c 100644\n--- a/dropshot/src/schema_util.rs\n+++ b/dropshot/src/schema_util.rs\n@@ -374,19 +374,20 @@ fn j2oas_schema_object(\n     obj: &schemars::schema::SchemaObject,\n ) -> openapiv3::ReferenceOr<openapiv3::Schema> {\n     if let Some(reference) = &obj.reference {\n+        if schema_is_nullable(obj) {\n+            return nullable_reference_schema(\n+                reference,\n+                openapiv3::SchemaData::default(),\n+            );\n+        }\n         return openapiv3::ReferenceOr::Reference {\n             reference: reference.clone(),\n         };\n     }\n \n-    let kind = j2oas_schema_object_kind(obj);\n-\n     let mut data = openapiv3::SchemaData::default();\n \n-    if matches!(\n-        &obj.extensions.get(\"nullable\"),\n-        Some(serde_json::Value::Bool(true))\n-    ) {\n+    if schema_is_nullable(obj) {\n         data.nullable = true;\n     }\n \n@@ -414,12 +415,90 @@ fn j2oas_schema_object(\n         data.example = Some(example.clone());\n     }\n \n+    if let Some(reference) = nullable_all_of_reference(obj) {\n+        data.nullable = false;\n+        return nullable_reference_schema(reference, data);\n+    }\n+\n+    let kind = j2oas_schema_object_kind(obj);\n+\n     openapiv3::ReferenceOr::Item(openapiv3::Schema {\n         schema_data: data,\n         schema_kind: kind,\n     })\n }\n \n+fn schema_is_nullable(obj: &schemars::schema::SchemaObject) -> bool {\n+    matches!(\n+        obj.extensions.get(\"nullable\"),\n+        Some(serde_json::Value::Bool(true))\n+    )\n+}\n+\n+fn nullable_all_of_reference(\n+    obj: &schemars::schema::SchemaObject,\n+) -> Option<&String> {\n+    if !schema_is_nullable(obj)\n+        || obj.reference.is_some()\n+        || obj.instance_type.is_some()\n+        || obj.format.is_some()\n+        || obj.enum_values.is_some()\n+        || obj.const_value.is_some()\n+        || obj.number.is_some()\n+        || obj.string.is_some()\n+        || obj.array.is_some()\n+        || obj.object.is_some()\n+        || obj.extensions.len() != 1\n+    {\n+        return None;\n+    }\n+\n+    let subschemas = obj.subschemas.as_ref()?;\n+    if subschemas.any_of.is_some()\n+        || subschemas.one_of.is_some()\n+        || subschemas.not.is_some()\n+        || subschemas.if_schema.is_some()\n+        || subschemas.then_schema.is_some()\n+        || subschemas.else_schema.is_some()\n+    {\n+        return None;\n+    }\n+\n+    let [schemars::schema::Schema::Object(schema)] =\n+        subschemas.all_of.as_ref()?.as_slice()\n+    else {\n+        return None;\n+    };\n+    schema.reference.as_ref()\n+}\n+\n+fn nullable_reference_schema(\n+    reference: &str,\n+    schema_data: openapiv3::SchemaData,\n+) -> openapiv3::ReferenceOr<openapiv3::Schema> {\n+    let reference_schema =\n+        openapiv3::ReferenceOr::Reference { reference: reference.to_string() };\n+    let null_schema = openapiv3::ReferenceOr::Item(openapiv3::Schema {\n+        schema_data: openapiv3::SchemaData {\n+            nullable: true,\n+            ..openapiv3::SchemaData::default()\n+        },\n+        schema_kind: openapiv3::SchemaKind::Type(openapiv3::Type::String(\n+            openapiv3::StringType {\n+                enumeration: vec![None],\n+                ..openapiv3::StringType::default()\n+            },\n+        )),\n+    });\n+\n+    openapiv3::ReferenceOr::Item(openapiv3::Schema {\n+        schema_data,\n+        schema_kind: openapiv3::SchemaKind::AnyOf {\n+            any_of: vec![reference_schema, null_schema],\n+        },\n+    })\n+}\n+\n fn j2oas_schema_object_kind(\n     obj: &schemars::schema::SchemaObject,\n ) -> openapiv3::SchemaKind {\n",
++  "test_patch": "diff --git a/dropshot/tests/integration-tests/openapi.rs b/dropshot/tests/integration-tests/openapi.rs\nindex 170297f..4966bd2 100644\n--- a/dropshot/tests/integration-tests/openapi.rs\n+++ b/dropshot/tests/integration-tests/openapi.rs\n@@ -809,3 +809,496 @@ fn test_openapi_custom_error_types_trait_based() -> anyhow::Result<()> {\n     );\n     Ok(())\n }\n+#[derive(JsonSchema, Serialize, Deserialize)]\n+#[allow(dead_code)]\n+struct OptionPositionItem {\n+    name: String,\n+}\n+\n+#[derive(JsonSchema)]\n+#[allow(dead_code)]\n+struct OptionPositionBodySchema {\n+    optional_field: Option<OptionPositionItem>,\n+    optional_items: Vec<Option<OptionPositionItem>>,\n+    optional_values: HashMap<String, Option<OptionPositionItem>>,\n+    nested_optional: Option<Option<OptionPositionItem>>,\n+    plain_field: OptionPositionItem,\n+    plain_items: Vec<OptionPositionItem>,\n+    plain_values: HashMap<String, OptionPositionItem>,\n+}\n+\n+#[derive(Serialize, Deserialize)]\n+#[allow(dead_code)]\n+struct OptionPositionBody {\n+    optional_field: Option<OptionPositionItem>,\n+    optional_items: Vec<Option<OptionPositionItem>>,\n+    optional_values: HashMap<String, Option<OptionPositionItem>>,\n+    nested_optional: Option<Option<OptionPositionItem>>,\n+    plain_field: OptionPositionItem,\n+    plain_items: Vec<OptionPositionItem>,\n+    plain_values: HashMap<String, OptionPositionItem>,\n+}\n+\n+impl JsonSchema for OptionPositionBody {\n+    fn schema_name() -> String {\n+        String::from(\"OptionPositionBody\")\n+    }\n+\n+    fn is_referenceable() -> bool {\n+        false\n+    }\n+\n+    fn json_schema(\n+        generator: &mut schemars::r#gen::SchemaGenerator,\n+    ) -> schemars::schema::Schema {\n+        OptionPositionBodySchema::json_schema(generator)\n+    }\n+}\n+\n+#[endpoint {\n+    method = GET,\n+    path = \"/test/option_positions\",\n+    tags = [\"it\"],\n+}]\n+async fn handler_option_positions(\n+    _rqctx: RequestContext<()>,\n+) -> Result<HttpResponseOk<OptionPositionBody>, HttpError> {\n+    unimplemented!()\n+}\n+\n+#[endpoint {\n+    method = POST,\n+    path = \"/test/option_request\",\n+    tags = [\"it\"],\n+}]\n+async fn handler_option_request(\n+    _rqctx: RequestContext<()>,\n+    _body: TypedBody<Option<OptionPositionItem>>,\n+) -> Result<HttpResponseUpdatedNoContent, HttpError> {\n+    unimplemented!()\n+}\n+\n+#[endpoint {\n+    method = GET,\n+    path = \"/test/option_return_item\",\n+    tags = [\"it\"],\n+}]\n+async fn handler_option_return(\n+    _rqctx: RequestContext<()>,\n+) -> Result<HttpResponseOk<Option<OptionPositionItem>>, HttpError> {\n+    unimplemented!()\n+}\n+\n+fn nullable_test_document() -> serde_json::Value {\n+    let mut description = ApiDescription::new();\n+    description.register(handler_option_positions).unwrap();\n+    description.register(handler_option_request).unwrap();\n+    description.register(handler_option_return).unwrap();\n+\n+    let mut bytes = Cursor::new(Vec::new());\n+    description\n+        .openapi(\"nullable-positions\", semver::Version::new(1, 0, 0))\n+        .write(&mut bytes)\n+        .unwrap();\n+\n+    let document: serde_json::Value =\n+        serde_json::from_slice(bytes.get_ref()).unwrap();\n+    let typed: openapiv3::OpenAPI =\n+        serde_json::from_value(document.clone()).unwrap();\n+    assert_eq!(typed.openapi, \"3.0.3\");\n+    assert_ref_objects_have_no_siblings(&document);\n+    document\n+}\n+\n+fn assert_ref_objects_have_no_siblings(node: &serde_json::Value) {\n+    match node {\n+        serde_json::Value::Array(elements) => {\n+            for element in elements {\n+                assert_ref_objects_have_no_siblings(element);\n+            }\n+        }\n+        serde_json::Value::Object(fields) => {\n+            if fields.get(\"$ref\").is_some() {\n+                assert_eq!(\n+                    fields.len(),\n+                    1,\n+                    \"reference object contains sibling keys: {}\",\n+                    serde_json::to_string_pretty(node).unwrap(),\n+                );\n+            }\n+            for element in fields.values() {\n+                assert_ref_objects_have_no_siblings(element);\n+            }\n+        }\n+        _ => {}\n+    }\n+}\n+\n+fn schema_accepts(\n+    document: &serde_json::Value,\n+    schema: &serde_json::Value,\n+    instance: &serde_json::Value,\n+    depth: usize,\n+) -> bool {\n+    if depth > 16 {\n+        return false;\n+    }\n+\n+    let Some(fields) = schema.as_object() else {\n+        return false;\n+    };\n+\n+    // OpenAPI 3.0 Reference Objects ignore all sibling fields.\n+    if let Some(reference) =\n+        fields.get(\"$ref\").and_then(serde_json::Value::as_str)\n+    {\n+        let Some(target) = reference\n+            .strip_prefix('#')\n+            .and_then(|pointer| document.pointer(pointer))\n+        else {\n+            return false;\n+        };\n+        return schema_accepts(document, target, instance, depth + 1);\n+    }\n+\n+    if let Some(schema_type) =\n+        fields.get(\"type\").and_then(serde_json::Value::as_str)\n+    {\n+        let nullable =\n+            fields.get(\"nullable\").and_then(serde_json::Value::as_bool)\n+                == Some(true);\n+        let type_matches = (instance.is_null() && nullable)\n+            || match schema_type {\n+                \"null\" => false,\n+                \"boolean\" => instance.is_boolean(),\n+                \"object\" => instance.is_object(),\n+                \"array\" => instance.is_array(),\n+                \"number\" => instance.is_number(),\n+                \"string\" => instance.is_string(),\n+                \"integer\" => instance\n+                    .as_number()\n+                    .is_some_and(|number| number.is_i64() || number.is_u64()),\n+                _ => false,\n+            };\n+        if !type_matches {\n+            return false;\n+        }\n+    }\n+\n+    if fields\n+        .get(\"enum\")\n+        .and_then(serde_json::Value::as_array)\n+        .is_some_and(|values| !values.contains(instance))\n+    {\n+        return false;\n+    }\n+\n+    if fields.get(\"allOf\").and_then(serde_json::Value::as_array).is_some_and(\n+        |schemas| {\n+            schemas.iter().any(|candidate| {\n+                !schema_accepts(document, candidate, instance, depth + 1)\n+            })\n+        },\n+    ) {\n+        return false;\n+    }\n+\n+    if fields.get(\"anyOf\").and_then(serde_json::Value::as_array).is_some_and(\n+        |schemas| {\n+            !schemas.iter().any(|candidate| {\n+                schema_accepts(document, candidate, instance, depth + 1)\n+            })\n+        },\n+    ) {\n+        return false;\n+    }\n+\n+    if fields.get(\"oneOf\").and_then(serde_json::Value::as_array).is_some_and(\n+        |schemas| {\n+            schemas\n+                .iter()\n+                .filter(|candidate| {\n+                    schema_accepts(document, candidate, instance, depth + 1)\n+                })\n+                .count()\n+                != 1\n+        },\n+    ) {\n+        return false;\n+    }\n+\n+    if fields.get(\"not\").is_some_and(|candidate| {\n+        schema_accepts(document, candidate, instance, depth + 1)\n+    }) {\n+        return false;\n+    }\n+\n+    if let Some(object) = instance.as_object() {\n+        if fields\n+            .get(\"required\")\n+            .and_then(serde_json::Value::as_array)\n+            .is_some_and(|required| {\n+                required.iter().any(|name| {\n+                    name.as_str().is_none_or(|name| !object.contains_key(name))\n+                })\n+            })\n+        {\n+            return false;\n+        }\n+\n+        let properties =\n+            fields.get(\"properties\").and_then(serde_json::Value::as_object);\n+        for (name, value) in object {\n+            if let Some(property_schema) =\n+                properties.and_then(|properties| properties.get(name))\n+            {\n+                if !schema_accepts(document, property_schema, value, depth + 1)\n+                {\n+                    return false;\n+                }\n+                continue;\n+            }\n+\n+            match fields.get(\"additionalProperties\") {\n+                Some(serde_json::Value::Bool(false)) => return false,\n+                Some(additional_schema) if additional_schema.is_object() => {\n+                    if !schema_accepts(\n+                        document,\n+                        additional_schema,\n+                        value,\n+                        depth + 1,\n+                    ) {\n+                        return false;\n+                    }\n+                }\n+                _ => {}\n+            }\n+        }\n+    }\n+\n+    if let (Some(items), Some(array)) =\n+        (fields.get(\"items\"), instance.as_array())\n+    {\n+        if array\n+            .iter()\n+            .any(|item| !schema_accepts(document, items, item, depth + 1))\n+        {\n+            return false;\n+        }\n+    }\n+\n+    true\n+}\n+\n+fn schema_at<'a>(\n+    document: &'a serde_json::Value,\n+    pointer: &str,\n+) -> &'a serde_json::Value {\n+    document.pointer(pointer).unwrap_or_else(|| {\n+        panic!(\n+            \"schema pointer {pointer} was absent:\\n{}\",\n+            serde_json::to_string_pretty(document).unwrap(),\n+        )\n+    })\n+}\n+\n+fn assert_schema_nullable(document: &serde_json::Value, pointer: &str) {\n+    let schema = schema_at(document, pointer);\n+    assert!(\n+        schema_accepts(document, schema, &serde_json::Value::Null, 0),\n+        \"schema at {pointer} does not permit null:\\n{}\",\n+        serde_json::to_string_pretty(schema).unwrap(),\n+    );\n+    assert!(\n+        schema_accepts(\n+            document,\n+            schema,\n+            &serde_json::json!({ \"name\": \"x\" }),\n+            0,\n+        ),\n+        \"schema at {pointer} rejects a valid OptionPositionItem:\\n{}\",\n+        serde_json::to_string_pretty(schema).unwrap(),\n+    );\n+    for invalid in [serde_json::json!({}), serde_json::json!({ \"name\": 1 })] {\n+        assert!(\n+            !schema_accepts(document, schema, &invalid, 0),\n+            \"schema at {pointer} accepts invalid instance {invalid}:\\n{}\",\n+            serde_json::to_string_pretty(schema).unwrap(),\n+        );\n+    }\n+}\n+\n+fn assert_schema_not_nullable(document: &serde_json::Value, pointer: &str) {\n+    let schema = schema_at(document, pointer);\n+    assert!(\n+        !schema_accepts(document, schema, &serde_json::Value::Null, 0),\n+        \"schema at {pointer} permits null unexpectedly:\\n{}\",\n+        serde_json::to_string_pretty(schema).unwrap(),\n+    );\n+    assert!(\n+        schema_accepts(\n+            document,\n+            schema,\n+            &serde_json::json!({ \"name\": \"x\" }),\n+            0,\n+        ),\n+        \"schema at {pointer} rejects a valid OptionPositionItem:\\n{}\",\n+        serde_json::to_string_pretty(schema).unwrap(),\n+    );\n+}\n+\n+const OPTION_POSITIONS_SCHEMA: &str = concat!(\n+    \"/paths/~1test~1option_positions/get/responses/200/\",\n+    \"content/application~1json/schema\",\n+);\n+\n+#[test]\n+fn test_openapi_option_response_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        \"/paths/~1test~1option_return_item/get/responses/200/content/application~1json/schema\",\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_option_struct_field_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        &format!(\"{OPTION_POSITIONS_SCHEMA}/properties/optional_field\"),\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_option_sequence_item_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        &format!(\"{OPTION_POSITIONS_SCHEMA}/properties/optional_items/items\"),\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_option_map_value_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        &format!(\n+            \"{OPTION_POSITIONS_SCHEMA}/properties/optional_values/additionalProperties\"\n+        ),\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_nested_option_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        &format!(\"{OPTION_POSITIONS_SCHEMA}/properties/nested_optional\"),\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_option_request_body_is_nullable() {\n+    let document = nullable_test_document();\n+    assert_schema_nullable(\n+        &document,\n+        \"/paths/~1test~1option_request/post/requestBody/content/application~1json/schema\",\n+    );\n+}\n+\n+#[test]\n+fn test_openapi_non_option_positions_unchanged() {\n+    let document = nullable_test_document();\n+    for pointer in [\n+        format!(\"{OPTION_POSITIONS_SCHEMA}/properties/plain_field\"),\n+        format!(\"{OPTION_POSITIONS_SCHEMA}/properties/plain_items/items\"),\n+        format!(\n+            \"{OPTION_POSITIONS_SCHEMA}/properties/plain_values/additionalProperties\"\n+        ),\n+        String::from(\"/components/schemas/OptionPositionItem\"),\n+    ] {\n+        assert_schema_not_nullable(&document, &pointer);\n+    }\n+}\n+\n+#[derive(JsonSchema, Serialize, Deserialize)]\n+#[allow(dead_code)]\n+struct PlainDocumentedRefLeaf {\n+    value: String,\n+}\n+\n+#[derive(JsonSchema)]\n+#[allow(dead_code)]\n+struct PlainDocumentedRefBodySchema {\n+    /// This documentation must not become a sibling of the reference.\n+    documented_leaf: PlainDocumentedRefLeaf,\n+}\n+\n+#[derive(Serialize, Deserialize)]\n+#[allow(dead_code)]\n+struct PlainDocumentedRefBody {\n+    documented_leaf: PlainDocumentedRefLeaf,\n+}\n+\n+impl JsonSchema for PlainDocumentedRefBody {\n+    fn schema_name() -> String {\n+        String::from(\"PlainDocumentedRefBody\")\n+    }\n+\n+    fn is_referenceable() -> bool {\n+        false\n+    }\n+\n+    fn json_schema(\n+        generator: &mut schemars::r#gen::SchemaGenerator,\n+    ) -> schemars::schema::Schema {\n+        PlainDocumentedRefBodySchema::json_schema(generator)\n+    }\n+}\n+\n+#[endpoint {\n+    method = GET,\n+    path = \"/test/plain_documented_ref\",\n+    tags = [\"it\"],\n+}]\n+async fn handler_plain_documented_ref(\n+    _rqctx: RequestContext<()>,\n+) -> Result<HttpResponseOk<PlainDocumentedRefBody>, HttpError> {\n+    unimplemented!()\n+}\n+\n+#[test]\n+fn test_openapi_plain_documented_ref_unchanged() {\n+    let mut description = ApiDescription::new();\n+    description.register(handler_plain_documented_ref).unwrap();\n+\n+    let mut bytes = Cursor::new(Vec::new());\n+    description\n+        .openapi(\"plain-documented-ref\", semver::Version::new(1, 0, 0))\n+        .write(&mut bytes)\n+        .unwrap();\n+    let document: serde_json::Value =\n+        serde_json::from_slice(bytes.get_ref()).unwrap();\n+    let _: openapiv3::OpenAPI =\n+        serde_json::from_value(document.clone()).unwrap();\n+\n+    assert_ref_objects_have_no_siblings(&document);\n+    let field_schema = schema_at(\n+        &document,\n+        \"/paths/~1test~1plain_documented_ref/get/responses/200/content/application~1json/schema/properties/documented_leaf\",\n+    );\n+    assert_eq!(\n+        field_schema,\n+        &serde_json::json!({\n+            \"$ref\": \"#/components/schemas/PlainDocumentedRefLeaf\"\n+        }),\n+    );\n+    assert!(\n+        document\n+            .pointer(\"/components/schemas/PlainDocumentedRefLeaf\")\n+            .is_some(),\n+        \"the documented field's named component was not emitted\",\n+    );\n+}\n"
+ }
