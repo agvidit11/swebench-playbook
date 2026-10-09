@@ -213,4 +213,5 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm6971 | guardian-checker-coherence-membership-writes | django-guardian/django-guardian | MT3: own assign/remove+prefetch / membership changes / other writes — checker coherence | P | PROBING | 2026-10-09 | base 5579b8e1; codex-verified 34/34 base diffs; A4 CLEAR; 23/28; no-over-invalidation rule from S2 |
 | devvm6971 | lane-i MT domain: test-data factories | factory_bot / factory_boy | — | I | KILLED | 2026-10-09 | factory_boy stale; factory_bot maintainer 5-PR core rewrite 10-06 discloses seams; sequences only 3 defects; model_bakery thin |
 | devvm6971 | lane-i MT domain: immutable-update patches (immer / mobx-state-tree) | TBD | MT3 | I | PROBING-REPO | 2026-10-09 | card agent dispatched |
-| devvm6971 | lane-i MT domain: graph views under mutation (networkx / rustworkx) | TBD | MT3 | I | PROBING-REPO | 2026-10-09 | card agent dispatched |
+| devvm6971 | lane-i MT domain: graph views under mutation | networkx | — | I | KILLED | 2026-10-09 | views: 1 one-line bug; overlay: copy+replay authority self-checkable, cold Codex 25/26, 12/12 |
+| devvm6971 | lane-i MT domain: CLI parameter-source bookkeeping (click / typer) | TBD | MT3 | I | PROBING-REPO | 2026-10-09 | card agent dispatched |
