@@ -308,3 +308,6 @@ Avocado — read it before choosing the next card.
 | 2026-10-09 | devvm6971 | shake resource cancel capacity (single-turn) | ndmitchell/shake (BSD-3) | capacity leak after cancelled run with queued waiter | v1 harness avocado 3/5 (fails = unstated scope; passers used broken hack) | v2 scope stated: harness avocado 4/4 | stating the scope removed the only difficulty | RELEASED |
 
 | 2026-10-09 | devvm6971 | shake versioned rule obsolete deps (single-turn) | ndmitchell/shake (BSD-3) | old-version deps still checked after versioned bump | real-harness avocado 4/4 | - | over ceiling | RELEASED |
+
+| 2026-10-09 | devvm6971 | rebar3 header removal stale beam (single-turn) | erlang/rebar3 (Apache-2.0) | deleted/restored direct include keeps stale beam | real-harness avocado 4/4 | - | over ceiling | RELEASED |
+| 2026-10-09 | devvm6971 | SINGLE-TURN BATCH SUMMARY | 5 seams on real harness | stated single facet + observability gap | 3/5 (unstated scope), then 4/4, 4/4, 4/4, 4/4 | - | avocado closes every STATED gap on the real harness, even ones a natural self-test cannot see | lens exhausted |
