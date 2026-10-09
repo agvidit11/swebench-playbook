@@ -292,3 +292,7 @@ Avocado — read it before choosing the next card.
 | 2026-10-08 | devvm23237 | yaml-map-key-rename-coherence | exact-final cold Muse k=5 | 5/5, not run | RELEASED; prior 1/5 + 2/5 used materially less explicit prompts, so build/READY evidence revoked before push |
 
 | 2026-10-08 | devvm6971 | io-sim timeout unwind + masking restore | IntersectMBO/io-sim (Haskell) | IO-anchored differential grader | Stage A Muse 0/5, Codex 2/5 (implied rule) | chained U: 5/5,5/5,5/5 both; chained S: Codex 5/5,4/5,5/5, Muse 5/5,5/5,4/4; ST stated Muse 4/5, Codex 2/5 | difficulty = discovering which scenarios matter; MT steps must name scenarios, so it saturates | RELEASED |
+
+| 2026-10-09 | devvm6971 | distributed-process registry re-register/dead-register (F2+F3) | haskell-distributed/distributed-process (BSD-3) | multi-party (requester/registry/host/observer) | Stage A | Codex 5/5, Muse 4/4 valid | no failures; named check not reached | KILLED (multi-party lens) |
+| 2026-10-09 | devvm6971 | distributed-process node shutdown not propagated (G) | distributed-process + network-transport-inmemory | multi-party; cause in a different package | Stage A | Codex 5/5, Muse 4/4 valid | Codex found the transport-level cause in ~10 min | KILLED (multi-party lens) |
+| 2026-10-09 | devvm6971 | MQTT 5 Will Delay Interval (W) | dotnet/MQTTnet (MIT) | will owner/subscriber/reconnect/session expiry | Stage A | Codex 5/5, Muse 5/5 | no failures | KILLED (multi-party lens) |
