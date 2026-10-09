@@ -301,3 +301,5 @@ Avocado — read it before choosing the next card.
 
 | 2026-10-09 | devvm6971 | commons-vfs snapshot re-capture (single-turn) | apache/commons-vfs | stale VFS child cache on re-capture | headless Muse 7/10 (pooled 10/15), Codex 5/5; REAL HARNESS avocado 5/5 | named Muse 3/3 | headless Muse overstates difficulty vs harness | RELEASED |
 | 2026-10-09 | devvm6971 | dejafu DPOR throwTo wake-up (single-turn) | barrucadu/dejafu | IO-anchored, 22 checks | Muse 8/10, Codex 4/5 | - | over stop rule | RELEASED |
+
+| 2026-10-09 | devvm6971 | nebulex listener/cache lifecycle (single-turn) | elixir-nebulex/nebulex (MIT) | listeners outlive cache on restart/crash | real-harness avocado 4/4 | - | over ceiling | RELEASED |
