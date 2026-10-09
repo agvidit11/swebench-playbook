@@ -132,3 +132,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-09 02:10 | devvm6971 | B | README rates placeholders on pushed tasks | — | Vidit rule: after server pass, README-only commit with real rates before submission (LANE-B item 12) — RULE
 
 - 2026-10-09 devvm6971/agvidit-b0: HEADLESS mc2.sh Muse probes overstate difficulty vs the real codimango harness (commons-vfs: 7/10 headless -> avocado 5/5 harness). Gate on harness avocado. Local metacode needs allow_internet=true, no network_mode, --allow-bridge-networks, NO_PROXY=host.docker.internal (recipe: memory feedback_swebench_headless_muse_vs_harness_avocado.md; harness copy ~/swebench/st-lane/harness-repo/).
+2026-10-09 14:20 | devvm6971 | ALL | Vidit: this lane raises NEW tasks only; post-submission reviews/revisions/status/reruns are not ours (another session handles them) | — | dropped vobject revision + jsonc/btree follow-ups — RULE
