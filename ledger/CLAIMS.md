@@ -219,3 +219,4 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm6971 | lane-i MT domain: graph views under mutation | networkx | — | I | KILLED | 2026-10-09 | views: 1 one-line bug; overlay: copy+replay authority self-checkable, cold Codex 25/26, 12/12 |
 | devvm6971 | picocli-value-provenance-argfile-overrides | remkop/picocli | MT3: valueSource / argumentFiles / overriddenOccurrences | P | PROBING | 2026-10-09 | base 10509c0a; codex-verified; A4 ADJACENT (exclusion zone); click/typer/clap/commander/yargs/go-flags taken; 21/28 |
 | devvm6971 | st-sourcing-kill-wai | yesodweb/wai | single-turn sourcing kill | B | RELEASED | 2026-10-09 | agvidit-b0: 88 AI-credited commits. |
+| devvm6971 | polyfactory-generic-model-specialization | litestar-org/polyfactory | MT3: generic aliases+subclass / variadic+defaults / deep hierarchies | P | PROBING | 2026-10-09 | base 6234cf0a; msgspec/cattrs dropped (peers); codex-verified 113 FAIR; A4 CLEAR; 25/28 |
