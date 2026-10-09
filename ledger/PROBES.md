@@ -296,3 +296,6 @@ Avocado — read it before choosing the next card.
 | 2026-10-09 | devvm6971 | distributed-process registry re-register/dead-register (F2+F3) | haskell-distributed/distributed-process (BSD-3) | multi-party (requester/registry/host/observer) | Stage A | Codex 5/5, Muse 4/4 valid | no failures; named check not reached | KILLED (multi-party lens) |
 | 2026-10-09 | devvm6971 | distributed-process node shutdown not propagated (G) | distributed-process + network-transport-inmemory | multi-party; cause in a different package | Stage A | Codex 5/5, Muse 4/4 valid | Codex found the transport-level cause in ~10 min | KILLED (multi-party lens) |
 | 2026-10-09 | devvm6971 | MQTT 5 Will Delay Interval (W) | dotnet/MQTTnet (MIT) | will owner/subscriber/reconnect/session expiry | Stage A | Codex 5/5, Muse 5/5 | no failures | KILLED (multi-party lens) |
+
+| 2026-10-09 | devvm6971 | commons-vfs snapshot re-capture (single-turn) | apache/commons-vfs | stale VFS child cache on re-capture | headless Muse 7/10 (pooled 10/15), Codex 5/5; REAL HARNESS avocado 5/5 | named Muse 3/3 | headless Muse overstates difficulty vs harness | RELEASED |
+| 2026-10-09 | devvm6971 | dejafu DPOR throwTo wake-up (single-turn) | barrucadu/dejafu | IO-anchored, 22 checks | Muse 8/10, Codex 4/5 | - | over stop rule | RELEASED |
