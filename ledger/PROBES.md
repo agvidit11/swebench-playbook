@@ -290,3 +290,5 @@ Avocado — read it before choosing the next card.
 | 2026-10-06 | devvm23237 | open-feature (frozen bundle) | K-to-N x2 | 5/5,0/5,— ; 5/5,1/5,0/5 | pooled with probe S2 3/15, S3 2/10 — low/at-risk |
 | 2026-10-06 | devvm23237 | open-feature C1-dropped variant | K-to-N metacode k=5 | 5/5, 2/5, 1/5 (2 distinct S2 seeds) | contingency; better S2 floor than full (pooled 3/15) |
 | 2026-10-08 | devvm23237 | yaml-map-key-rename-coherence | exact-final cold Muse k=5 | 5/5, not run | RELEASED; prior 1/5 + 2/5 used materially less explicit prompts, so build/READY evidence revoked before push |
+
+| 2026-10-08 | devvm6971 | io-sim timeout unwind + masking restore | IntersectMBO/io-sim (Haskell) | IO-anchored differential grader | Stage A Muse 0/5, Codex 2/5 (implied rule) | chained U: 5/5,5/5,5/5 both; chained S: Codex 5/5,4/5,5/5, Muse 5/5,5/5,4/4; ST stated Muse 4/5, Codex 2/5 | difficulty = discovering which scenarios matter; MT steps must name scenarios, so it saturates | RELEASED |
