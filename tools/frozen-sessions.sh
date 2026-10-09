@@ -47,7 +47,13 @@ for f in sorted(glob.glob(f"{home}/.claude/sessions/*.json")):
     reg_age = (now - d.get("updatedAt", 0) / 1000) / 60
     proj = (d.get("cwd") or home).replace("/", "-")
     tr = f"{home}/.claude/projects/{proj}/{sid}.jsonl"
-    tr_age = (now - os.path.getmtime(tr)) / 60 if os.path.exists(tr) else float("inf")
+    # Activity = the newest write among the session transcript AND its subagents'
+    # transcripts. A coordinator waiting on a long-running subagent stays "busy" while
+    # its own transcript goes quiet; on 2026-10-09 this session was falsely flagged
+    # that way (own transcript idle 1.5h, subagent writing the whole time).
+    cands = [tr] + glob.glob(f"{home}/.claude/projects/{proj}/{sid}/subagents/*.jsonl")
+    mts = [os.path.getmtime(x) for x in cands if os.path.exists(x)]
+    tr_age = (now - max(mts)) / 60 if mts else float("inf")
     if reg_age < mins or tr_age < mins:
         continue
     zombies = 0
