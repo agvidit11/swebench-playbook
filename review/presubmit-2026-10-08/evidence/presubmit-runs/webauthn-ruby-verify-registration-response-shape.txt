@@ -1,0 +1,32 @@
+
+presubmit: webauthn-ruby-verify-registration-response-shape  (format=swe_bench_single_turn)
+  FAIL  task.toml fields: [task].track_assignment missing
+  FAIL  task.toml metadata: [metadata].reward_type missing (structural check)
+  FAIL  README completeness: placeholder text present: ['TBD']
+  FAIL  README counts: README count(s) disagree with tests/config.json: 5 fail_to_pass (config: 7)
+  FAIL  agentic verdict: BAD_GRADING_WEAK — fix the named rubric items or justify each
+  WARN  task.toml metadata: [metadata] missing (reviewers flag): ['difficulty', 'category', 'tags']
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  config task: uppercase duplicate keys ['PASS_TO_PASS', 'FAIL_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  trial census: 1 errored/crashed trial(s) — avocado: 1P/4F/0E, claude: 2P/3F/0E, gpt: 4P/1F/1E. Crashes are not difficulty (mlx review). `codimango task rerun webauthn-ruby-verify-registration-response-shape` and re-check before submitting.
+  WARN  single-test dominance: 7/8 failed trials fail `spec/webauthn/verify_registration_shape_validation_spec.rb::verify_registration response shape validation does not convert legacy assertion-path errors into a registration-family error` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  PASS  task.toml name: codimango/webauthn-ruby-verify-registration-response-shape
+  PASS  README sections: all 4 required sections present
+  PASS  README internal URLs: none
+  PASS  config task: 7 f2p / 6 p2p, clean keys
+  PASS  server freshness: server at 781a4da5
+  PASS  validation: Structural checks: All 9/9 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado not trivial and ≥1 agent solved (avocado [avocado-5.14-code]: 1/5, opus [claude-opus-4-8]: 2/5, gpt [gpt-5.5]: 4/5)
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 0 · Low 1)
+  PASS  validation: Contamination check: Risk: MEDIUM
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  solvers: solved by ['claude', 'gpt', 'avocado']
+  PASS  human review: latest decision Accept @ 2026-07-23 14:47 — make sure every point is addressed
+
+  5 FAIL · 5 WARN · 17 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

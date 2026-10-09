@@ -1,0 +1,37 @@
+
+presubmit: unyt-pint-bridge-semantic-fidelity  (format=swe_bench_multi_turn)
+  FAIL  README sections: missing required section(s): ['Description', 'Completion Rates', 'Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
+  WARN  task.toml name: [task].name = 'agvidit/unyt-pint-bridge-semantic-fidelity', expected 'codimango/unyt-pint-bridge-semantic-fidelity'
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 1_bidirectional_fidelity: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 2_round_trip: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  MT re-test: 2_round_trip does not re-run 9 of 9 f2p from 1_bidirectional_fidelity (regressions invisible)
+  WARN  MT task-level config: task-level fail_to_pass has 3 id(s) no step grades
+  WARN  harness collision: steps/1_bidirectional_fidelity/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  harness collision: steps/2_round_trip/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  solvers: only gpt solved it — reviewers ask for a second model (concourse review)
+  WARN  single-test dominance: 8/9 failed trials fail `unyt/tests/test_pint_semantic_bridge_import.py::test_mt2_regression` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 15 f2p / 15 p2p, clean keys
+  PASS  config 1_bidirectional_fidelity: 9 f2p / 16 p2p, clean keys
+  PASS  config 2_round_trip: 3 f2p / 15 p2p, clean keys
+  PASS  server freshness: server at a939748b
+  PASS  validation: Structural checks: All 20/20 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — every step is within avocado [avocado-code-flex-5.16]'s 3/5 ceiling, or carried by a third-party gradient (avocado [avocado-code-fl
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  stage multi-turn-step-results: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 0P/5F/0E, gpt: 6P/4F/0E
+  PASS  human review: latest decision Accept @ 2026-10-05 23:45 — make sure every point is addressed
+
+  1 FAIL · 11 WARN · 20 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

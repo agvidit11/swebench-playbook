@@ -1,0 +1,32 @@
+
+presubmit: django-model-utils-fieldtracker-related-snapshot  (format=swe_bench_multi_turn)
+  WARN  config task: uppercase duplicate keys ['TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 1_related_snapshot: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD', 'TEST_PATCH'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 2_partial_invalidation: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD', 'TEST_PATCH'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  harness interpreter: steps/1_related_snapshot/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  harness interpreter: steps/2_partial_invalidation/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  PASS  task.toml name: codimango/django-model-utils-fieldtracker-related-snapshot
+  PASS  README sections: all 4 required sections present
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 15 f2p / 5 p2p, clean keys
+  PASS  config 1_related_snapshot: 8 f2p / 6 p2p, clean keys
+  PASS  config 2_partial_invalidation: 7 f2p / 16 p2p, clean keys
+  PASS  MT re-test: 2_partial_invalidation re-runs all f2p of 1_related_snapshot
+  PASS  server freshness: server at 30342987
+  PASS  validation: Structural checks: All 20/20 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — every step is within avocado [avocado-code-flex-5.16]'s 3/5 ceiling, or carried by a third-party gradient (avocado [avocado-code-fl
+  PASS  validation: Contamination check: Risk: MEDIUM
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 3P/8F/0E, claude: 4P/6F/0E, gpt: 5P/5F/0E
+  PASS  solvers: solved by ['claude', 'avocado', 'gpt']
+  PASS  human review: latest decision Accept @ 2026-09-25 03:00 — make sure every point is addressed
+
+  0 FAIL · 5 WARN · 22 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

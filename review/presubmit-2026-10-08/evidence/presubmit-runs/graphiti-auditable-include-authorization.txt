@@ -1,0 +1,31 @@
+
+presubmit: graphiti-auditable-include-authorization  (format=swe_bench_single_turn)
+  FAIL  README sections: missing required section(s): ['Description'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  harness collision: tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  harness interpreter: tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  solvers: only gpt solved it — reviewers ask for a second model (concourse review)
+  WARN  single-test dominance: 5/5 failed trials fail `./spec/query_spec.rb[1:2:15]` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  PASS  task.toml name: codimango/graphiti-auditable-include-authorization
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  README counts: match config (8 f2p / 86 p2p)
+  PASS  config task: 8 f2p / 86 p2p, clean keys
+  PASS  server freshness: server at d43e01bb
+  PASS  validation: Structural checks: All 17/17 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 0/5, opus: no trials, gpt [gpt-6.1-sol]: 5/5)
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 0 · Low 1)
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: Verdict: SUSPECT — review recommended
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 0P/5F/0E, gpt: 5P/0F/0E
+  PASS  human review: latest decision Accept @ 2026-10-02 18:47 — make sure every point is addressed
+
+  1 FAIL · 5 WARN · 20 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

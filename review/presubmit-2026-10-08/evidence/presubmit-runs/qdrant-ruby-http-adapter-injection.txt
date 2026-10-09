@@ -1,0 +1,29 @@
+
+presubmit: qdrant-ruby-http-adapter-injection  (format=swe_bench_single_turn)
+  FAIL  task.toml fields: [task].track_assignment missing
+  FAIL  task.toml metadata: [metadata].reward_type missing (structural check)
+  FAIL  agentic verdict: BAD_GRADING_WEAK — fix the named rubric items or justify each
+  WARN  task.toml metadata: [metadata] missing (reviewers flag): ['difficulty', 'category', 'tags']
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  PASS  task.toml name: codimango/qdrant-ruby-http-adapter-injection
+  PASS  README sections: all 4 required sections present
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 19 f2p / 5 p2p, clean keys
+  PASS  server freshness: server at 31a1c6e1
+  PASS  validation: Structural checks: All 9/9 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado not trivial and ≥1 agent solved (avocado [avocado-5.14-code]: 2/5, opus [claude-opus-4-8]: 3/5, gpt [gpt-5.5]: 1/5)
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 1 · Low 1)
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  trial census: all counted trials completed — avocado: 2P/3F/0E, claude: 3P/2F/0E, gpt: 1P/4F/0E
+  PASS  solvers: solved by ['gpt', 'claude', 'avocado']
+  PASS  human review: latest decision Accept @ 2026-07-24 12:13 — make sure every point is addressed
+
+  3 FAIL · 2 WARN · 19 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

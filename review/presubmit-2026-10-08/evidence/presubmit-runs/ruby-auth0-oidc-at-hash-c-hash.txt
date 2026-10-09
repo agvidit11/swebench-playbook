@@ -1,0 +1,30 @@
+
+presubmit: ruby-auth0-oidc-at-hash-c-hash  (format=swe_bench_multi_turn)
+  FAIL  task.toml fields: [task].track_assignment missing
+  FAIL  README sections: missing required section(s): ['Description', 'Completion Rates', 'Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  MT task-level config: task-level fail_to_pass has 4 id(s) no step grades
+  PASS  task.toml name: codimango/ruby-auth0-oidc-at-hash-c-hash
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 15 f2p / 13 p2p, clean keys
+  PASS  config 1_at_hash: 5 f2p / 8 p2p, clean keys
+  PASS  config 2_c_hash: 8 f2p / 20 p2p, clean keys
+  PASS  MT re-test: 2_c_hash re-runs all f2p of 1_at_hash
+  PASS  server freshness: server at 9c367515
+  PASS  validation: Structural checks: All 12/12 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado not trivial and ≥1 agent solved (avocado [avocado-5.14-code]: 9/10, opus [claude-opus-4-8]: 8/10, gpt [gpt-5.5]: 9/10)
+  PASS  validation: Contamination check: Not checked — repo not yet covered by the contamination pipeline
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 19P/1F/0E, claude: 15P/5F/0E, gpt: 16P/4F/0E
+  PASS  solvers: solved by ['claude', 'gpt', 'avocado']
+  PASS  human review: latest decision Accept @ 2026-08-26 17:18 — make sure every point is addressed
+
+  2 FAIL · 2 WARN · 21 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

@@ -1,0 +1,30 @@
+
+presubmit: object-rs-atomic-rewriter-modify  (format=swe_bench_single_turn)
+  FAIL  README sections: missing required section(s): ['Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
+  FAIL  README completeness: placeholder text present: ['not yet run']
+  FAIL  README counts: README count(s) disagree with tests/config.json: 4 pass_to_pass (config: 40)
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  harness collision: tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  WARN  single-test dominance: 2/2 failed trials fail `mixed_edits_that_cancel_restore_original_bytes` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  PASS  task.toml name: codimango/object-rs-atomic-rewriter-modify
+  PASS  README internal URLs: none
+  PASS  config task: 9 f2p / 40 p2p, clean keys
+  PASS  server freshness: server at 26055cae
+  PASS  validation: Structural checks: All 17/17 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 3/5, opus: no trials, gpt: no trials)
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 2 · Low 4)
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 3P/2F/0E
+
+  3 FAIL · 5 WARN · 17 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

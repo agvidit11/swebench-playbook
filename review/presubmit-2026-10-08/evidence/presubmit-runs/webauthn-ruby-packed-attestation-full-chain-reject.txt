@@ -1,0 +1,27 @@
+
+presubmit: webauthn-ruby-packed-attestation-full-chain-reject  (format=swe_bench_single_turn)
+  FAIL  task.toml fields: [task].track_assignment missing
+  FAIL  trials: no validation jobs at fd53bd12 — run `codimango task rerun webauthn-ruby-packed-attestation-full-chain-reject`
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  agentic verdict: no agentic review found at this commit
+  PASS  task.toml name: codimango/webauthn-ruby-packed-attestation-full-chain-reject
+  PASS  README sections: all 4 required sections present
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 5 f2p / 15 p2p, clean keys
+  PASS  server freshness: server at fd53bd12
+  PASS  validation: Structural checks: All 9/9 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado not trivial and ≥1 agent solved (avocado [avocado-5.14-code]: 3/5, opus [claude-opus-4-8]: 5/5, gpt [gpt-5.5]: 0/5)
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 1 · Low 2)
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  human review: latest decision Accept @ 2026-07-27 20:32 — make sure every point is addressed
+
+  2 FAIL · 3 WARN · 17 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

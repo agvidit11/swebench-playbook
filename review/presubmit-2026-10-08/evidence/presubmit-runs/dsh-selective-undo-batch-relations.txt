@@ -1,0 +1,39 @@
+
+presubmit: dsh-selective-undo-batch-relations  (format=swe_bench_multi_turn)
+  FAIL  server freshness: server task is at 547f999c but origin/main last touched this task at 04988793 — stale import: run `codimango task rerun dsh-selective-undo-batch-relations` (free)
+  WARN  README internal URLs: internal links in README: ['fb.workplace', 'internalmeta.com']
+  WARN  config task: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 1_single_entry_undo: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 2_batch_undo: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 3_m2m_undo: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  MT re-test: 2_batch_undo does not re-run 22 of 22 f2p from 1_single_entry_undo (regressions invisible)
+  WARN  MT re-test: 3_m2m_undo does not re-run 21 of 21 f2p from 2_batch_undo (regressions invisible)
+  WARN  MT task-level config: task-level fail_to_pass has 48 id(s) no step grades
+  WARN  harness interpreter: steps/1_single_entry_undo/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  harness interpreter: steps/2_batch_undo/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  harness interpreter: steps/3_m2m_undo/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  PASS  task.toml name: codimango/dsh-selective-undo-batch-relations
+  PASS  README sections: all 4 required sections present
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  config task: 69 f2p / 364 p2p, clean keys
+  PASS  config 1_single_entry_undo: 22 f2p / 364 p2p, clean keys
+  PASS  config 2_batch_undo: 21 f2p / 387 p2p, clean keys
+  PASS  config 3_m2m_undo: 21 f2p / 412 p2p, clean keys
+  PASS  validation: Structural checks: All 20/20 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — every step is within avocado [avocado-code-flex-5.16]'s 3/5 ceiling, or carried by a third-party gradient (avocado [avocado-code-fl
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: Verdict: SUSPECT — review recommended
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  stage multi-turn-step-results: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 8P/7F/0E
+  PASS  human review: latest decision Accept @ 2026-10-06 21:37 — make sure every point is addressed
+
+  1 FAIL · 12 WARN · 21 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

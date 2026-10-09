@@ -1,0 +1,29 @@
+
+presubmit: ruby-terraform-multiio-inherits-io  (format=swe_bench_single_turn)
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  harness collision: tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  WARN  single-test dominance: 5/5 failed trials fail `RubyTerraform::MultiIO when closed after a subprocess completes delivers every subprocess byte in order to every target before close returns` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  WARN  human review: latest decision Request changes @ 2026-08-27 08:04 — make sure every point is addressed
+  PASS  task.toml name: codimango/ruby-terraform-multiio-inherits-io
+  PASS  README sections: all 4 required sections present
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 14 f2p / 16 p2p, clean keys
+  PASS  server freshness: server at 2f306afa
+  PASS  validation: Structural checks: All 17/17 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 1/5, opus: no trials, gpt: no trials)
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 2 · Low 2)
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 5P/5F/0E
+
+  0 FAIL · 5 WARN · 19 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

@@ -1,0 +1,29 @@
+
+presubmit: ruby-auth0-http-extra-headers-post  (format=swe_bench_single_turn)
+  FAIL  task.toml fields: [task].track_assignment missing
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  single-test dominance: 10/11 failed trials fail `spec/lib/auth0/mixins/extra_headers_spec.rb::Auth0::Mixins::HTTPProxy extra_headers merging POST_FORM strips Content-Type even when extra tries to set it lowercased` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  PASS  task.toml name: codimango/ruby-auth0-http-extra-headers-post
+  PASS  README sections: all 4 required sections present
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 12 f2p / 4 p2p, clean keys
+  PASS  server freshness: server at a57fde38
+  PASS  validation: Structural checks: All 9/9 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado not trivial and ≥1 agent solved (avocado [avocado-5.14-code]: 2/5, opus [claude-opus-4-8]: 0/5, gpt [gpt-5.5]: 2/5)
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 0 · Low 1)
+  PASS  validation: Contamination check: Risk: MEDIUM
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 2P/3F/0E, claude: 0P/5F/0E, gpt: 2P/3F/0E
+  PASS  solvers: solved by ['avocado', 'gpt']
+  PASS  human review: latest decision Accept @ 2026-07-27 20:31 — make sure every point is addressed
+
+  1 FAIL · 3 WARN · 20 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

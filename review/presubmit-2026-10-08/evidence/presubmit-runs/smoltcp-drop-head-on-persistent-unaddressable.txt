@@ -1,0 +1,28 @@
+
+presubmit: smoltcp-drop-head-on-persistent-unaddressable  (format=swe_bench_single_turn)
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  PASS  task.toml name: codimango/smoltcp-drop-head-on-persistent-unaddressable
+  PASS  README sections: all 4 required sections present
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  README counts: match config (3 f2p / 6 p2p)
+  PASS  config task: 3 f2p / 6 p2p, clean keys
+  PASS  server freshness: server at b2b1a168
+  PASS  validation: Structural checks: All 17/17 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 3/5, opus: no trials, gpt: no trials)
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 0 · Low 0)
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 3P/2F/0E
+  PASS  human review: latest decision Accept @ 2026-10-09 01:28 — make sure every point is addressed
+
+  0 FAIL · 2 WARN · 21 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

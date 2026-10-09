@@ -1,0 +1,38 @@
+
+presubmit: reversion-selective-undo-revisions  (format=swe_bench_multi_turn)
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 1_field_undo: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 2_structure_undo: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 3_batch_undo: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  MT re-test: 2_structure_undo does not re-run 9 of 9 f2p from 1_field_undo (regressions invisible)
+  WARN  MT re-test: 3_batch_undo does not re-run 19 of 19 f2p from 2_structure_undo (regressions invisible)
+  WARN  MT task-level config: task-level fail_to_pass has 32 id(s) no step grades
+  WARN  harness interpreter: steps/1_field_undo/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  harness interpreter: steps/2_structure_undo/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  harness interpreter: steps/3_batch_undo/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  trial census: 2 errored/crashed trial(s) — avocado: 6P/7F/2E. Crashes are not difficulty (mlx review). `codimango task rerun reversion-selective-undo-revisions` and re-check before submitting.
+  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  PASS  task.toml name: codimango/reversion-selective-undo-revisions
+  PASS  README sections: all 4 required sections present
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 46 f2p / 158 p2p, clean keys
+  PASS  config 1_field_undo: 9 f2p / 158 p2p, clean keys
+  PASS  config 2_structure_undo: 19 f2p / 170 p2p, clean keys
+  PASS  config 3_batch_undo: 14 f2p / 190 p2p, clean keys
+  PASS  server freshness: server at d661d753
+  PASS  validation: Structural checks: All 20/20 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — every step is within avocado [avocado-code-flex-5.16]'s 3/5 ceiling, or carried by a third-party gradient (avocado [avocado-code-fl
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  stage multi-turn-step-results: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+
+  0 FAIL · 12 WARN · 21 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

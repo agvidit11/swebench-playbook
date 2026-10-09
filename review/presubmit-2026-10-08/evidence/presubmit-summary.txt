@@ -1,0 +1,30 @@
+== accepted: 26 tasks | 0 FAIL: 7 | 0 FAIL ignoring README-sections: 19
+   FAIL: {'README sections': 13, 'task.toml fields': 5, 'server freshness': 2, 'agentic verdict': 2, 'task.toml metadata': 2, 'README completeness': 1, 'README counts': 1, 'trials': 1}
+== needs_revision: 9 tasks | 0 FAIL: 1 | 0 FAIL ignoring README-sections: 4
+   FAIL: {'validation': 4, 'validation overall': 4, 'README sections': 4, 'agentic verdict': 1, 'trial census': 1, 'trials': 1, 'stage multi-turn-post-runs': 1, 'stage build-verification': 1}
+== being_reviewed: 7 tasks | 0 FAIL: 5 | 0 FAIL ignoring README-sections: 7
+   FAIL: {'README sections': 2}
+== needs_reviewers_assigned: 6 tasks | 0 FAIL: 3 | 0 FAIL ignoring README-sections: 3
+   FAIL: {'stage agentic-review': 2, 'TBR': 2, 'README sections': 2, 'README completeness': 1, 'README counts': 1, 'stage build-verification': 1, 'stage evalgt': 1}
+== draft: 8 tasks | 0 FAIL: 1 | 0 FAIL ignoring README-sections: 1
+   FAIL: {'validation': 6, 'validation overall': 6, 'stage multi-turn-post-runs': 3, 'stage build-verification': 2, 'TBR': 2, 'stage agentic-review': 2, 'stage evalgt': 2, 'trials': 1}
+
+== accepted with FAIL other than README sections:
+   beancount-split-restatement-price-cil            ['server freshness']
+   dsh-selective-undo-batch-relations               ['server freshness']
+   qdrant-ruby-http-adapter-injection               ['agentic verdict', 'task.toml fields', 'task.toml metadata']
+   ruby-auth0-http-extra-headers-post               ['task.toml fields']
+   ruby-auth0-oidc-at-hash-c-hash                   ['task.toml fields']
+   webauthn-ruby-packed-attestation-full-chain-re   ['task.toml fields', 'trials']
+   webauthn-ruby-verify-registration-response-sha   ['README completeness', 'README counts', 'agentic verdict', 'task.toml fields', 'task.toml metadata']
+
+== needs_revision:
+   commonmark-java-source-preserving-link-retarge   ['README sections']
+   configupdater-option-edit-layout-preservation    ['validation', 'validation overall']
+   dropshot-option-return-nullable-openapi          ['agentic verdict', 'validation', 'validation overall']
+   mlx-openai-server-glm4moe-empty-args-crash-dep   ['trial census']
+   pyhms-rfc9421-component-context-negotiation      ['README sections']
+   redb-database-drop-hangs-outstanding-writetxn-   ['TBR', 'stage agentic-review', 'stage build-verification', 'stage evalgt', 'validation', 'validation overall']
+   spire-bundle-configuration-epoch-fencing         ['README sections']
+   spire-workload-api-delivery-readiness            ['README sections', 'stage multi-turn-post-runs', 'trials', 'validation', 'validation overall']
+   vobject-series-edit-split-move                   []

@@ -1,0 +1,29 @@
+
+presubmit: cancancan-limited-ability-common-permission  (format=swe_bench_single_turn)
+  FAIL  README sections: missing required section(s): ['Description', 'Completion Rates', 'Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
+  FAIL  stage agentic-review: failed — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
+  FAIL  stage build-verification: failed — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
+  FAIL  stage evalgt: failed — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
+  FAIL  TBR: tbdReviewStatus = fail — re-run TBR at this commit before requesting review
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  harness collision: tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  WARN  single-test dominance: 3/3 failed trials fail `./spec/cclacp_7e2d9a_combined_paths_spec.rb[1:2:2]` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  PASS  task.toml name: codimango/cancancan-limited-ability-common-permission
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  README internal URLs: none
+  PASS  config task: 75 f2p / 534 p2p, clean keys
+  PASS  server freshness: server at 8aec248e
+  PASS  validation: Structural checks: All 17/17 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 2/5, opus: no trials, gpt: no trials)
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 2 · Low 2)
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 2P/3F/0E
+
+  5 FAIL · 5 WARN · 14 PASS
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.
