@@ -289,4 +289,4 @@ Avocado — read it before choosing the next card.
 | 2026-10-06 | devvm23237 | mikro-orm flush planner | K-to-N metacode k=5 | 0/5, —, — | released (S1 cliff) |
 | 2026-10-06 | devvm23237 | open-feature (frozen bundle) | K-to-N x2 | 5/5,0/5,— ; 5/5,1/5,0/5 | pooled with probe S2 3/15, S3 2/10 — low/at-risk |
 | 2026-10-06 | devvm23237 | open-feature C1-dropped variant | K-to-N metacode k=5 | 5/5, 2/5, 1/5 (2 distinct S2 seeds) | contingency; better S2 floor than full (pooled 3/15) |
-| 2026-10-08 | devvm23237 | yaml-map-key-rename-coherence | chained cold Muse k=5 | 1/5, 2/5 | IN BAND -> build; S1 combines visitor and direct Scalar-key coherence; S2 clone/schema-mapKey/round-trip independence; distinct real passing parents |
+| 2026-10-08 | devvm23237 | yaml-map-key-rename-coherence | exact-final cold Muse k=5 | 5/5, not run | RELEASED; prior 1/5 + 2/5 used materially less explicit prompts, so build/READY evidence revoked before push |
