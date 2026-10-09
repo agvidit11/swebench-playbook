@@ -214,4 +214,4 @@ waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free ag
 | devvm6971 | lane-i MT domain: test-data factories | factory_bot / factory_boy | — | I | KILLED | 2026-10-09 | factory_boy stale; factory_bot maintainer 5-PR core rewrite 10-06 discloses seams; sequences only 3 defects; model_bakery thin |
 | devvm6971 | lane-i MT domain: immutable-update patches (immer / mobx-state-tree) | TBD | MT3 | I | PROBING-REPO | 2026-10-09 | card agent dispatched |
 | devvm6971 | lane-i MT domain: graph views under mutation | networkx | — | I | KILLED | 2026-10-09 | views: 1 one-line bug; overlay: copy+replay authority self-checkable, cold Codex 25/26, 12/12 |
-| devvm6971 | lane-i MT domain: CLI parameter-source bookkeeping (click / typer) | TBD | MT3 | I | PROBING-REPO | 2026-10-09 | card agent dispatched |
+| devvm6971 | picocli-value-provenance-argfile-overrides | remkop/picocli | MT3: valueSource / argumentFiles / overriddenOccurrences | P | PROBING | 2026-10-09 | base 10509c0a; codex-verified; A4 ADJACENT (exclusion zone); click/typer/clap/commander/yargs/go-flags taken; 21/28 |
