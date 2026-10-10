@@ -312,3 +312,4 @@ Avocado — read it before choosing the next card.
 
 | 2026-10-09 | devvm6971 | rebar3 header removal stale beam (single-turn) | erlang/rebar3 (Apache-2.0) | deleted/restored direct include keeps stale beam | real-harness avocado 4/4 | - | over ceiling | RELEASED |
 | 2026-10-09 | devvm6971 | SINGLE-TURN BATCH SUMMARY | 5 seams on real harness | stated single facet + observability gap | 3/5 (unstated scope), then 4/4, 4/4, 4/4, 4/4 | - | avocado closes every STATED gap on the real harness, even ones a natural self-test cannot see | lens exhausted |
+| 2026-10-09 | devvm6971 | lwt Lwt_pool slot accounting (MT 3-step) | ocsigen/lwt (MIT) | multi-axis stateful invariant (capacity/waiters/max) | headless Muse chained: S1 5/5 (fair), S2 5/5, S3 pre-prompt 4/5 already pass | v1 grader pinned 2 unstated outcomes (Muse 0/5 was unfair) | Muse writes reservation-based pool unprompted | RELEASED |
