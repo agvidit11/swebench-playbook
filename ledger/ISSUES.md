@@ -135,3 +135,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-09 14:20 | devvm6971 | ALL | Vidit: this lane raises NEW tasks only; post-submission reviews/revisions/status/reruns are not ours (another session handles them) | — | dropped vobject revision + jsonc/btree follow-ups — RULE
 2026-10-09 21:20 | devvm6971 | B | MST (18:17) + polyfactory (17:55) build agents stalled | — | STOP sent, both replaced — OPEN
 2026-10-10 05:20 | devvm6971 | B | picocli fix agent stalled (01:23) | — | STOP sent, replacement launched — OPEN
+2026-10-10 15:20 | devvm6971 | B/I | wtforms build + rubygem card agents stalled (12:50/12:44) | — | STOP sent, both replaced — OPEN
