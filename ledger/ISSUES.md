@@ -138,3 +138,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-10 15:20 | devvm6971 | B/I | wtforms build + rubygem card agents stalled (12:50/12:44) | — | STOP sent, both replaced — OPEN
 2026-10-10 19:20 | devvm6971 | B | wtforms fix (17:19) + store_model build (15:40) agents stalled | — | STOP sent, both replaced — OPEN
 2026-10-11 03:20 | devvm6971 | B | store_model build replacement stalled (23:11) | — | replaced again — OPEN
+2026-10-11 07:20 | devvm6971 | B | dogpile fix + store_model build agents silent | — | both replaced — OPEN
