@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """presubmit.py — mechanical first-submission checks for a codimango SWE-bench task.
 
-READ-ONLY. Reads the task directory and the codimango server; writes nothing anywhere.
+READ-ONLY BY DEFAULT. Reads the task repository and the codimango server. It never edits task
+files or Git refs; refresh the selected Git ref yourself before running it.
 Encodes groups A (mechanical) and D (trial-status census) of
-~/swebench/reviews-2026-10-08/FIRST-PASS-CHECKLIST.md — the checks that, by reading all 28
+evidence/FIRST-PASS-CHECKLIST.md — the checks that, by reading all 28
 "Request changes" reviews on 2026-10-08, would have prevented the bulk of bounces.
 
 Usage:
@@ -19,18 +20,24 @@ import collections
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tomllib
-from urllib.parse import quote
 
-REPO_URL = "https://github.com/codimango/swe-bench-pro-agvidit"
-CLIENT_PATH = "/home/agvidit/.local/share/uv/tools/codimango/lib/python3.12/site-packages"
 README_SECTIONS = ["Description", "Completion Rates", "Model Analysis", "Anti-Cheating"]
 STAGE_MODEL = {"metacode": "avocado", "codex": "gpt", "agent": "claude", "opus": "claude"}
 
 results = []  # (level, check, message)
+infra_failures = []
 SERVER_FMT = "?"
+SERVER_REVIEW_STATUS = None
+
+
+class CommandError(RuntimeError):
+    def __init__(self, kind, message):
+        super().__init__(f"{kind}: {message}")
+        self.kind = kind
 
 
 def record(level, check, msg):
@@ -49,6 +56,11 @@ def fail(c, m):
     record("FAIL", c, m)
 
 
+def infra(c, m):
+    infra_failures.append((c, m))
+    fail(c, f"infrastructure error: {m}")
+
+
 def sh(args, timeout=300):
     try:
         r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
@@ -58,9 +70,43 @@ def sh(args, timeout=300):
 
 
 def load_json_loose(text):
-    # stderr banner ("Need help ... codimango feedback") may follow the JSON; decode only the document
-    i = min([p for p in (text.find("{"), text.find("[")) if p >= 0], default=-1)
-    return json.JSONDecoder().raw_decode(text[i:])[0] if i >= 0 else None
+    """Decode the first JSON document, tolerating CLI banners before or after it."""
+    decoder = json.JSONDecoder()
+    for i, char in enumerate(text):
+        if char not in "[{":
+            continue
+        try:
+            return decoder.raw_decode(text[i:])[0]
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
+def command_json(args, timeout=300):
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(str(e)) from e
+    if r.returncode != 0:
+        error_data = load_json_loose(r.stdout)
+        if isinstance(error_data, dict) and isinstance(error_data.get("error"), dict):
+            error = error_data["error"]
+            raise CommandError(error.get("kind", "error"), error.get("message", "unknown error"))
+        raise CommandError("command_failed", (r.stdout or r.stderr or f"exit {r.returncode}").strip())
+    data = load_json_loose(r.stdout)
+    if data is None:
+        raise RuntimeError("command returned no JSON document")
+    return data
+
+
+def command_text(args, timeout=300):
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    except Exception as e:  # noqa: BLE001
+        raise CommandError("command_failed", str(e)) from e
+    if r.returncode != 0:
+        raise CommandError("command_failed", (r.stdout or r.stderr or f"exit {r.returncode}").strip())
+    return r.stdout
 
 
 # ───────────────────────────── local checks ─────────────────────────────
@@ -95,15 +141,36 @@ class Source:
         t = self._git("ls-tree", "-r", "--name-only", self.ref, "--", self.task) or ""
         return [l[len(self.task) + 1:] for l in t.splitlines() if l.startswith(self.task + "/")]
 
+    def task_exists(self):
+        if self.ref is None:
+            return os.path.isdir(self.root)
+        return bool(self.files())
+
+    def last_commit(self):
+        ref = self.ref or "HEAD"
+        value = self._git("log", "-1", "--format=%H", ref, "--", self.task)
+        return value.strip() if value else None
+
+    def author_emails(self):
+        ref = self.ref or "HEAD"
+        value = self._git("log", "--format=%ae", ref, "--", self.task) or ""
+        return set(value.split())
+
 
 SRC = None
+
+def natural_step_key(value):
+    return [int(part) if part.isdigit() else part.lower()
+            for part in re.split(r"(\d+)", value)]
+
 
 def configs(task_dir):
     out = []
     if SRC.exists("tests/config.json"):
         out.append(("task", "tests/config.json"))
     steps = sorted({f.split("/")[1] for f in SRC.files()
-                    if f.startswith("steps/") and f.endswith("/tests/config.json")})
+                    if f.startswith("steps/") and f.endswith("/tests/config.json")},
+                   key=natural_step_key)
     for st in steps:
         out.append((st, f"steps/{st}/tests/config.json"))
     return out
@@ -178,7 +245,7 @@ def check_task_toml(task_dir, name):
     if "artifacts" in m and "artifacts" not in t:
         warn("task.toml artifacts", "artifacts declared under [metadata] — silently ignored; belongs in [task]")
     emails = [a.get("email", "") for a in t.get("authors", []) if isinstance(a, dict)]
-    git_emails = set(sh(["git", "-C", task_dir, "log", "--format=%ae", "--", "."]).split())
+    git_emails = SRC.author_emails()
     if emails and git_emails and not any(e in git_emails for e in emails):
         warn("task.toml author", f"author email {emails} not among commit authors {sorted(git_emails)[:3]}")
     return d
@@ -248,42 +315,80 @@ def check_harness(task_dir):
                  f"hide files from the stray-file check (spire review).")
         if re.search(r"bash -lc", s):
             warn("harness login shell", f"{rel}: `bash -lc` can drop toolchain PATH (cargo/go)")
-    if any(os.sep + "steps" + os.sep in p for p in scripts):
-        tests = [p for p in scripts if p.endswith("test.sh") and os.sep + "steps" + os.sep in p]
-        traps = {p: bool(re.search(r"trap\b", SRC.read(p) or "")) for p in tests}
+    if any(p.startswith("steps/") for p in scripts):
+        tests = [p for p in scripts if p.endswith("test.sh") and p.startswith("steps/")]
+        traps = {p: has_exit_trap(SRC.read(p) or "") for p in tests}
         if len(set(traps.values())) > 1:
             warn("MT EXIT trap", f"EXIT trap present in some step test.sh but not others: {traps} "
                  f"(graded files leak into the next step — net-imap review)")
 
 
+def has_exit_trap(script):
+    for line in script.splitlines():
+        try:
+            lexer = shlex.shlex(line, posix=True, punctuation_chars=";&|")
+            lexer.whitespace_split = True
+            lexer.commenters = "#"
+            tokens = list(lexer)
+        except ValueError:
+            continue
+        boundaries = {";", "&&", "||", "|", "then", "do", "{"}
+        for index, token in enumerate(tokens):
+            if token != "trap" or (index and tokens[index - 1] not in boundaries):
+                continue
+            signals = []
+            for candidate in tokens[index + 1:]:
+                if candidate in boundaries:
+                    break
+                signals.append(candidate)
+            if "EXIT" in signals or "0" in signals:
+                return True
+    return False
+
+
 # ───────────────────────────── server checks ─────────────────────────────
 
 def api_task(name):
-    sys.path.insert(0, CLIENT_PATH)
-    from cli.api_client import CodimangoClient  # noqa: E402
-    d = CodimangoClient()._request("GET", f"/api/v1/aai/tasks/{quote(name, safe='')}",
-                                   params={"sourceRepo": REPO_URL}, cacheable=False)
+    d = command_json(["codimango", "task", "show", name, "--json"])
+    if isinstance(d, list):
+        if len(d) != 1:
+            raise RuntimeError(f"expected one task, got {len(d)}")
+        d = d[0]
+    if not isinstance(d, dict):
+        raise RuntimeError(f"unexpected task payload type: {type(d).__name__}")
     return d.get("task", d)
 
 
 def check_server(name, task_dir):
+    global SERVER_FMT, SERVER_REVIEW_STATUS
+    SERVER_REVIEW_STATUS = "unavailable"
     try:
         t = api_task(name)
-    except Exception as e:  # noqa: BLE001
-        fail("server", f"cannot read task from codimango: {str(e)[:120]}")
+    except CommandError as e:
+        if e.kind == "not_found":
+            fail("server", f"cannot read task from codimango: {str(e)[:120]}")
+        else:
+            SERVER_REVIEW_STATUS = None
+            infra("server", str(e)[:160])
         return
-    global SERVER_FMT
+    except Exception as e:  # noqa: BLE001
+        SERVER_REVIEW_STATUS = None
+        infra("server", str(e)[:160])
+        return
     SERVER_FMT = t.get("format") or "?"
+    SERVER_REVIEW_STATUS = t.get("reviewStatus") or "?"
     sha = str(t.get("commitSha") or "")
     vsha = str(t.get("validationCommitSha") or "")
-    local = sh(["git", "-C", task_dir, "log", "-1", "--format=%H", "origin/main", "--", "."]).strip()
+    local = SRC.last_commit() if SRC is not None else None
     if local and len(local) == 40 and sha and local != sha:
         fail("server freshness", f"server task is at {sha[:8]} but origin/main last touched this task at "
              f"{local[:8]} — stale import: run `codimango task rerun {name}` (free)")
     elif vsha and sha and vsha != sha:
         warn("server freshness", f"validation ran at {vsha[:8]} but task is at {sha[:8]}")
-    else:
+    elif local:
         ok("server freshness", f"server at {sha[:8]}")
+    else:
+        warn("server freshness", "not checked (run with --repo to compare the selected ref)")
 
     # validation rows
     for row in t.get("validationDetails") or []:
@@ -298,13 +403,20 @@ def check_server(name, task_dir):
         fail("validation overall", f"validationStatus = {t.get('validationStatus')}")
 
     # engine stages (agentic-review / build-verification / evalgt) — text only in `task show`
-    show = sh(["codimango", "task", "show", name])
-    for st_name, st_val in re.findall(r"-\s+([a-z\-]+):\s+([a-z_]+)\s+@", show):
+    try:
+        show = command_text(["codimango", "task", "show", name])
+    except CommandError as e:
+        infra("engine stages", str(e)[:160])
+        show = ""
+    stages = re.findall(r"-\s+([a-z\-]+):\s+([a-z_]+)\s+@", show)
+    for st_name, st_val in stages:
         if st_val == "passed":
             ok(f"stage {st_name}", "passed")
         else:
             fail(f"stage {st_name}", f"{st_val} — reviewers block on red engine stages "
                  f"(go-zero-goctl: 'Eval GT errors are hard blocking')")
+    if not stages:
+        warn("engine stages", "no stage rows parsed from `codimango task show`; inspect manually")
     if t.get("evalGtNotFinalized"):
         fail("stage evalgt", "evalGt not finalized")
 
@@ -322,7 +434,12 @@ def check_server(name, task_dir):
             ok("TBR", "pass")
 
     # agentic verdict
-    rv = sh(["codimango", "job", "review", name])
+    try:
+        rv = command_text(["codimango", "job", "review", name])
+    except CommandError as e:
+        if "has not run" not in str(e):
+            infra("agentic verdict", str(e)[:160])
+        rv = ""
     m = re.search(r"\*\*Verdict:\*\*\s*([A-Z_]+)", rv)
     if not m:
         warn("agentic verdict", "no agentic review found at this commit")
@@ -334,7 +451,11 @@ def check_server(name, task_dir):
     check_trials(name, sha)
 
     # human review history
-    hr = sh(["codimango", "task", "reviews", name, "--full"])
+    try:
+        hr = command_text(["codimango", "task", "reviews", name, "--full"])
+    except CommandError as e:
+        infra("human review", str(e)[:160])
+        return
     decs = re.findall(r"REVIEW by [^\n]*@ ([0-9\- :]+) UTC.*?\*\*Decision:\*\*\s*([^\n]+)", hr, re.S)
     if decs:
         d0 = decs[0]
@@ -343,7 +464,11 @@ def check_server(name, task_dir):
 
 
 def check_trials(name, sha):
-    jl = sh(["codimango", "job", "list", name])
+    try:
+        jl = command_text(["codimango", "job", "list", name])
+    except CommandError as e:
+        infra("trials", str(e)[:160])
+        return
     jobs = re.findall(r"^\s*(\d+)\s+status=(\w+)\s+progress=(\d+)/(\d+)\s+commit=([0-9a-f]+)", jl, re.M)
     cur = [j for j in jobs if sha.startswith(j[4])]
     if not cur:
@@ -357,12 +482,18 @@ def check_trials(name, sha):
     fail_tests = collections.Counter()
     failed_trials = 0
     for jid, *_ in cur:
-        raw = sh(["codimango", "trial", "list", jid, "--json"])
         try:
-            d = load_json_loose(raw)
-        except Exception:  # noqa: BLE001
-            continue
-        trials = d if isinstance(d, list) else (d or {}).get("trials", (d or {}).get("items", []))
+            d = command_json(["codimango", "trial", "list", jid, "--json"])
+        except (CommandError, RuntimeError) as e:
+            infra("trials", str(e)[:160])
+            return
+        if isinstance(d, list):
+            trials = d
+        elif isinstance(d, dict):
+            trials = d.get("trials", d.get("items", []))
+        else:
+            infra("trials", f"unexpected trial payload type: {type(d).__name__}")
+            return
         for tr in trials or []:
             stage = tr.get("stage") or "?"
             if stage not in STAGE_MODEL:  # oracle, agentic-review, test-patch[-validation] are not solvers
@@ -410,30 +541,62 @@ def check_trials(name, sha):
 
 # ───────────────────────────── main ─────────────────────────────
 
+def check_ref_freshness(repo, ref):
+    """Check a remote-tracking ref without updating it."""
+    if ref != "origin/main":
+        return
+    local = sh(["git", "-C", repo, "rev-parse", ref]).strip()
+    remote = sh(["git", "-C", repo, "remote", "get-url", "origin"]).strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", local) or not remote or remote.startswith("__ERROR__"):
+        warn("git ref freshness", f"could not resolve {ref} and origin; local checks may be stale")
+        return
+    advertised = sh(["git", "ls-remote", remote, "refs/heads/main"]).split()
+    if not advertised or not re.fullmatch(r"[0-9a-f]{40}", advertised[0]):
+        warn("git ref freshness", "could not read origin/main without mutating refs; local checks may be stale")
+    elif advertised[0] != local:
+        fail("git ref freshness", f"{ref} is stale ({local[:8]} vs remote {advertised[0][:8]}); run git fetch")
+    else:
+        ok("git ref freshness", f"{ref} is current at {local[:8]}")
+
+
 def main():
+    global SERVER_REVIEW_STATUS
+    results.clear()
+    infra_failures.clear()
+    SERVER_REVIEW_STATUS = None
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("task")
-    ap.add_argument("--repo", default="/home/agvidit/swe-bench-pro-agvidit")
+    ap.add_argument("--repo", default=os.environ.get("SWEBENCH_REPO"),
+                    help="task-repository checkout (or set SWEBENCH_REPO); required except with --server-only")
     ap.add_argument("--local-only", action="store_true")
     ap.add_argument("--server-only", action="store_true")
     ap.add_argument("--ref", default="origin/main",
                     help="git ref to read task files from (default origin/main); use --worktree for uncommitted edits")
     ap.add_argument("--worktree", action="store_true", help="read the working tree instead of a git ref")
+    ap.add_argument("--color", choices=("auto", "always", "never"), default="auto")
     a = ap.parse_args()
-    task_dir = os.path.join(a.repo, a.task)
-    if not os.path.isdir(task_dir) and not a.server_only:
-        print(f"task dir not found: {task_dir}", file=sys.stderr)
+    if a.local_only and a.server_only:
+        print("--local-only and --server-only are mutually exclusive", file=sys.stderr)
         return 2
+    if not a.server_only and not a.repo:
+        print("--repo DIR (or SWEBENCH_REPO) is required for local checks", file=sys.stderr)
+        return 2
+    repo = os.path.abspath(a.repo) if a.repo else None
+    task_dir = os.path.join(repo, a.task) if repo else None
     global SRC
-    SRC = Source(a.repo, a.task, None if a.worktree else a.ref)
-    if not a.worktree:
-        # HTTPS fetch 403s on this repo (needs SSH cert); the :22 SSH URL works. A failed fetch must
-        # not pass silently — a stale origin/main judged 22 accepted tasks wrong on 2026-10-08.
-        r = subprocess.run(["git", "-C", a.repo, "fetch", "-q",
-                            "ssh://git@github.com:22/codimango/swe-bench-pro-agvidit.git",
-                            "+refs/heads/main:refs/remotes/origin/main"], capture_output=True, text=True)
-        if r.returncode != 0:
-            warn("git fetch", f"could not refresh origin/main ({r.stderr.strip()[:80]}) — local checks may be stale")
+    SRC = Source(repo, a.task, None if a.worktree else a.ref) if repo else None
+    if not a.server_only:
+        inside = sh(["git", "-C", repo, "rev-parse", "--is-inside-work-tree"]).strip() \
+            if repo and os.path.isdir(repo) else ""
+        if inside != "true":
+            print("--repo must name a Git checkout", file=sys.stderr)
+            return 2
+        if not SRC.task_exists():
+            where = "the worktree" if a.worktree else a.ref
+            print(f"task {a.task!r} not found in {where}", file=sys.stderr)
+            return 2
+        if not a.worktree:
+            check_ref_freshness(repo, a.ref)
     fmt = "?"
     if not a.server_only:
         cfgs = configs(task_dir)
@@ -448,15 +611,19 @@ def main():
             fmt = SERVER_FMT
 
     order = {"FAIL": 0, "WARN": 1, "PASS": 2}
-    color = {"FAIL": "\033[31m", "WARN": "\033[33m", "PASS": "\033[32m"}
+    use_color = a.color == "always" or (a.color == "auto" and sys.stdout.isatty())
+    color = {"FAIL": "\033[31m", "WARN": "\033[33m", "PASS": "\033[32m"} if use_color else {}
+    reset = "\033[0m" if use_color else ""
     print(f"\npresubmit: {a.task}  (format={fmt})")
     for lvl, check, msg in sorted(results, key=lambda r: order[r[0]]):
-        print(f"  {color[lvl]}{lvl}\033[0m  {check}: {msg}")
+        print(f"  {color.get(lvl, '')}{lvl}{reset}  {check}: {msg}")
     n = collections.Counter(r[0] for r in results)
     print(f"\n  {n['FAIL']} FAIL · {n['WARN']} WARN · {n['PASS']} PASS")
+    if SERVER_REVIEW_STATUS is not None:
+        print(f"  Review status: {SERVER_REVIEW_STATUS}")
     print("  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs "
           "real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.")
-    return 1 if n["FAIL"] else 0
+    return 2 if infra_failures else (1 if n["FAIL"] else 0)
 
 
 if __name__ == "__main__":

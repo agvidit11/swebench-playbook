@@ -1,10 +1,6 @@
+# exit_code: 0
 
 presubmit: dropshot-option-return-nullable-openapi  (format=swe_bench_single_turn)
-  FAIL  validation: Agentic trial-output review: failed: Agentic full-task review: BAD_GRADING_WEAK — fix, or write an override justification
-  FAIL  validation: AI assessment: failed: Verdict: Revise (Critical 0 · High 0 · Medium 3 · Low 2) — fix, or write an override justification
-  FAIL  validation overall: validationStatus = failed
-  FAIL  agentic verdict: BAD_GRADING_WEAK — fix the named rubric items or justify each
-  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  solvers: only gpt solved it — reviewers ask for a second model (concourse review)
   WARN  single-test dominance: 5/5 failed trials fail `openapi::test_openapi_option_map_value_is_nullable` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
   WARN  human review: latest decision Request changes @ 2026-10-07 03:46 — make sure every point is addressed
@@ -12,19 +8,23 @@ presubmit: dropshot-option-return-nullable-openapi  (format=swe_bench_single_tur
   PASS  README sections: all 4 required sections present
   PASS  README completeness: no TBD / 'not yet run' placeholders
   PASS  README internal URLs: none
-  PASS  README counts: match config (6 f2p / 7 p2p)
-  PASS  config task: 6 f2p / 7 p2p, clean keys
-  PASS  server freshness: server at 9914a643
+  PASS  README counts: match config (6 f2p / 8 p2p)
+  PASS  config task: 6 f2p / 8 p2p, clean keys
+  PASS  server freshness: server at d13dce7a
   PASS  validation: Structural checks: All 17/17 checks pass/warn
   PASS  validation: Oracle validation: All 3/3 passed
   PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 0/5, opus: no trials, gpt [gpt-6.1-sol]: 5/5)
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 0 · Low 1)
   PASS  validation: Contamination check: Risk: LOW
   PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
   PASS  stage agentic-review: passed
   PASS  stage build-verification: passed
   PASS  stage evalgt: passed
   PASS  TBR: pass
+  PASS  agentic verdict: GOOD
   PASS  trial census: all counted trials completed — avocado: 0P/5F/0E, gpt: 5P/0F/0E
 
-  4 FAIL · 4 WARN · 17 PASS
+  0 FAIL · 3 WARN · 20 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

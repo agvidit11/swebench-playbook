@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: ruby-auth0-http-extra-headers-post  (format=swe_bench_single_turn)
   FAIL  task.toml fields: [task].track_assignment missing
@@ -26,4 +27,5 @@ presubmit: ruby-auth0-http-extra-headers-post  (format=swe_bench_single_turn)
   PASS  human review: latest decision Accept @ 2026-07-27 20:31 — make sure every point is addressed
 
   1 FAIL · 3 WARN · 20 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

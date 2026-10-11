@@ -1,6 +1,8 @@
+# exit_code: 1
 
 presubmit: commonmark-java-source-preserving-link-retarget  (format=swe_bench_multi_turn)
   FAIL  README sections: missing required section(s): ['Description', 'Completion Rates', 'Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  README internal URLs: internal links in README: ['fb.workplace', 'internalmeta.com']
   WARN  harness collision: steps/1_retarget_links/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
   WARN  harness interpreter: steps/1_retarget_links/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
@@ -8,17 +10,16 @@ presubmit: commonmark-java-source-preserving-link-retarget  (format=swe_bench_mu
   WARN  harness interpreter: steps/2_unlink_block_markers/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
   WARN  harness collision: steps/3_unlink_document_fidelity/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
   WARN  harness interpreter: steps/3_unlink_document_fidelity/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
-  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  WARN  trial census: 1 errored/crashed trial(s) — avocado: 3P/6F/1E, gpt: 13P/2F/0E. Crashes are not difficulty (mlx review). `codimango task rerun commonmark-java-source-preserving-link-retarget` and re-check before submitting.
   WARN  human review: latest decision Request changes @ 2026-10-06 10:52 — make sure every point is addressed
   PASS  task.toml name: codimango/commonmark-java-source-preserving-link-retarget
   PASS  README completeness: no TBD / 'not yet run' placeholders
-  PASS  config task: 40 f2p / 363 p2p, clean keys
   PASS  config 1_retarget_links: 40 f2p / 363 p2p, clean keys
-  PASS  config 2_unlink_block_markers: 28 f2p / 402 p2p, clean keys
-  PASS  config 3_unlink_document_fidelity: 10 f2p / 431 p2p, clean keys
+  PASS  config 2_unlink_block_markers: 35 f2p / 402 p2p, clean keys
+  PASS  config 3_unlink_document_fidelity: 10 f2p / 438 p2p, clean keys
   PASS  MT re-test: 2_unlink_block_markers re-runs all f2p of 1_retarget_links
   PASS  MT re-test: 3_unlink_document_fidelity re-runs all f2p of 2_unlink_block_markers
-  PASS  server freshness: server at 89bb3386
+  PASS  server freshness: server at 64ede457
   PASS  validation: Structural checks: All 20/20 checks pass/warn
   PASS  validation: Oracle validation: All 3/3 passed
   PASS  validation: Metacode or Opus pass/fail balance: Passed — every step is within avocado [avocado-code-flex-5.16]'s 3/5 ceiling, or carried by a third-party gradient (avocado [avocado-code-fl
@@ -31,7 +32,8 @@ presubmit: commonmark-java-source-preserving-link-retarget  (format=swe_bench_mu
   PASS  stage multi-turn-step-results: passed
   PASS  TBR: pass
   PASS  agentic verdict: GOOD
-  PASS  trial census: all counted trials completed — avocado: 8P/7F/0E
+  PASS  solvers: solved by ['gpt', 'avocado']
 
-  1 FAIL · 9 WARN · 22 PASS
+  1 FAIL · 10 WARN · 21 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

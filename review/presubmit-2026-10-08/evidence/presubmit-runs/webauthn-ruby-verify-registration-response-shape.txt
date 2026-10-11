@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: webauthn-ruby-verify-registration-response-shape  (format=swe_bench_single_turn)
   FAIL  task.toml fields: [task].track_assignment missing
@@ -29,4 +30,5 @@ presubmit: webauthn-ruby-verify-registration-response-shape  (format=swe_bench_s
   PASS  human review: latest decision Accept @ 2026-07-23 14:47 — make sure every point is addressed
 
   5 FAIL · 5 WARN · 17 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

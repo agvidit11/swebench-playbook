@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: ruby-auth0-oidc-at-hash-c-hash  (format=swe_bench_multi_turn)
   FAIL  task.toml fields: [task].track_assignment missing
@@ -27,4 +28,5 @@ presubmit: ruby-auth0-oidc-at-hash-c-hash  (format=swe_bench_multi_turn)
   PASS  human review: latest decision Accept @ 2026-08-26 17:18 — make sure every point is addressed
 
   2 FAIL · 2 WARN · 21 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

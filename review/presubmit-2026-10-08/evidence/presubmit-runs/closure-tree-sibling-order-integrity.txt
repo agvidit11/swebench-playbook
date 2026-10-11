@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: closure-tree-sibling-order-integrity  (format=swe_bench_multi_turn)
   FAIL  validation: Metacode or Opus pass/fail balance: failed: Step gate failed — "2_single_and_bulk_delete_order" too easy — avocado [avocado-code-flex-5.16] passed 5 of 5, over the 3/5 ceiling, and the — fix, or write an override justification
@@ -7,6 +8,7 @@ presubmit: closure-tree-sibling-order-integrity  (format=swe_bench_multi_turn)
   FAIL  stage evalgt: failed — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
   FAIL  stage multi-turn-post-runs: error — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
   FAIL  TBR: tbdReviewStatus = fail — re-run TBR at this commit before requesting review
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  config task: uppercase duplicate keys ['TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 1_preorder_read_path: uppercase duplicate keys ['TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 2_single_and_bulk_delete_order: uppercase duplicate keys ['TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -33,5 +35,6 @@ presubmit: closure-tree-sibling-order-integrity  (format=swe_bench_multi_turn)
   PASS  agentic verdict: GOOD
   PASS  trial census: all counted trials completed — avocado: 15P/0F/0E
 
-  7 FAIL · 8 WARN · 17 PASS
+  7 FAIL · 9 WARN · 17 PASS
+  Review status: draft
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

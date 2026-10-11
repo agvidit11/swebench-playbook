@@ -1,10 +1,7 @@
+# exit_code: 1
 
 presubmit: cancancan-limited-ability-common-permission  (format=swe_bench_single_turn)
   FAIL  README sections: missing required section(s): ['Description', 'Completion Rates', 'Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
-  FAIL  stage agentic-review: failed — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
-  FAIL  stage build-verification: failed — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
-  FAIL  stage evalgt: failed — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
-  FAIL  TBR: tbdReviewStatus = fail — re-run TBR at this commit before requesting review
   WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  harness collision: tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
@@ -22,8 +19,13 @@ presubmit: cancancan-limited-ability-common-permission  (format=swe_bench_single
   PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 2 · Low 2)
   PASS  validation: Contamination check: Risk: LOW
   PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  TBR: pass
   PASS  agentic verdict: GOOD
   PASS  trial census: all counted trials completed — avocado: 2P/3F/0E
 
-  5 FAIL · 5 WARN · 14 PASS
+  1 FAIL · 5 WARN · 18 PASS
+  Review status: needs_reviewers_assigned
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

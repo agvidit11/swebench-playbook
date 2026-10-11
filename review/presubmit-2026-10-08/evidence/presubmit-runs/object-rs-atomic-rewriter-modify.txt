@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: object-rs-atomic-rewriter-modify  (format=swe_bench_single_turn)
   FAIL  README sections: missing required section(s): ['Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
@@ -25,6 +26,8 @@ presubmit: object-rs-atomic-rewriter-modify  (format=swe_bench_single_turn)
   PASS  TBR: pass
   PASS  agentic verdict: GOOD
   PASS  trial census: all counted trials completed — avocado: 3P/2F/0E
+  PASS  human review: latest decision Accept @ 2026-10-09 05:57 — make sure every point is addressed
 
-  3 FAIL · 5 WARN · 17 PASS
+  3 FAIL · 5 WARN · 18 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

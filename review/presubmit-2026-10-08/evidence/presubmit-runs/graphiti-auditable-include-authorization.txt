@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: graphiti-auditable-include-authorization  (format=swe_bench_single_turn)
   FAIL  README sections: missing required section(s): ['Description'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
@@ -28,4 +29,5 @@ presubmit: graphiti-auditable-include-authorization  (format=swe_bench_single_tu
   PASS  human review: latest decision Accept @ 2026-10-02 18:47 — make sure every point is addressed
 
   1 FAIL · 5 WARN · 20 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

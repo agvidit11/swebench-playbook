@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: redb-database-drop-hangs-outstanding-writetxn-depri  (format=swe_bench_single_turn)
   FAIL  validation: Metacode or Opus pass/fail balance: failed: Too easy — avocado passed more than 3/5 (avocado [avocado-code-flex]: 5/5, opus: no trials, gpt: no trials) — fix, or write an override justification
@@ -25,4 +26,5 @@ presubmit: redb-database-drop-hangs-outstanding-writetxn-depri  (format=swe_benc
   PASS  trial census: all counted trials completed — avocado: 5P/0F/0E
 
   6 FAIL · 3 WARN · 14 PASS
+  Review status: needs_revision
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

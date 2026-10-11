@@ -1,3 +1,4 @@
+# exit_code: 0
 
 presubmit: commons-text-staged-substitution  (format=swe_bench_multi_turn)
   WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
@@ -36,4 +37,5 @@ presubmit: commons-text-staged-substitution  (format=swe_bench_multi_turn)
   PASS  human review: latest decision Accept @ 2026-10-06 20:33 — make sure every point is addressed
 
   0 FAIL · 10 WARN · 24 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

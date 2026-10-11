@@ -1,6 +1,8 @@
+# exit_code: 1
 
 presubmit: dsh-selective-undo-batch-relations  (format=swe_bench_multi_turn)
   FAIL  server freshness: server task is at 547f999c but origin/main last touched this task at 04988793 — stale import: run `codimango task rerun dsh-selective-undo-batch-relations` (free)
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  README internal URLs: internal links in README: ['fb.workplace', 'internalmeta.com']
   WARN  config task: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 1_single_entry_undo: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -35,5 +37,6 @@ presubmit: dsh-selective-undo-batch-relations  (format=swe_bench_multi_turn)
   PASS  trial census: all counted trials completed — avocado: 8P/7F/0E
   PASS  human review: latest decision Accept @ 2026-10-06 21:37 — make sure every point is addressed
 
-  1 FAIL · 12 WARN · 21 PASS
+  1 FAIL · 13 WARN · 21 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

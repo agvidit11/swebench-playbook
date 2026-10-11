@@ -1,3 +1,4 @@
+# exit_code: 0
 
 presubmit: ruby-terraform-multiio-inherits-io  (format=swe_bench_single_turn)
   WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -26,4 +27,5 @@ presubmit: ruby-terraform-multiio-inherits-io  (format=swe_bench_single_turn)
   PASS  trial census: all counted trials completed — avocado: 5P/5F/0E
 
   0 FAIL · 5 WARN · 19 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

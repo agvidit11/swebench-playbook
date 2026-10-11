@@ -1,5 +1,7 @@
+# exit_code: 0
 
 presubmit: reversion-selective-undo-revisions  (format=swe_bench_multi_turn)
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 1_field_undo: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 2_structure_undo: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -34,5 +36,6 @@ presubmit: reversion-selective-undo-revisions  (format=swe_bench_multi_turn)
   PASS  TBR: pass
   PASS  agentic verdict: GOOD
 
-  0 FAIL · 12 WARN · 21 PASS
+  0 FAIL · 13 WARN · 21 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

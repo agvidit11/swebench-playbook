@@ -1,3 +1,4 @@
+# exit_code: 0
 
 presubmit: smoltcp-drop-head-on-persistent-unaddressable  (format=swe_bench_single_turn)
   WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -25,4 +26,5 @@ presubmit: smoltcp-drop-head-on-persistent-unaddressable  (format=swe_bench_sing
   PASS  human review: latest decision Accept @ 2026-10-09 01:28 — make sure every point is addressed
 
   0 FAIL · 2 WARN · 21 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

@@ -1,3 +1,4 @@
+# exit_code: 0
 
 presubmit: zendesk-biz-schedule-intersection-composition  (format=swe_bench_multi_turn)
   WARN  task.toml artifacts: artifacts declared under [metadata] — silently ignored; belongs in [task]
@@ -38,4 +39,5 @@ presubmit: zendesk-biz-schedule-intersection-composition  (format=swe_bench_mult
   PASS  human review: latest decision Accept @ 2026-10-02 14:55 — make sure every point is addressed
 
   0 FAIL · 12 WARN · 24 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

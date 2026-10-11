@@ -1,28 +1,24 @@
+# exit_code: 0
 
 presubmit: jsonc-parser-cst-transplant-dotted-reparent  (format=swe_bench_multi_turn)
-  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  config 1_move: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  config 2_move_into_nest: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  config 3_flatten: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  MT re-test: 2_move_into_nest does not re-run 10 of 10 f2p from 1_move (regressions invisible)
-  WARN  MT re-test: 3_flatten does not re-run 47 of 47 f2p from 2_move_into_nest (regressions invisible)
   WARN  harness collision: steps/1_move/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
   WARN  harness interpreter: steps/1_move/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
   WARN  harness collision: steps/2_move_into_nest/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
   WARN  harness interpreter: steps/2_move_into_nest/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
   WARN  harness collision: steps/3_flatten/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
   WARN  harness interpreter: steps/3_flatten/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
-  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
   WARN  human review: latest decision Request changes @ 2026-10-09 03:29 — make sure every point is addressed
   PASS  task.toml name: codimango/jsonc-parser-cst-transplant-dotted-reparent
   PASS  README sections: all 4 required sections present
   PASS  README completeness: no TBD / 'not yet run' placeholders
   PASS  README internal URLs: none
-  PASS  config task: 26 f2p / 14 p2p, clean keys
-  PASS  config 1_move: 10 f2p / 12 p2p, clean keys
-  PASS  config 2_move_into_nest: 47 f2p / 14 p2p, clean keys
-  PASS  config 3_flatten: 26 f2p / 14 p2p, clean keys
-  PASS  server freshness: server at 8fb4273b
+  PASS  config 1_move: 10 f2p / 13 p2p, clean keys
+  PASS  config 2_move_into_nest: 47 f2p / 15 p2p, clean keys
+  PASS  config 3_flatten: 22 f2p / 61 p2p, clean keys
+  PASS  MT re-test: 3_flatten re-runs all f2p of 2_move_into_nest
+  PASS  server freshness: server at 76aefb68
   PASS  validation: Structural checks: All 20/20 checks pass/warn
   PASS  validation: Oracle validation: All 3/3 passed
   PASS  validation: Metacode or Opus pass/fail balance: Passed — every step is within avocado [avocado-code-flex-5.16]'s 3/5 ceiling, or carried by a third-party gradient (avocado [avocado-code-fl
@@ -35,7 +31,9 @@ presubmit: jsonc-parser-cst-transplant-dotted-reparent  (format=swe_bench_multi_
   PASS  stage multi-turn-step-results: passed
   PASS  TBR: pass
   PASS  agentic verdict: GOOD
-  PASS  trial census: all counted trials completed — avocado: 8P/7F/0E
+  PASS  trial census: all counted trials completed — avocado: 5P/5F/0E, gpt: 8P/7F/0E
+  PASS  solvers: solved by ['gpt', 'avocado']
 
-  0 FAIL · 14 WARN · 22 PASS
+  0 FAIL · 9 WARN · 23 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

@@ -1,1 +1,42 @@
-task dir not found: /home/agvidit/swe-bench-pro-agvidit/pendulum-editable-interval-schedules
+# exit_code: 1
+
+presubmit: pendulum-editable-interval-schedules  (format=swe_bench_multi_turn)
+  FAIL  README sections: missing required section(s): ['Description', 'Completion Rates', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
+  WARN  README internal URLs: internal links in README: ['fb.workplace', 'internalmeta.com']
+  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 1_schedule: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 2_override: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  config 3_shift: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
+  WARN  MT re-test: 2_override does not re-run 2 of 2 f2p from 1_schedule (regressions invisible)
+  WARN  MT re-test: 3_shift does not re-run 6 of 6 f2p from 2_override (regressions invisible)
+  WARN  MT task-level config: task-level fail_to_pass has 19 id(s) no step grades
+  WARN  harness collision: steps/1_schedule/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  harness collision: steps/2_override/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  harness collision: steps/3_shift/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  PASS  task.toml name: codimango/pendulum-editable-interval-schedules
+  PASS  README completeness: no TBD / 'not yet run' placeholders
+  PASS  config task: 19 f2p / 43 p2p, clean keys
+  PASS  config 1_schedule: 2 f2p / 10 p2p, clean keys
+  PASS  config 2_override: 6 f2p / 10 p2p, clean keys
+  PASS  config 3_shift: 11 f2p / 43 p2p, clean keys
+  PASS  server freshness: server at 158881a7
+  PASS  validation: Structural checks: All 20/20 checks pass/warn
+  PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — every step is within avocado [avocado-code-flex-5.16]'s 3/5 ceiling, or carried by a third-party gradient (avocado [avocado-code-fl
+  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: Contamination check: Risk: LOW
+  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  stage agentic-review: passed
+  PASS  stage build-verification: passed
+  PASS  stage evalgt: passed
+  PASS  stage multi-turn-step-results: passed
+  PASS  TBR: pass
+  PASS  agentic verdict: GOOD
+  PASS  trial census: all counted trials completed — avocado: 8P/7F/0E
+  PASS  human review: latest decision Accept @ 2026-10-06 14:11 — make sure every point is addressed
+
+  1 FAIL · 13 WARN · 21 PASS
+  Review status: accepted
+  Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

@@ -1,6 +1,8 @@
+# exit_code: 1
 
 presubmit: auditlog-point-in-time-reconstruction  (format=swe_bench_multi_turn)
-  FAIL  stage multi-turn-post-runs: pending — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
+  FAIL  stage multi-turn-post-runs: error — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  config task: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 1_state_and_rows: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 2_related_at: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -35,5 +37,6 @@ presubmit: auditlog-point-in-time-reconstruction  (format=swe_bench_multi_turn)
   PASS  agentic verdict: GOOD
   PASS  solvers: solved by ['gpt', 'avocado']
 
-  1 FAIL · 11 WARN · 22 PASS
+  1 FAIL · 12 WARN · 22 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

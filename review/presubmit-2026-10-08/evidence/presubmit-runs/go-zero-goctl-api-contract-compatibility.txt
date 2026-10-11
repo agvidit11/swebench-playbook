@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: go-zero-goctl-api-contract-compatibility  (format=swe_bench_multi_turn)
   FAIL  README sections: missing required section(s): ['Description', 'Completion Rates', 'Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
@@ -11,7 +12,6 @@ presubmit: go-zero-goctl-api-contract-compatibility  (format=swe_bench_multi_tur
   WARN  trial census: 1 errored/crashed trial(s) — avocado: 10P/4F/1E. Crashes are not difficulty (mlx review). `codimango task rerun go-zero-goctl-api-contract-compatibility` and re-check before submitting.
   WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
   WARN  single-test dominance: 4/4 failed trials fail `github.com/zeromicro/go-zero/tools/goctl/api/spec::ExampleMember_GetEnumOptions` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
-  WARN  human review: latest decision Request changes @ 2026-10-06 16:32 — make sure every point is addressed
   PASS  task.toml name: codimango/go-zero-goctl-api-contract-compatibility
   PASS  README completeness: no TBD / 'not yet run' placeholders
   PASS  README internal URLs: none
@@ -34,6 +34,8 @@ presubmit: go-zero-goctl-api-contract-compatibility  (format=swe_bench_multi_tur
   PASS  stage multi-turn-step-results: passed
   PASS  TBR: pass
   PASS  agentic verdict: GOOD
+  PASS  human review: latest decision Accept @ 2026-10-09 17:01 — make sure every point is addressed
 
-  1 FAIL · 11 WARN · 22 PASS
+  1 FAIL · 10 WARN · 23 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

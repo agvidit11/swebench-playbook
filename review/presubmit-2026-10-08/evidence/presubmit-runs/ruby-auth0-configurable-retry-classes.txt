@@ -1,28 +1,15 @@
+# exit_code: 1
 
 presubmit: ruby-auth0-configurable-retry-classes  (format=swe_bench_single_turn)
-  FAIL  validation: Metacode or Opus pass/fail balance: failed: Too easy — avocado passed more than 3/5 (avocado [avocado-code-flex]: 4/5, opus: no trials, gpt: no trials) — fix, or write an override justification
-  FAIL  validation overall: validationStatus = failed
+  FAIL  server: cannot read task from codimango: not_found: Task not found (ruby-auth0-configurable-retry-classes)
   WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
   PASS  task.toml name: codimango/ruby-auth0-configurable-retry-classes
   PASS  README sections: all 4 required sections present
   PASS  README completeness: no TBD / 'not yet run' placeholders
   PASS  README internal URLs: none
   PASS  README counts: match config (21 f2p / 2 p2p)
   PASS  config task: 21 f2p / 2 p2p, clean keys
-  PASS  server freshness: server at 10c66504
-  PASS  validation: Structural checks: All 17/17 checks pass/warn
-  PASS  validation: Oracle validation: All 3/3 passed
-  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
-  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 1 · Low 4)
-  PASS  validation: Contamination check: Risk: LOW
-  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
-  PASS  stage agentic-review: passed
-  PASS  stage build-verification: passed
-  PASS  stage evalgt: passed
-  PASS  TBR: pass
-  PASS  agentic verdict: GOOD
-  PASS  trial census: all counted trials completed — avocado: 4P/1F/0E
 
-  2 FAIL · 2 WARN · 19 PASS
+  1 FAIL · 1 WARN · 6 PASS
+  Review status: unavailable
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: beancount-split-restatement-price-cil  (format=swe_bench_multi_turn)
   FAIL  server freshness: server task is at 700e6ee4 but origin/main last touched this task at d96239be — stale import: run `codimango task rerun beancount-split-restatement-price-cil` (free)
@@ -37,4 +38,5 @@ presubmit: beancount-split-restatement-price-cil  (format=swe_bench_multi_turn)
   PASS  human review: latest decision Accept @ 2026-10-06 23:55 — make sure every point is addressed
 
   1 FAIL · 12 WARN · 22 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

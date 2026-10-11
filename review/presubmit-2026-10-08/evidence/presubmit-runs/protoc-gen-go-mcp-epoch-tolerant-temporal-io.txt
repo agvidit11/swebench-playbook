@@ -1,3 +1,4 @@
+# exit_code: 0
 
 presubmit: protoc-gen-go-mcp-epoch-tolerant-temporal-io  (format=swe_bench_multi_turn)
   WARN  README internal URLs: internal links in README: ['fb.workplace', 'internalmeta.com']
@@ -34,4 +35,5 @@ presubmit: protoc-gen-go-mcp-epoch-tolerant-temporal-io  (format=swe_bench_multi
   PASS  solvers: solved by ['gpt', 'avocado']
 
   0 FAIL · 8 WARN · 24 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

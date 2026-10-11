@@ -1,30 +1,58 @@
-== accepted: 26 tasks | 0 FAIL: 7 | 0 FAIL ignoring README-sections: 19
-   FAIL: {'README sections': 13, 'task.toml fields': 5, 'server freshness': 2, 'agentic verdict': 2, 'task.toml metadata': 2, 'README completeness': 1, 'README counts': 1, 'trials': 1}
-== needs_revision: 9 tasks | 0 FAIL: 1 | 0 FAIL ignoring README-sections: 4
-   FAIL: {'validation': 4, 'validation overall': 4, 'README sections': 4, 'agentic verdict': 1, 'trial census': 1, 'trials': 1, 'stage multi-turn-post-runs': 1, 'stage build-verification': 1}
-== being_reviewed: 7 tasks | 0 FAIL: 5 | 0 FAIL ignoring README-sections: 7
-   FAIL: {'README sections': 2}
-== needs_reviewers_assigned: 6 tasks | 0 FAIL: 3 | 0 FAIL ignoring README-sections: 3
-   FAIL: {'stage agentic-review': 2, 'TBR': 2, 'README sections': 2, 'README completeness': 1, 'README counts': 1, 'stage build-verification': 1, 'stage evalgt': 1}
-== draft: 8 tasks | 0 FAIL: 1 | 0 FAIL ignoring README-sections: 1
-   FAIL: {'validation': 6, 'validation overall': 6, 'stage multi-turn-post-runs': 3, 'stage build-verification': 2, 'TBR': 2, 'stage agentic-review': 2, 'stage evalgt': 2, 'trials': 1}
+Regenerated successfully: 56/56 tasks; 0 infrastructure errors.
+Pinned task repository ref: be21725c3cce45a83260d56cbb20d16b07e16403
 
-== accepted with FAIL other than README sections:
-   beancount-split-restatement-price-cil            ['server freshness']
-   dsh-selective-undo-batch-relations               ['server freshness']
-   qdrant-ruby-http-adapter-injection               ['agentic verdict', 'task.toml fields', 'task.toml metadata']
-   ruby-auth0-http-extra-headers-post               ['task.toml fields']
-   ruby-auth0-oidc-at-hash-c-hash                   ['task.toml fields']
-   webauthn-ruby-packed-attestation-full-chain-re   ['task.toml fields', 'trials']
-   webauthn-ruby-verify-registration-response-sha   ['README completeness', 'README counts', 'agentic verdict', 'task.toml fields', 'task.toml metadata']
+== accepted: 31 tasks | 0 FAIL: 6 | 0 FAIL ignoring README-sections: 22
+   FAIL: {'server freshness': 3, 'README sections': 18, 'README completeness': 2, 'README counts': 2, 'task.toml fields': 5, 'task.toml metadata': 2, 'agentic verdict': 2, 'trials': 1}
+== being_reviewed: 11 tasks | 0 FAIL: 6 | 0 FAIL ignoring README-sections: 9
+   FAIL: {'stage multi-turn-post-runs': 1, 'README sections': 4, 'stage evalgt': 1, 'TBR': 1}
+== draft: 3 tasks | 0 FAIL: 0 | 0 FAIL ignoring README-sections: 0
+   FAIL: {'validation': 4, 'validation overall': 3, 'stage agentic-review': 1, 'stage build-verification': 1, 'stage evalgt': 1, 'stage multi-turn-post-runs': 3, 'TBR': 1, 'trials': 1, 'README sections': 1}
+== needs_reviewers_assigned: 4 tasks | 0 FAIL: 1 | 0 FAIL ignoring README-sections: 3
+   FAIL: {'README sections': 2, 'server freshness': 1}
+== needs_revision: 6 tasks | 0 FAIL: 2 | 0 FAIL ignoring README-sections: 2
+   FAIL: {'stage agentic-review': 2, 'TBR': 2, 'validation': 4, 'validation overall': 3, 'stage multi-turn-post-runs': 1, 'trials': 1, 'stage build-verification': 1, 'stage evalgt': 1, 'README sections': 1}
+== unavailable: 1 tasks | 0 FAIL: 0 | 0 FAIL ignoring README-sections: 0
+   FAIL: {'server': 1}
 
-== needs_revision:
-   commonmark-java-source-preserving-link-retarge   ['README sections']
-   configupdater-option-edit-layout-preservation    ['validation', 'validation overall']
-   dropshot-option-return-nullable-openapi          ['agentic verdict', 'validation', 'validation overall']
-   mlx-openai-server-glm4moe-empty-args-crash-dep   ['trial census']
-   pyhms-rfc9421-component-context-negotiation      ['README sections']
-   redb-database-drop-hangs-outstanding-writetxn-   ['TBR', 'stage agentic-review', 'stage build-verification', 'stage evalgt', 'validation', 'validation overall']
-   spire-bundle-configuration-epoch-fencing         ['README sections']
-   spire-workload-api-delivery-readiness            ['README sections', 'stage multi-turn-post-runs', 'trials', 'validation', 'validation overall']
-   vobject-series-edit-split-move                   []
+== tasks with FAIL:
+   auditlog-point-in-time-reconstruction                    being_reviewed             ['stage multi-turn-post-runs']
+   beancount-split-restatement-price-cil                    accepted                   ['server freshness']
+   cancancan-limited-ability-common-permission              needs_reviewers_assigned   ['README sections']
+   circl-secretsharing-share-lifecycle                      accepted                   ['README sections']
+   closure-tree-sibling-order-integrity                     draft                      ['validation', 'validation overall', 'stage agentic-review', 'stage build-verification', 'stage evalgt', 'stage multi-turn-post-runs', 'TBR']
+   commonmark-java-source-preserving-link-retarget          being_reviewed             ['README sections']
+   concourse-retry-attempt-state-atomicity                  being_reviewed             ['README sections']
+   css-inline-cascade-layers-residual-order                 accepted                   ['README sections']
+   django-model-utils-choices-grouped-selection-materialization accepted                   ['README sections']
+   django-model-utils-fieldtracker-db-truth                 needs_revision             ['stage agentic-review', 'TBR']
+   dsh-selective-undo-batch-relations                       accepted                   ['server freshness']
+   go-zero-flush-accountability                             accepted                   ['README sections']
+   go-zero-goctl-api-contract-compatibility                 accepted                   ['README sections']
+   graphiti-auditable-include-authorization                 accepted                   ['README sections']
+   jedi-behaviour-preserving-refactorings                   needs_revision             ['validation', 'validation', 'validation overall', 'stage multi-turn-post-runs', 'trials']
+   jsoup-w3c-mirror-reconciliation                          accepted                   ['README sections']
+   kustomize-localize-source-fidelity                       accepted                   ['README sections']
+   lektor-output-liveness-prune                             draft                      ['validation', 'validation', 'validation overall', 'stage multi-turn-post-runs', 'trials']
+   mlx-openai-server-glm4moe-empty-args-crash-depri         accepted                   ['server freshness']
+   net-imap-debug-log-secret-redaction                      accepted                   ['README sections']
+   object-rs-atomic-rewriter-modify                         accepted                   ['README sections', 'README completeness', 'README counts']
+   open62541-numericrange-canonical-form-composition        accepted                   ['README sections']
+   openfeature-go-multiprovider-live-replacement            draft                      ['README sections', 'validation', 'validation overall', 'stage multi-turn-post-runs']
+   pendulum-editable-interval-schedules                     accepted                   ['README sections']
+   pep440go-matching-prerelease-filter-satisfiable          accepted                   ['README sections']
+   pion-sctp-handshake-option-failure-teardown              needs_reviewers_assigned   ['README sections']
+   pyhms-rfc9421-component-context-negotiation              being_reviewed             ['README sections']
+   qdrant-ruby-http-adapter-injection                       accepted                   ['task.toml fields', 'task.toml metadata', 'agentic verdict']
+   redb-database-drop-hangs-outstanding-writetxn-depri      needs_revision             ['validation', 'validation overall', 'stage agentic-review', 'stage build-verification', 'stage evalgt', 'TBR']
+   ruby-auth0-configurable-retry-classes                    unavailable                ['server']
+   ruby-auth0-http-extra-headers-post                       accepted                   ['task.toml fields']
+   ruby-auth0-oidc-at-hash-c-hash                           accepted                   ['task.toml fields', 'README sections']
+   spire-bundle-configuration-epoch-fencing                 being_reviewed             ['README sections', 'stage evalgt', 'TBR']
+   spire-workload-api-delivery-readiness                    needs_revision             ['README sections', 'validation', 'validation overall']
+   state-machines-ar-implicit-callback-fix                  accepted                   ['README sections']
+   stjsonschema-compound-bundle-split-flatten               accepted                   ['README sections']
+   tidwall-btree-split-append-restore                       needs_reviewers_assigned   ['server freshness']
+   unleash-go-snapshot-specialization                       accepted                   ['README sections']
+   unyt-pint-bridge-semantic-fidelity                       accepted                   ['README sections']
+   webauthn-ruby-packed-attestation-full-chain-reject       accepted                   ['task.toml fields', 'trials']
+   webauthn-ruby-verify-registration-response-shape         accepted                   ['task.toml fields', 'task.toml metadata', 'README completeness', 'README counts', 'agentic verdict']

@@ -1,36 +1,42 @@
+# exit_code: 1
 
 presubmit: jedi-behaviour-preserving-refactorings  (format=swe_bench_multi_turn)
+  FAIL  validation: Metacode or Opus pass/fail balance: PENDING — never submit mid-validation: Waiting on per-step results (avocado n/a, opus n/a, gpt n/a)
+  FAIL  validation: Agentic trial-output review: PENDING — never submit mid-validation: Agentic full-task review is waiting to dispatch
+  FAIL  validation overall: validationStatus = pending
+  FAIL  stage multi-turn-post-runs: pending — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
+  FAIL  trials: 2 job(s) still running at f4d42c5b — wait for a complete verdict
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  config task: uppercase duplicate keys ['TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'HIDDEN_TEST_FILES_TO_COPY', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 1_rename: uppercase duplicate keys ['TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'HIDDEN_TEST_FILES_TO_COPY', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 2_inline: uppercase duplicate keys ['TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'HIDDEN_TEST_FILES_TO_COPY', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 3_extract_function: uppercase duplicate keys ['TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'HIDDEN_TEST_FILES_TO_COPY', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  MT re-test: 2_inline does not re-run 6 of 6 f2p from 1_rename (regressions invisible)
-  WARN  MT re-test: 3_extract_function does not re-run 11 of 11 f2p from 2_inline (regressions invisible)
   WARN  harness interpreter: steps/1_rename/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
   WARN  harness interpreter: steps/2_inline/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
   WARN  harness interpreter: steps/3_extract_function/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  agentic verdict: no agentic review found at this commit
+  WARN  trial census: 1 errored/crashed trial(s) — avocado: 3P/4F/1E. Crashes are not difficulty (mlx review). `codimango task rerun jedi-behaviour-preserving-refactorings` and re-check before submitting.
   WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  WARN  human review: latest decision Request changes @ 2026-10-09 09:48 — make sure every point is addressed
   PASS  task.toml name: codimango/jedi-behaviour-preserving-refactorings
   PASS  README sections: all 4 required sections present
   PASS  README completeness: no TBD / 'not yet run' placeholders
   PASS  README internal URLs: none
   PASS  config 1_rename: 6 f2p / 111 p2p, clean keys
-  PASS  config 2_inline: 11 f2p / 112 p2p, clean keys
-  PASS  config 3_extract_function: 12 f2p / 109 p2p, clean keys
-  PASS  server freshness: server at c8a62a87
+  PASS  config 2_inline: 11 f2p / 124 p2p, clean keys
+  PASS  config 3_extract_function: 11 f2p / 139 p2p, clean keys
+  PASS  MT re-test: 2_inline re-runs all f2p of 1_rename
+  PASS  MT re-test: 3_extract_function re-runs all f2p of 2_inline
+  PASS  server freshness: server at f4d42c5b
   PASS  validation: Structural checks: All 20/20 checks pass/warn
   PASS  validation: Oracle validation: All 3/3 passed
-  PASS  validation: Metacode or Opus pass/fail balance: Passed — every step is within avocado [avocado-code-flex-5.16]'s 3/5 ceiling, or carried by a third-party gradient (avocado [avocado-code-fl
-  PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
   PASS  validation: Contamination check: Risk: LOW
   PASS  validation: Provenance check: Verdict: SUSPECT — review recommended
   PASS  stage agentic-review: passed
   PASS  stage build-verification: passed
   PASS  stage evalgt: passed
-  PASS  stage multi-turn-step-results: passed
   PASS  TBR: pass
-  PASS  agentic verdict: GOOD
-  PASS  trial census: all counted trials completed — avocado: 7P/12F/0E
 
-  0 FAIL · 10 WARN · 21 PASS
+  5 FAIL · 12 WARN · 18 PASS
+  Review status: needs_revision
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

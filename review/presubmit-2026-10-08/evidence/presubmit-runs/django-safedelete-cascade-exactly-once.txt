@@ -1,7 +1,7 @@
+# exit_code: 0
 
 presubmit: django-safedelete-cascade-exactly-once  (format=swe_bench_multi_turn)
-  FAIL  validation: Metacode or Opus pass/fail balance: failed: Step gate failed — "3_queryset_batch_ops" has no gradient — avocado never reached it and every model that did passed every attempt, and the  — fix, or write an override justification
-  FAIL  validation overall: validationStatus = failed
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  config task: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD', 'FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 1_exactly_once_atomic: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD', 'FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 2_mti_undelete_inverse: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'BEFORE_REPO_SET_CMD', 'FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -12,7 +12,7 @@ presubmit: django-safedelete-cascade-exactly-once  (format=swe_bench_multi_turn)
   WARN  harness interpreter: steps/1_exactly_once_atomic/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
   WARN  harness interpreter: steps/2_mti_undelete_inverse/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
   WARN  harness interpreter: steps/3_queryset_batch_ops/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
-  WARN  single-test dominance: 8/8 failed trials fail `safedelete.tests.test_zz_cascade_s2_3fee6c.ProbeR3StageTwoInverse7D4ATests.test_generic_relations_on_both_mti_sides_round_trip` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  WARN  trial census: 1 errored/crashed trial(s) — avocado: 8P/6F/1E, gpt: 13P/2F/0E. Crashes are not difficulty (mlx review). `codimango task rerun django-safedelete-cascade-exactly-once` and re-check before submitting.
   PASS  task.toml name: codimango/django-safedelete-cascade-exactly-once
   PASS  README sections: all 4 required sections present
   PASS  README completeness: no TBD / 'not yet run' placeholders
@@ -21,9 +21,10 @@ presubmit: django-safedelete-cascade-exactly-once  (format=swe_bench_multi_turn)
   PASS  config 1_exactly_once_atomic: 5 f2p / 109 p2p, clean keys
   PASS  config 2_mti_undelete_inverse: 13 f2p / 119 p2p, clean keys
   PASS  config 3_queryset_batch_ops: 6 f2p / 138 p2p, clean keys
-  PASS  server freshness: server at 30b6b8e6
+  PASS  server freshness: server at c5891179
   PASS  validation: Structural checks: All 20/20 checks pass/warn
   PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed, WITH REVIEWER ACTION REQUIRED — "3_queryset_batch_ops": avocado 0.0 with gpt at 1.0 — accepted under rule (4), but the author must c
   PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
   PASS  validation: Contamination check: Risk: LOW
   PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
@@ -33,8 +34,8 @@ presubmit: django-safedelete-cascade-exactly-once  (format=swe_bench_multi_turn)
   PASS  stage multi-turn-step-results: passed
   PASS  TBR: pass
   PASS  agentic verdict: GOOD
-  PASS  trial census: all counted trials completed — avocado: 5P/5F/0E, gpt: 12P/3F/0E
   PASS  solvers: solved by ['gpt', 'avocado']
 
-  2 FAIL · 11 WARN · 22 PASS
+  0 FAIL · 12 WARN · 22 PASS
+  Review status: needs_reviewers_assigned
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

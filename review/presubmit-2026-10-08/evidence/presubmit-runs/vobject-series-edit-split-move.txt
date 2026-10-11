@@ -1,5 +1,7 @@
+# exit_code: 0
 
 presubmit: vobject-series-edit-split-move  (format=swe_bench_multi_turn)
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  README internal URLs: internal links in README: ['fb.workplace', 'internalmeta.com']
   WARN  config task: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 1_edit_and_split: uppercase duplicate keys ['PATCH', 'TEST_PATCH', 'FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -38,5 +40,6 @@ presubmit: vobject-series-edit-split-move  (format=swe_bench_multi_turn)
   PASS  agentic verdict: GOOD
   PASS  trial census: all counted trials completed — avocado: 10P/5F/0E
 
-  0 FAIL · 16 WARN · 21 PASS
+  0 FAIL · 17 WARN · 21 PASS
+  Review status: needs_revision
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

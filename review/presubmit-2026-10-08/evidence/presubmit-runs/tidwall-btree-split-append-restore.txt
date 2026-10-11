@@ -1,41 +1,32 @@
+# exit_code: 1
 
-presubmit: tidwall-btree-split-append-restore  (format=swe_bench_multi_turn)
-  FAIL  validation: Metacode or Opus pass/fail balance: failed: Step gate failed — "2_append_tree" too easy — avocado [avocado-code-flex-5.16] passed 5 of 5, over the 3/5 ceiling, and the single-step exem — fix, or write an override justification
-  FAIL  validation overall: validationStatus = failed
+presubmit: tidwall-btree-split-append-restore  (format=swe_bench_single_turn)
+  FAIL  server freshness: server task is at 9fb1f74b but origin/main last touched this task at 10fa6347 — stale import: run `codimango task rerun tidwall-btree-split-append-restore` (free)
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  config 1_split_at_pivot: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  config 2_append_tree: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  config 3_restore_deleted_range: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'SELECTED_TEST_FILES_TO_RUN', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  MT re-test: 2_append_tree does not re-run 3 of 3 f2p from 1_split_at_pivot (regressions invisible)
-  WARN  MT re-test: 3_restore_deleted_range does not re-run 7 of 7 f2p from 2_append_tree (regressions invisible)
-  WARN  harness collision: steps/1_split_at_pivot/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
-  WARN  harness interpreter: steps/1_split_at_pivot/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
-  WARN  harness collision: steps/2_append_tree/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
-  WARN  harness interpreter: steps/2_append_tree/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
-  WARN  harness collision: steps/3_restore_deleted_range/tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
-  WARN  harness interpreter: steps/3_restore_deleted_range/tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
-  WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
+  WARN  harness collision: tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  WARN  harness interpreter: tests/test.sh: conditionally uses a /usr/local/bin interpreter — root agent can plant it (vobject review). Use a fixed root-owned path.
+  WARN  solvers: only gpt solved it — reviewers ask for a second model (concourse review)
+  WARN  single-test dominance: 5/5 failed trials fail `github.com/tidwall/btree::TestTBSARd4e8b2PoolModel` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
   PASS  task.toml name: codimango/tidwall-btree-split-append-restore
   PASS  README sections: all 4 required sections present
   PASS  README completeness: no TBD / 'not yet run' placeholders
   PASS  README internal URLs: none
-  PASS  config task: 18 f2p / 60 p2p, clean keys
-  PASS  config 1_split_at_pivot: 3 f2p / 60 p2p, clean keys
-  PASS  config 2_append_tree: 7 f2p / 60 p2p, clean keys
-  PASS  config 3_restore_deleted_range: 8 f2p / 60 p2p, clean keys
-  PASS  server freshness: server at c0eb5a87
-  PASS  validation: Structural checks: All 20/20 checks pass/warn
+  PASS  config task: 20 f2p / 60 p2p, clean keys
+  PASS  validation: Structural checks: All 17/17 checks pass/warn
   PASS  validation: Oracle validation: All 3/3 passed
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 0/5, opus: no trials, gpt [gpt-6.1-sol]: 5/5)
   PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 2 · Low 3)
   PASS  validation: Contamination check: Risk: LOW
-  PASS  validation: Provenance check: No third-party model authorship detected (does not distinguish human from 1p/Avocado authorship — 1p drafting is permitted with human review
+  PASS  validation: Provenance check: Verdict: SUSPECT — review recommended
   PASS  stage agentic-review: passed
   PASS  stage build-verification: passed
   PASS  stage evalgt: passed
-  PASS  stage multi-turn-step-results: passed
   PASS  TBR: pass
   PASS  agentic verdict: GOOD
-  PASS  trial census: all counted trials completed — avocado: 14P/1F/0E
+  PASS  trial census: all counted trials completed — avocado: 0P/5F/0E, gpt: 5P/0F/0E
 
-  2 FAIL · 13 WARN · 21 PASS
+  1 FAIL · 6 WARN · 18 PASS
+  Review status: needs_reviewers_assigned
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

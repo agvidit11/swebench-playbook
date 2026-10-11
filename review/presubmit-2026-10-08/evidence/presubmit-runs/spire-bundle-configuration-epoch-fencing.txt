@@ -1,31 +1,32 @@
+# exit_code: 1
 
 presubmit: spire-bundle-configuration-epoch-fencing  (format=swe_bench_single_turn)
-  FAIL  README sections: missing required section(s): ['Completion Rates'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
-  WARN  task.toml name: [task].name = 'swe-bench-pro-agvidit/spire-bundle-configuration-epoch-fencing', expected 'codimango/spire-bundle-configuration-epoch-fencing'
-  WARN  task.toml metadata: [metadata] missing (reviewers flag): ['difficulty', 'category', 'tags']
-  WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
-  WARN  harness collision: tests/test.sh: `git apply --check … || exit 1` — a solver-created test file makes reward 0 (smoltcp review). Prefer direct write + idempotent mod/import line.
+  FAIL  README sections: missing required section(s): ['Model Analysis'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
+  FAIL  stage evalgt: failed — reviewers block on red engine stages (go-zero-goctl: 'Eval GT errors are hard blocking')
+  FAIL  TBR: tbdReviewStatus = fail — re-run TBR at this commit before requesting review
+  WARN  task.toml metadata: [metadata] missing (reviewers flag): ['category']
   WARN  harness ignore-escape: tests/test.sh: uses --exclude-standard — agent-added ignore rules hide files from the stray-file check (spire review).
   WARN  solvers: only avocado solved it — reviewers ask for a second model (concourse review)
-  WARN  single-test dominance: 2/2 failed trials fail `github.com/spiffe/spire/pkg/server/bundle/client::TestBundleUpdaterCanceledParticipantDoesNotCancelSharedUpdate` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
+  WARN  single-test dominance: 3/3 failed trials fail `github.com/spiffe/spire/pkg/server/bundle/client::TestBundleUpdaterCanceledParticipantDoesNotCancelSharedUpdate` — that test carries the difficulty: prove it is STATED in instruction.md and fair (crossplane/spire-workload/redb)
   WARN  human review: latest decision Request changes @ 2026-10-07 21:48 — make sure every point is addressed
+  PASS  task.toml name: codimango/spire-bundle-configuration-epoch-fencing
   PASS  README completeness: no TBD / 'not yet run' placeholders
   PASS  README internal URLs: none
-  PASS  config task: 6 f2p / 3 p2p, clean keys
-  PASS  server freshness: server at 27fba06d
+  PASS  README counts: match config (8 f2p / 4 p2p)
+  PASS  config task: 8 f2p / 4 p2p, clean keys
+  PASS  server freshness: server at eb7730e1
   PASS  validation: Structural checks: All 18/18 checks pass/warn
   PASS  validation: Oracle validation: All 3/3 passed
-  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 3/5, opus: no trials, gpt: no trials)
+  PASS  validation: Metacode or Opus pass/fail balance: Passed — avocado can pass at most 3/5 and ≥1 model solved (avocado [avocado-code-flex]: 2/5, opus: no trials, gpt: no trials)
   PASS  validation: Agentic trial-output review: Agentic full-task review: GOOD
-  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 2 · Low 2)
+  PASS  validation: AI assessment: Verdict: Accept (Critical 0 · High 0 · Medium 1 · Low 3)
   PASS  validation: Contamination check: Risk: LOW
   PASS  validation: Provenance check: Verdict: SUSPECT — review recommended
   PASS  stage agentic-review: passed
   PASS  stage build-verification: passed
-  PASS  stage evalgt: passed
-  PASS  TBR: pass
   PASS  agentic verdict: GOOD
-  PASS  trial census: all counted trials completed — avocado: 3P/2F/0E
+  PASS  trial census: all counted trials completed — avocado: 2P/3F/0E
 
-  1 FAIL · 8 WARN · 17 PASS
+  3 FAIL · 5 WARN · 17 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

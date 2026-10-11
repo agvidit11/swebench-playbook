@@ -1,3 +1,4 @@
+# exit_code: 0
 
 presubmit: jsonschema-schema-subsumption-checker  (format=swe_bench_multi_turn)
   WARN  README internal URLs: internal links in README: ['fb.workplace', 'internalmeta.com']
@@ -29,4 +30,5 @@ presubmit: jsonschema-schema-subsumption-checker  (format=swe_bench_multi_turn)
   PASS  human review: latest decision Accept @ 2026-09-22 13:38 — make sure every point is addressed
 
   0 FAIL · 6 WARN · 21 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

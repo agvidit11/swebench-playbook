@@ -1,3 +1,4 @@
+# exit_code: 1
 
 presubmit: concourse-retry-attempt-state-atomicity  (format=swe_bench_single_turn)
   FAIL  README sections: missing required section(s): ['Description', 'Completion Rates', 'Model Analysis', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
@@ -29,4 +30,5 @@ presubmit: concourse-retry-attempt-state-atomicity  (format=swe_bench_single_tur
   PASS  trial census: all counted trials completed — avocado: 0P/5F/0E, gpt: 2P/3F/0E
 
   1 FAIL · 8 WARN · 18 PASS
+  Review status: being_reviewed
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

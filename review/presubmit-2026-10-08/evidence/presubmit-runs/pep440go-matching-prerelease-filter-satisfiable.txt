@@ -1,7 +1,9 @@
+# exit_code: 1
 
 presubmit: pep440go-matching-prerelease-filter-satisfiable  (format=swe_bench_multi_turn)
   FAIL  README sections: missing required section(s): ['Completion Rates', 'Anti-Cheating'] (spec: Description, Completion Rates, Model Analysis, Anti-Cheating Analysis). Intentionally FAIL: some reviewers accept without them, but 5 tasks were bounced for exactly this; minutes to fix
   WARN  task.toml name: [task].name = 'agvidit/pep440go-matching-prerelease-filter-satisfiable', expected 'codimango/pep440go-matching-prerelease-filter-satisfiable'
+  WARN  task.toml author: author email ['agvidit@meta.com'] not among commit authors ['agvidit@fb.com']
   WARN  config task: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 1_prefix_compatible_matching: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
   WARN  config 2_prerelease_filter: uppercase duplicate keys ['FAIL_TO_PASS', 'PASS_TO_PASS', 'BEFORE_REPO_SET_CMD'] — reviewers flag them as unused; remove ONLY if test.sh/parser.py don't read them as a fallback
@@ -37,5 +39,6 @@ presubmit: pep440go-matching-prerelease-filter-satisfiable  (format=swe_bench_mu
   PASS  solvers: solved by ['gpt', 'avocado']
   PASS  human review: latest decision Accept @ 2026-10-06 23:18 — make sure every point is addressed
 
-  1 FAIL · 13 WARN · 22 PASS
+  1 FAIL · 14 WARN · 22 PASS
+  Review status: accepted
   Not covered (judgement/container): forge attempts, per-assertion stated-check, golden vs real standard, collision/idempotency replay, MT step-dependency replay, public-issue sweep.

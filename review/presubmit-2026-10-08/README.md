@@ -11,7 +11,9 @@
 > **Reviewing from any machine:** `git pull` the playbook, then open
 > `review/presubmit-2026-10-08/`. Every path in this doc is relative to that folder. To run the tool:
 > `python3 presubmit.py <task> --repo <path-to-your-swe-bench-pro-agvidit-checkout>`. It needs the
-> `codimango` CLI; it is read-only and writes nothing. Evidence was captured 2026-10-08 on devvm6971.
+> `codimango` CLI. The tool is read-only by default: it does not fetch, edit task files, or update Git
+> refs. Fetch the task repo first so `origin/main` is current; the tool fails if the selected ref is
+> stale. Evidence was first captured 2026-10-08 and regenerated after the portability fixes below.
 > Reviewer comments in `evidence/nonaccept.md` include reviewer names: keep this repo private.
 
 ---
@@ -67,8 +69,9 @@ on files the agent can modify.**
 | README has Description / Completion Rates / Model Analysis / Anti-Cheating sections | 2 | FAIL |
 | README has no "TBD" / "not yet run" / placeholder text | 2 | FAIL |
 | README graded counts equal `tests/config.json` | 2 | FAIL |
-| README has no internal URLs (internalmeta, workplace, fburl) | 9 | FAIL |
-| `task.toml`: `name = codimango/<folder>`, format/workstream/track_assignment, reward_type | 9 | FAIL |
+| README has no internal URLs (internalmeta, workplace, fburl) | 9 | WARN |
+| `task.toml`: `name = codimango/<folder>` | 9 | WARN |
+| `task.toml`: format/workstream/track_assignment, reward_type | 9 | FAIL |
 | `task.toml`: difficulty, category, tags, taxonomy; artifacts not misplaced under [metadata]; author email | 9 | WARN |
 | config.json parses; repo/base_commit real (not placeholders); f2p non-empty; f2p ∩ p2p = ∅ | 9 | FAIL |
 | config.json uppercase duplicate keys | 9 | WARN (some harnesses read them) |
@@ -118,8 +121,10 @@ on files the agent can modify.**
 
 ## 6. Validation of the tool (retro-test on all 56 tasks)
 
-Ran `presubmit.py` (reading `origin/main`) over all 56 tasks on 2026-10-08. Per-task output is in
-`evidence/presubmit-runs/`; the summary is in `evidence/presubmit-summary.txt`.
+The evidence was regenerated on 2026-10-11 against one pinned task-repository commit,
+`be21725c3cce45a83260d56cbb20d16b07e16403`. All 56 runs completed with exit code 0 or 1; there
+were no usage or infrastructure exits. Per-task output is in `evidence/presubmit-runs/`; the exact
+aggregate is in `evidence/presubmit-summary.txt`.
 
 **Caveat:** this tests each task's *current* state. Many bounced tasks have since been fixed and
 accepted, so it measures (a) noise on accepted tasks and (b) detection on still-open needs-revision
@@ -127,47 +132,56 @@ tasks. It is not a perfect replay of each task's state at bounce time.
 
 | Status | Tasks | 0 FAIL | 0 FAIL, ignoring README-sections |
 |---|---|---|---|
-| accepted | 26 | 7 | **19** |
-| needs_revision | 9 | 1 | 4 |
-| being_reviewed | 7 | 5 | 7 |
-| needs_reviewers_assigned | 6 | 3 | 3 |
-| draft | 8 | 1 | 1 |
+| accepted | 31 | 6 | **22** |
+| needs_revision | 6 | 2 | 2 |
+| being_reviewed | 11 | 6 | 9 |
+| needs_reviewers_assigned | 4 | 1 | 3 |
+| draft | 3 | 0 | 0 |
+| unavailable | 1 | 0 | 0 |
 
-**Accepted tasks with a FAIL other than README sections (7). All are explained:**
-- 5 July single-turn tasks (qdrant, ruby-auth0 ×2, webauthn ×2) fail `task.toml fields` or metadata.
-  `track_assignment` and related fields became required on 2026-09-17, after those tasks were accepted.
-  These are correct FAILs for any *new* submission.
-- 2 tasks (beancount, dsh) fail `server freshness` because they have commits after acceptance.
-- **There are no unexplained false positives on tasks accepted since September.**
+The one unavailable task (`ruby-auth0-configurable-retry-classes`) no longer exists on the server;
+the tool reports that as a blocking server FAIL instead of silently treating it as clean.
 
-**README sections is intentionally FAIL even though 13 accepted tasks lack the headings.** Acceptance
+**Accepted tasks with a FAIL other than README sections remain explainable:**
+- Five older single-turn tasks fail fields or metadata introduced after they were accepted.
+- Beancount, dsh and mlx have task-directory commits newer than the server import and correctly fail
+  server freshness.
+- Two older tasks still expose non-GOOD agentic results, and one has no job at its current commit.
+
+**README sections is intentionally FAIL even though 18 accepted tasks lack the headings.** Acceptance
 here is reviewer-dependent: kustomize was accepted with "The defect / The two steps / …", while
 beancount, commons-text and dsh were each bounced for missing exactly these sections. Adding the
 sections takes minutes; a bounce costs a full cycle. *Reviewers: say if you disagree.*
 
-**Detection on open needs-revision tasks (8 of 9 flagged):**
-- configupdater, dropshot, redb: red validation, stages or TBR.
-- mlx: `trial census`, avocado measurement swamped by crashes. This is exactly the reviewer's reason.
-- spire-workload: red stages.
-- commonmark, pyhms, spire-bundle: flagged only on README sections. Their actual bounce reasons
-  (forgeable grader, unstated requirements) are §4b manual checks.
-- vobject: passes. Its bounce was a forgeable grader plus MT re-testing, both §4b.
-- So the tool cleanly covers the mechanical third of bounces and correctly does **not** claim the
-  substantive ones.
+Current status is not a replay of the 2026-10-08 bounce states: tasks have been fixed, accepted,
+resubmitted, or removed since then. The regenerated evidence therefore validates present-day tool
+execution and false-positive pressure; `decisions.tsv` and `nonaccept.md` remain the historical source
+for root-cause coverage. The tool covers the mechanical checks and explicitly leaves the substantive
+grader/spec judgements to §4b.
 
 **Bugs found and fixed while validating (useful for reviewers to know):**
 1. The tool originally read the local checkout, which was 141 commits behind origin. That falsely
    failed 22 of 26 accepted tasks. It now reads `origin/main` by default; use `--worktree` for
    uncommitted edits.
-2. `git fetch` over HTTPS returns 403 on this repo. The tool now fetches via the `:22` SSH URL and
-   WARNs if the fetch fails.
-3. The CLI banner on stderr broke JSON parsing. Fixed with `raw_decode`.
+2. Automatic fetch both mutated the checkout and could fail by transport. The tool now compares the
+   selected `origin/main` with `git ls-remote` without changing refs and fails if it is stale. Batch
+   evidence pins one resolved commit so every run observes the same tree.
+3. CLI banners broke JSON parsing. The decoder now searches for the first valid JSON document rather
+   than assuming the first bracket begins it.
 4. Non-model stages (agentic-review, test-patch) were being counted as solvers. Fixed.
 5. Severities were recalibrated against what reviewers actually accepted:
    - internal URLs: WARN (9 accepted tasks have them, 1 Medium flag)
    - `agvidit/` task name: WARN (spire flagged it Low)
    - uppercase config keys: WARN (some harnesses read them as a fallback)
    - trial census: FAIL only when crashes swamp a model's measurement, else WARN
+6. Reference-mode originally required the task directory to exist in the checked-out worktree. Five
+   recorded runs therefore contained only `task dir not found` and were incorrectly eligible to look
+   clean in the aggregate summary. Reference-mode now reads the Git tree directly, the evidence
+   generator fails closed on exit code 2, and all evidence runs must complete before it writes a summary.
+7. The tool had machine-specific codimango Python and repository paths. It now uses only the public
+   `codimango task show --json` CLI and requires `--repo` (or `SWEBENCH_REPO`) for local checks.
+8. The MT EXIT-trap check looked for `/steps/` even though Git paths begin with `steps/`, so it never
+   ran. The matcher is fixed and covered by a regression test.
 
 ## 7. Evidence files
 
@@ -175,6 +189,10 @@ sections takes minutes; a bounce costs a full cycle. *Reviewers: say if you disa
 - `evidence/nonaccept.md`: full text of every Request-changes review
 - `evidence/FIRST-PASS-CHECKLIST.md`: the 26-check list with per-check evidence
 - `presubmit.py` (this folder): the tool
+- `test_presubmit.py`: focused regression tests for portability, Git-ref reads, JSON decoding, natural
+  step ordering, and MT EXIT-trap detection
+- `evidence/regenerate.py`: reproducible all-task runner; refuses to update the summary after any
+  infrastructure/usage failure and publishes no partial run set
 - `evidence/presubmit-runs/<task>.txt`: the tool's output per task (§6)
 
 ## 8. Questions for reviewers
