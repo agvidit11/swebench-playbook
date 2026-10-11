@@ -103,11 +103,12 @@ BASH_WRITE_TEMPLATE = (
 
 BASH_WRITE = re.compile(BASH_WRITE_TEMPLATE.replace("TASKNAME", re.escape(task)))
 # pathlib writes: only when a literal path containing the task name is being written
-def copies_into_task(cmd):
-    """cp/mv/rsync write only to their LAST path argument. Matching the task name anywhere in
+def copy_targets_into_task(cmd):
+    """Return cp/mv/rsync destinations inside the task tree. Matching the task name anywhere in
     the command flags copy-OUT as a write: a reviewer sandboxing `cp -a <task>/tests/. /tmp/rr/`
     read as a violation and blocked a clean task three times. A blocking gate that cries wolf
     gets switched off, which is the same end state as no gate."""
+    targets = []
     for seg in re.split(r"[|;&]+|\n", cmd):
         toks = seg.split()
         verb = next((t for t in toks if t in ("cp", "mv", "rsync")), None)
@@ -115,8 +116,8 @@ def copies_into_task(cmd):
             continue
         args = [t for t in toks[toks.index(verb)+1:] if not t.startswith("-")]
         if args and task in args[-1]:          # destination only
-            return True
-    return False
+            targets.append(args[-1])
+    return targets
 
 PATHLIB_WRITE = re.compile(
     r"Path\(\s*['\"][^'\"]*" + re.escape(task) + r"[^'\"]*['\"]\s*\)[^\n]{0,80}?\.write_",
@@ -136,6 +137,21 @@ def outside_repo_only(text):
         return t.startswith(("/tmp/", "/var/tmp/", "/home/agvidit/scratch/", "~/scratch/")) or \
                ("/" in t.split(task)[0] and "swe-bench-pro" not in t.split(task)[0] and t.startswith("/"))
     return all(outside(t) for t in toks)
+
+def external_cwd_before(cmd, pos):
+    """True when a relative write target is evaluated after `cd` into scratch space.
+
+    Commands that build replay evidence commonly start with `cd /tmp/...` and then write
+    `TASK/summary.json` relative to that directory.  Looking only at the relative target
+    mistakes that scratch tree for the real benchmark checkout.  Use the last explicit cwd
+    change preceding the target; a later `cd` must not affect an earlier write.
+    """
+    prefix = cmd[:pos]
+    dirs = re.findall(r"(?:^|[;&\n])\s*cd\s+([^\s;&|]+)", prefix)
+    if not dirs:
+        return False
+    cwd = dirs[-1].strip("'\"")
+    return cwd.startswith(("/tmp/", "/var/tmp/", "/home/agvidit/scratch/", "~/scratch/"))
 
 def classify(text):
     """Only instruction.md and tests/** are restricted for Claude."""
@@ -186,12 +202,19 @@ for p in paths:
                         # (ruby-auth0's contamination was exactly that). Only the TARGET of each
                         # matched write expression is judged, never surrounding text.
                         body = cmd
-                        targets = [m.group(0) for m in BASH_WRITE.finditer(body)] + \
-                                  [m.group(0) for m in PATHLIB_WRITE.finditer(body)]
-                        inside = [t for t in targets if not outside_repo_only(t)]
-                        if task in cmd and (inside or copies_into_task(body)):
+                        matches = list(BASH_WRITE.finditer(body)) + list(PATHLIB_WRITE.finditer(body))
+                        inside = [m.group(0) for m in matches
+                                  if not outside_repo_only(m.group(0))
+                                  and not external_cwd_before(body, m.start())]
+                        targets = inside + copy_targets_into_task(body)
+                        if task in cmd and targets:
                             one = " ".join(cmd.split())[:150]
-                            hits.append((sess, ln, "Bash", one, classify(cmd)))
+                            verdict = (
+                                "VIOLATION"
+                                if any(classify(target) == "VIOLATION" for target in targets)
+                                else "ALLOWED(other)"
+                            )
+                            hits.append((sess, ln, "Bash", one, verdict))
     except Exception as e:
         print(f"  (skipped {sess}: {e})", file=sys.stderr)
 
