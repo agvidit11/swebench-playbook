@@ -53,6 +53,14 @@ codimango task show $T --json | jq -r .commitSha     # must equal the remote hea
 # (c) claim the row (from a playbook worktree; never --autostash the shared clone)
 ```
 
+- **Read the CURRENT playbook, not the shared clone.** `~/swebench-playbook` often lags
+  `origin/master` and cannot fast-forward, because other sessions leave uncommitted `CLAIMS.md`
+  edits there. Check `git -C ~/swebench-playbook rev-list --count HEAD..origin/master` after a
+  fetch. If it is non-zero, read every act-file from a fresh `git worktree add /tmp/pb-<you>
+  origin/master`. Never `pull --autostash` the shared clone. Also read the clone's *uncommitted*
+  `CLAIMS.md` diff (`git diff origin/master -- ledger/CLAIMS.md`): an unpushed claim on your task
+  is still a claim, and you ask Vidit before taking it. Re-fetch the task repo before declaring
+  ready; if the task moved upstream, rebase and re-run the gates.
 - **One local `bench run` per host.** Check `ps aux | grep -i codimango-bench` and take
   `flock /tmp/swebench-docker.lock` for every Docker or bench call. A second concurrent bench kills
   both with gateway 400s.
