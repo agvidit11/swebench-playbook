@@ -186,6 +186,7 @@ snippet returns a banner and does nothing. (`mc.sh` was patched to forward to
 | `BAD_GRADING_WEAK` | `2-build.md` -> stated is a superset of graded; **add** a test |
 | `Unauthorized third-party model authorship` | `2-build.md` -> provenance; 1P re-author |
 | `Passed` | `3-harness.md` -> stage 7, submit |
+| `needs_revision` / any human review (green OR failed validation) | `~/swebench-playbook/C-drive/C7-revision-response.md` (after a `C1` diagnosis). A failed gate is fixed in the same revision via `3-harness.md`. Ready to resubmit only with `RESUBMIT-PROOF.md` lines 1-8 green; C7 also drafts the reviewer reply for Vidit to send |
 
 Full verdict-string table with exact wording: `SKILL.md`.
 

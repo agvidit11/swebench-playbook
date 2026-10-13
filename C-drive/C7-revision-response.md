@@ -6,7 +6,7 @@
 
 ```
 ACT:    C7-revision-response
-OWNER:  Claude routes and re-validates · Avocado/MetaCode for every contract sentence
+OWNER:  Claude routes and re-validates · Muse via mc2.sh ("Avocado/MetaCode" below) for every contract sentence
         · Codex for tests/* and for the independent re-read · never Claude in tests/
 INPUT:  a task at `needs_revision` (or any human review with scored rubrics), plus a
         C1 diagnosis of that review
@@ -35,7 +35,33 @@ by the sourcing and the contract. A rebuild throws them away and re-rolls them. 
 if more than half the asks would be answered by "we changed that area anyway", you are rebuilding,
 and you should say so rather than do it quietly.
 
-## 1. Pull, and treat every ask as a ledger finding
+## 0. Before touching anything: one owner, a clean base, a claim
+
+`STATUS: LIVE`, 2026-10-13. Three things go wrong before the first edit:
+
+```bash
+T=<task>
+# (a) is anyone else already on it? Any hit = STOP and ask Vidit. One agent per task.
+ps aux | grep -i "$T\|${T%%-*}" | grep -v grep
+ls ~/scratch/lane-pb/workers/ | grep -i "${T%%-*}"; ls ~/scratch/lane-pb/ADOPT-* 2>/dev/null
+git -C ~/swebench-playbook fetch -q && git -C ~/swebench-playbook show origin/master:ledger/CLAIMS.md | grep -i "$T"
+# (b) work from REMOTE main in your own worktree, never the shared checkout (it lags and other
+#     agents stage into its index). Reconcile the server commitSha with the remote head.
+git -C ~/swe-bench-pro-agvidit fetch -q ssh://git@github.com:22/codimango/swe-bench-pro-agvidit.git main
+git -C ~/swe-bench-pro-agvidit worktree add /tmp/rev-$T FETCH_HEAD
+codimango task show $T --json | jq -r .commitSha     # must equal the remote head for $T, or say why
+# (c) claim the row (from a playbook worktree; never --autostash the shared clone)
+```
+
+- **One local `bench run` per host.** Check `ps aux | grep -i codimango-bench` and take
+  `flock /tmp/swebench-docker.lock` for every Docker or bench call. A second concurrent bench kills
+  both with gateway 400s.
+- **`needs_revision` with a FAILED validation is two jobs, not one.** Answer the reviewer (§1–§3)
+  *and* fix the harness: route the failing gate through `C1` → `C2`/`C3`/`C4` (skill:
+  `runbooks/3-harness.md`) in the same revision. A reply that answers every ask but ships a red
+  gate is not resubmittable.
+
+## 1. Pull EVERY review, every version, and treat every ask as a ledger finding
 
 ```bash
 codimango task reviews <task> --full > $D/human-reviews.txt   # SINGULAR 'task'
@@ -44,6 +70,23 @@ codimango task reviews <task> --full > $D/human-reviews.txt   # SINGULAR 'task'
 Everything else in the pull set is `R9` — run it whole, including trials and trajectories. The
 human review is **not** a substitute for the machine artifacts; the reviewer read the same
 artifacts you can, and their prose is a summary of what is in them.
+
+**"All reviews" means all sources and all commits**, not the latest human comment:
+
+| source | command | what to extract |
+|---|---|---|
+| every human review, every round | `task reviews --full` | each decision + every requested change, every reviewer |
+| contamination / QRA / TBR bot entries | same file | risk level, any non-pass |
+| agentic full-task review per pushed SHA | `job review <task> --commit <sha>` for **each** SHA in `job list` | verdict + each finding |
+| AI assessment counts | `task show --json` | non-zero Low/Medium counts → go find them (`C1` ①) |
+| the validation record | `task errors --json` | every failing or warn row |
+| the existing ledger | `<task>/audit/REVIEW-LEDGER.md` | every prior `OPEN`/`ESCALATED`/`DEFERRED` |
+
+**Proof of completeness:** write `$D/REVIEW-INVENTORY.md`: one line per review entry pulled
+(source · date · SHA · reviewer · decision), and next to each, the ledger row IDs it produced. An
+entry that produced zero rows says why ("bot pass, no asks"). The count of entries in the inventory
+must equal the count in `human-reviews.txt` + one per reviewed SHA. This is what lets you say "every
+review is addressed" and back it up.
 
 Then, in the ledger, **one row per ask, in the reviewer's own words.** Not your paraphrase — the
 paraphrase is where an ask quietly narrows. A reviewer's sentence is the acceptance criterion you
@@ -132,6 +175,64 @@ And per the quality ladder (`00-ROUTER.md` §3b): **the floor is L1, and the ban
 it.** A revision that answers every ask, passes every gate, and lands out-of-band is a *successful*
 revision. Do not trade an answered finding for a band guess.
 
+## 5b. Prove nothing else broke — baseline before, diff after
+
+`STATUS: LIVE`, 2026-10-13. "Answers the review" and "breaks nothing" are separate claims and need
+separate proof. A revision has broken an already-green gate before (`00-ROUTER.md` §4: WEAK → WRONG).
+
+1. **Before the first change**, snapshot every surface at the current server SHA into
+   `$D/baseline.md`: every `validationDetails` row by label, per-step avocado/opus/gpt bands,
+   agentic verdict, `tbdReviewStatus`, provenance `agentModified`, plus local `gate.py --fast`
+   stage results (preflight, presubmit, provenance, carry, forge).
+2. **After the last change**, run the full `gate.py <task>` (all 7 stages, issues the stamp) and
+   write `$D/after.md` with the same rows.
+3. **Diff them.** Any green → red is a blocker. Any stage that was not run says `NOT RUN` with a
+   reason, never blank. Calibration that cannot be measured locally (gateway, slot) is `UNPROVEN`
+   and stays visible in the handoff and in the reviewer message's risk line.
+
+**No new issues** is shown by three readers that did not write the change, all clean on the
+final tree: the `gate.py` stage-6 reviewer agent (`review-task-swebench-v2`) with zero new
+findings, the §3 Codex whole-tree re-read, and `authorship-audit.sh <task>` exit 0 plus
+`prov_predict.py` 0 surviving blocks. A finding any of them raises is either fixed or becomes a
+ledger row with a disposition. It is never dropped silently.
+
+## 5c. RESUBMIT-READY — the proof bundle, then the reviewer message
+
+A task is **ready to resubmit** only when `$D/RESUBMIT-PROOF.md` exists and every line is green
+or explicitly dispositioned. It lives in the evidence dir, **outside** the task tree (Claude may
+write it there). The task's own `audit/REVIEW-LEDGER.md` is written by Codex.
+
+```
+RESUBMIT-PROOF <task>  base <old sha> -> <new sha>
+1 ALL REVIEWS PULLED   REVIEW-INVENTORY.md: <n> entries, <n> mapped, 0 unmapped
+2 ALL ASKS ANSWERED    ledger: <n> rows · FIXED <a> · ESCALATED <b> · OPEN 0   (grep cmd + output)
+3 EACH FIX HAS A CHECK per row: commit + the test/probe/gate that now fails on the old behaviour
+4 NOTHING ELSE BROKE   baseline vs after diff: 0 green->red   (paste the diff)
+5 NO NEW ISSUES        reviewer agent: <verdict, n new> · Codex re-read: <n flags> · authorship 0 · prov 0
+6 GATE                 gate.py full: PASS, stamp <hash>  (or GATE_OVERRIDE "<reason>", logged)
+7 HARNESS              oracle 3/3 per step · per-step band <local/replay> · C6 PROVEN|UNPROVEN per change
+8 SERVER               after push: validationStatus, every row, balance string with every arm (B5)
+```
+
+Line 8 can only be filled after the push. Until it is filled the task is **pushed, not ready**.
+Nobody presses resubmit or replies to the reviewer before line 8 is green.
+
+**Then draft the reviewer message, for Vidit to send.** Claude never posts it. Replying to a
+reviewer is outward-facing, so Vidit sends it. Write it in Vidit's voice: first person,
+plain, short, no headings, no bold, no marketing words. One line per ask, in the reviewer's order,
+saying what changed and where to look. One honest line on anything escalated or unproven. Nothing
+the proof bundle cannot back up.
+
+```
+Hi <reviewer>, thanks for the review. Pushed <short sha>.
+- <ask 1 in their words, shortened>: <what changed, one clause>. <file/test name>.
+- <ask 2>: ...
+- <anything not changed>: <why, one clause>.
+Re-ran oracle, the full gate and validation on the new commit, all green. <one risk line if any>
+```
+
+Keep it under ~120 words unless the review had more than six asks.
+
 ## 6. CHECKLIST — the reviewer-feedback check
 
 ```
@@ -155,6 +256,18 @@ revision. Do not trade an answered finding for a band guess.
        proof: the B5 block
 [ ] 10. Every missing model arm from the prior gate triggered and read (B5)
        proof: the new balance string
+[ ] 0.  No other agent on the task; own worktree off remote main; claim row pushed (§0)
+       proof: the ps/workers/CLAIMS output, the worktree path, the claim commit
+[ ] 11. EVERY review from EVERY source and SHA inventoried and mapped to rows (§1)
+       proof: REVIEW-INVENTORY.md, 0 unmapped
+[ ] 12. Failing harness gate (if any) repaired in the same revision via C1→C2/C3/C4 (§0)
+       proof: the C1 plan + the gate now green, or UNPROVEN with reason
+[ ] 13. Baseline vs after diff: 0 green->red (§5b)
+       proof: baseline.md, after.md, the diff
+[ ] 14. RESUBMIT-PROOF.md complete; lines 1-7 green before push, line 8 after (§5c)
+       proof: the file
+[ ] 15. Reviewer message drafted in Vidit's voice and handed to Vidit, NOT sent (§5c)
+       proof: the draft in the final report
 ```
 
 ## HANDOFF
@@ -168,5 +281,7 @@ FACTS:      <rubric scores before · which asks were contract vs test vs rerun>
 RUNG:       <L0-L3 after the revision>
 UNVERIFIED: <every change with no C6 replay behind it, named>
 OPEN:       <ESCALATED rows, and anything the reviewer may still contest>
-NEXT:       S8 — wait on the new SHA (00-ROUTER.md §3)
+PROOF:      $D/RESUBMIT-PROOF.md (lines 1-8) · $D/REVIEW-INVENTORY.md
+REPLY:      <the reviewer message draft, verbatim, for Vidit to send>
+NEXT:       S8 — wait on the new SHA (00-ROUTER.md §3); resubmit only once PROOF line 8 is green
 ```
