@@ -18,19 +18,19 @@ cd "$REPO" || exit 2
 [ -d "$T" ] || { echo "no such task dir: $T"; exit 2; }
 
 echo "== 0. revision-gate stamp (precheck, Vidit 2026-10-13)"
-# One command before ANY push: ~/swebench-playbook/tools/revision-gate/gate.py <task>
+# One command before ANY push: python3 ~/swebench/revision-gate/gate.py <task>
 # It runs preflight, presubmit, provenance, step carry-forward, fake-pass probes, the
 # reviewer agent and k2n x2, and stamps the exact task files it passed.
 # PROVISIONAL until 3 independent agents verify the gate (ledger/VERIFY-revision-gate.md):
 # while provisional, GATE_OVERRIDE="<reason>" pushes without a stamp and logs the reason.
-GATE=~/swebench-playbook/tools/revision-gate/gate.py
+GATE=~/swebench/revision-gate/gate.py   # installed by ~/swebench-playbook/tools/revision-gate/install-hook.sh
 if [ -f "$GATE" ] && python3 "$GATE" "$T" --repo "$REPO" --check-stamp; then :
 elif [ -n "${GATE_OVERRIDE:-}" ]; then
   mkdir -p ~/swebench/gate-stamps
   printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$(hostname -s)" "$T" "$GATE_OVERRIDE" >> ~/swebench/gate-stamps/overrides.log
   echo "  GATE_OVERRIDE used: $GATE_OVERRIDE (logged to ~/swebench/gate-stamps/overrides.log)"
 else
-  [ -f "$GATE" ] || echo "  gate not installed: cd ~/swebench-playbook && git pull"
+  [ -f "$GATE" ] || echo "  gate not installed: run ~/swebench-playbook/tools/revision-gate/install-hook.sh"
   echo "  run first:  python3 $GATE $T --repo $REPO"
   echo "  (or, while the gate is provisional: GATE_OVERRIDE=\"<reason>\" push-task.sh $T)"
   exit 1

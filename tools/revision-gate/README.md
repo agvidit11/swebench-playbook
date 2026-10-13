@@ -4,8 +4,8 @@ One command before ANY push of a SWE-bench task, first push or revision:
 
 ```bash
 cd ~/swe-bench-pro-agvidit
-python3 ~/swebench-playbook/tools/revision-gate/gate.py <task>          # full run, issues the push stamp
-python3 ~/swebench-playbook/tools/revision-gate/gate.py <task> --fast   # stages 1-5 while iterating
+python3 ~/swebench/revision-gate/gate.py <task>          # full run, issues the push stamp
+python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iterating
 ```
 
 **PROVISIONAL (2026-10-13).** Not yet verified by 3 independent agents. See
@@ -24,7 +24,8 @@ python3 ~/swebench-playbook/tools/revision-gate/gate.py <task> --fast   # stages
 - Writes nothing inside the task directory. Logs go to `/tmp/revision-gate/`, stamps to `~/swebench/gate-stamps/`.
 - `push-task.sh` refuses to push without a clean full-run stamp for the exact task files.
 - A git **pre-push hook** enforces the same on every push path (custom scripts, plain `git push`).
-  Install it in every task-repo clone on a host, and again after making a new clone:
+  `install-hook.sh` also installs the gate itself at `~/swebench/revision-gate/` (what the hook and
+  push-task.sh run), so re-run it after every gate update. Install in every task-repo clone on a host:
   `~/swebench-playbook/tools/revision-gate/install-hook.sh` (`--list` to check, `--uninstall` to remove).
   Changes only under `<task>/audit/` need no new run. Never use `git push --no-verify`.
 - Stage 7 refuses to start while another `bench run` owns the host (one per host).

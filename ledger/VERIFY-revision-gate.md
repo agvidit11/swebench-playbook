@@ -27,7 +27,7 @@ expectation above, plus: Go forge blocked on spire-bundle (controls OK), reviewe
 wtforms (human reviewer also said revise), k2n parser read 69's dropshot run as 5/5 then 3/5.
 **Not yet run end to end: stage 7 (calibrate, two k2n runs) and Ruby/JS/Rust/Java/PHP forges.**
 Please exercise at least one of those.
-4. **Gate end to end**: `gate.py <task> --fast` on one task; confirm the verdict, the logs and the stamp
+4. **Gate end to end**: `python3 ~/swebench/revision-gate/gate.py <task> --fast` on one task; confirm the verdict, the logs and the stamp
    in `~/swebench/gate-stamps/` make sense, and that `--check-stamp` flips after any task-file edit.
 5. **Wiring**: `push-task.sh` and the pre-push hook (`tools/revision-gate/pre-push`, installed by
    `install-hook.sh`) refuse without a stamp, accept with one, re-block after an edit, allow audit-only

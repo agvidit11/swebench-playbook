@@ -8,7 +8,7 @@
 # PROVISIONAL (ledger/VERIFY-revision-gate.md): GATE_OVERRIDE="<reason>" lets a push through and is
 # logged to ~/swebench/gate-stamps/overrides.log. (`git push --no-verify` also skips hooks: don't.)
 set -uo pipefail
-GATE="${SWEBENCH_PLAYBOOK:-$HOME/swebench-playbook}/tools/revision-gate/gate.py"
+GATE="${SWEBENCH_GATE:-$HOME/swebench/revision-gate/gate.py}"   # installed copy (install-hook.sh), never a working clone
 REPO=$(git rev-parse --show-toplevel)
 Z=0000000000000000000000000000000000000000
 blocked=()
@@ -34,7 +34,7 @@ while read -r lref lsha rref rsha; do
         git cat-file -e "$lsha:$t/task.toml" 2>/dev/null || continue  # not a task, or task removed
         git diff --name-only "$base" "$lsha" -- "$t/" | grep -qv "^$t/audit/" || continue
         if [ ! -f "$GATE" ]; then
-            msg="gate not installed ($GATE): cd ~/swebench-playbook && git pull"
+            msg="gate not installed ($GATE): run tools/revision-gate/install-hook.sh from an up-to-date playbook checkout"
         elif msg=$(python3 "$GATE" "$t" --repo "$REPO" --check-stamp --at "$lsha"); then
             continue
         fi

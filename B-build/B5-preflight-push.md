@@ -2,7 +2,7 @@
 
 > **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
 
-> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench-playbook/tools/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged.
+> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged.
 
 ```
 OWNER:   Claude

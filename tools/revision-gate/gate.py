@@ -30,7 +30,7 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLAYBOOK = os.path.dirname(os.path.dirname(HERE))
+PLAYBOOK = os.environ.get("SWEBENCH_PLAYBOOK", os.path.expanduser("~/swebench-playbook"))  # for presubmit.py
 SKILL = os.path.expanduser("~/.claude/skills/swebench-mt")
 STAMPS = os.path.expanduser("~/swebench/gate-stamps")
 ORDER = ["preflight", "presubmit", "provenance", "carry", "forge", "review", "calibrate"]

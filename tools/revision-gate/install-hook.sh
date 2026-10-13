@@ -6,6 +6,9 @@
 #   install-hook.sh --uninstall     # restore whatever hook was there before
 #   install-hook.sh --list          # show discovered clones and their current pre-push hook
 #
+# Also installs/refreshes the gate itself at ~/swebench/revision-gate/ (what the hook and push-task.sh run).
+# Re-run this after every gate update.
+#
 # Worktrees share their main clone's hooks, so one install covers them. An existing pre-push hook is
 # kept as pre-push.local and still runs first. Re-running is safe.
 set -uo pipefail
@@ -26,6 +29,13 @@ if [ ${#repos[@]} -eq 0 ]; then
         done | sort -u)
 fi
 [ ${#repos[@]} -eq 0 ] && { echo "no clones of codimango/swe-bench-pro-agvidit found"; exit 1; }
+
+# The hook and push-task.sh run an installed copy of the gate, not a working clone: the shared playbook
+# clone often carries other sessions' uncommitted edits and cannot always fast-forward.
+DEST="${SWEBENCH_GATE_DIR:-$HOME/swebench/revision-gate}"
+if [ -z "$UNINSTALL" ] && [ -z "$LIST" ]; then
+    mkdir -p "$DEST" && rsync -a --delete "$HERE/" "$DEST/" && echo "gate copy  $DEST  ($(git -C "$HERE" rev-parse --short HEAD 2>/dev/null || echo '?'))"
+fi
 
 for r in "${repos[@]}"; do
     common=$(git -C "$r" rev-parse --git-common-dir 2>/dev/null) || { echo "skip  $r (not a git repo)"; continue; }

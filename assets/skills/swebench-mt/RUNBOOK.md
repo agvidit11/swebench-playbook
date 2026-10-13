@@ -148,7 +148,7 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
 
 ## Tools
 
-> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench-playbook/tools/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged.
+> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged.
 
 `~/swebench/<tool>` paths below are host-local: missing ~/swebench? run ~/swebench-playbook/tools/bootstrap-swebench-home.sh (and
 `~/swebench-playbook/tools/sync-skill.sh install` to install this skill itself).
