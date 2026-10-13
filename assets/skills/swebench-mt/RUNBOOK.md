@@ -123,7 +123,7 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    pivot, replay, or archive decision. Never begin proper work from stale local
    state, an old report, or remembered calibration numbers.
 1. **End of phase 1** — no measured 1-3/5 split, no build.
-2. **Before push** — `preflight.sh <task> --with-oracle` must exit 0.
+2. **Before push** — `revision-gate/gate.py <task>` must pass (it runs `preflight.sh --with-oracle` plus presubmit, provenance, step carry-forward, fake-pass probes, the reviewer agent and k2n x2). PROVISIONAL until `ledger/VERIFY-revision-gate.md` has 3 sign-offs; see the playbook's `tools/revision-gate/README.md`.
 3. **After the verdict** — is the number real? `references/signal-integrity.md`
    before touching anything.
 4. **Before submit** — human review, preceded by a **deep-review pass**.
@@ -147,6 +147,8 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
 ---
 
 ## Tools
+
+> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench-playbook/tools/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged.
 
 `~/swebench/<tool>` paths below are host-local: missing ~/swebench? run ~/swebench-playbook/tools/bootstrap-swebench-home.sh (and
 `~/swebench-playbook/tools/sync-skill.sh install` to install this skill itself).

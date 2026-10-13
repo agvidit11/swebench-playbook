@@ -17,7 +17,26 @@ DRY=""; [ "${2:-}" = "--dry-run" ] && DRY=1
 cd "$REPO" || exit 2
 [ -d "$T" ] || { echo "no such task dir: $T"; exit 2; }
 
-echo "== 1. preflight (must exit 0)"
+echo "== 0. revision-gate stamp (precheck, Vidit 2026-10-13)"
+# One command before ANY push: ~/swebench-playbook/tools/revision-gate/gate.py <task>
+# It runs preflight, presubmit, provenance, step carry-forward, fake-pass probes, the
+# reviewer agent and k2n x2, and stamps the exact task files it passed.
+# PROVISIONAL until 3 independent agents verify the gate (ledger/VERIFY-revision-gate.md):
+# while provisional, GATE_OVERRIDE="<reason>" pushes without a stamp and logs the reason.
+GATE=~/swebench-playbook/tools/revision-gate/gate.py
+if [ -f "$GATE" ] && python3 "$GATE" "$T" --repo "$REPO" --check-stamp; then :
+elif [ -n "${GATE_OVERRIDE:-}" ]; then
+  mkdir -p ~/swebench/gate-stamps
+  printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$(hostname -s)" "$T" "$GATE_OVERRIDE" >> ~/swebench/gate-stamps/overrides.log
+  echo "  GATE_OVERRIDE used: $GATE_OVERRIDE (logged to ~/swebench/gate-stamps/overrides.log)"
+else
+  [ -f "$GATE" ] || echo "  gate not installed: cd ~/swebench-playbook && git pull"
+  echo "  run first:  python3 $GATE $T --repo $REPO"
+  echo "  (or, while the gate is provisional: GATE_OVERRIDE=\"<reason>\" push-task.sh $T)"
+  exit 1
+fi
+
+echo; echo "== 1. preflight (must exit 0)"
 # Take the Docker mutex. Without it this oracle run races any other container
 # work on the host: measured 2026-09-23, a concurrent oracle turned a stable
 # 3/3 into 2/3, which reads as a golden defect (R13) and is really contention.
