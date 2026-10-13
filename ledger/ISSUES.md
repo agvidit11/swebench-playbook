@@ -142,3 +142,5 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-11 11:20 | devvm6971 | B | dogpile fix + store_model build: replacements died again (no progress after start line) | — | fresh agents launched with detached jobs + ≤2 min tool calls — OPEN
 2026-10-11 11:40 | devvm6971 | ALL | My 'stalled' check (PROGRESS.md age + pgrep task name) missed live agents whose codex runs from /tmp build dirs → duplicate agents on store_model (one overwrote another's brief) | — | before replacing: also check ps for /tmp/<task-short>* and the agent's build dir mtimes; send STOP and wait for reply before launching a replacement — RULE
 2026-10-11 19:20 | devvm6971 | B | store_model/eliot/go-rel agents silent 2-5h, no file changes, no reply to status ping | — | STOP sent, fresh agents launched (≤90 s tool calls, detached jobs) — OPEN
+
+- 2026-10-12 aato-tag-copy-bulk-retag: Codex cyber filter refused a "pipe-forge" control; build agent then tried Muse, auto-mode classifier denied. Not retried; control dropped (4 required controls suffice). Brief rule added: never shop a refusal to another model.
