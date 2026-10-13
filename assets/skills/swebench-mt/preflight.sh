@@ -286,6 +286,17 @@ done
 if [ "$GC_BAD" = 0 ]; then pass "SWE Config: no git clean in before_repo_set_cmd"
 else fail "SWE Config: before_repo_set_cmd runs git clean (server rejects it; move cleanup into tests/test.sh)"; fi
 
+# --- SWE Step Configs: selected_test_files_to_run present ----------------
+# Server-only check; missed on jsondiffpatch-delta-squash 5a3fd86 (2026-10-13).
+STF_MISSING=""
+for C in "$T"/steps/*/tests/config.json; do
+  [ -f "$C" ] || continue
+  python3 -c 'import json,sys; c=json.load(open(sys.argv[1])); v=c.get("selected_test_files_to_run"); sys.exit(0 if isinstance(v,list) and v else 1)' "$C" \
+    || STF_MISSING="$STF_MISSING $(basename "$(dirname "$(dirname "$C")")")"
+done
+if [ -z "$STF_MISSING" ]; then pass "SWE Step Configs: selected_test_files_to_run present"
+else fail "SWE Step Configs: missing selected_test_files_to_run in:$STF_MISSING (server structural check fails)"; fi
+
 # --- SWE Step Configs ----------------------------------------------------
 if [ "$MT" = 1 ]; then
   BAD=0
