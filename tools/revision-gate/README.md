@@ -23,6 +23,10 @@ python3 ~/swebench-playbook/tools/revision-gate/gate.py <task> --fast   # stages
 
 - Writes nothing inside the task directory. Logs go to `/tmp/revision-gate/`, stamps to `~/swebench/gate-stamps/`.
 - `push-task.sh` refuses to push without a clean full-run stamp for the exact task files.
+- A git **pre-push hook** enforces the same on every push path (custom scripts, plain `git push`).
+  Install it in every task-repo clone on a host, and again after making a new clone:
+  `~/swebench-playbook/tools/revision-gate/install-hook.sh` (`--list` to check, `--uninstall` to remove).
+  Changes only under `<task>/audit/` need no new run. Never use `git push --no-verify`.
 - Stage 7 refuses to start while another `bench run` owns the host (one per host).
 - Validated so far: carry-forward, Python and Go forges, the reviewer-agent stage, the k2n parser.
   Not yet run end to end: stage 7 (two live k2n runs) and the Ruby/JS/Rust/Java/PHP forges.

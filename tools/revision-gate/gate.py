@@ -37,14 +37,24 @@ ORDER = ["preflight", "presubmit", "provenance", "carry", "forge", "review", "ca
 FAST = ORDER[:5]
 
 
-def task_hash(task_dir):
+def task_hash(task_dir, at=None):
+    """Hash exactly what git would push for this task: tracked + untracked-not-ignored files (or the
+    files in commit `at`), excluding audit/. The same content hashes the same on disk and in a commit."""
+    repo, task = os.path.dirname(task_dir), os.path.basename(task_dir)
+    g = lambda *c: subprocess.run(["git", "-C", repo, *c], capture_output=True).stdout
+    if at:
+        names = g("ls-tree", "-r", "--name-only", at, "--", task + "/").decode().split("\n")
+        read = lambda n: g("cat-file", "blob", f"{at}:{n}")
+    else:
+        names = g("ls-files", "-co", "--exclude-standard", "--", task + "/").decode().split("\n")
+        read = lambda n: open(os.path.join(repo, n), "rb").read()
     h = hashlib.sha256()
-    for root, dirs, files in os.walk(task_dir):
-        dirs[:] = sorted(d for d in dirs if d not in (".git", "audit"))
-        for f in sorted(files):
-            p = os.path.join(root, f)
-            h.update(os.path.relpath(p, task_dir).encode() + b"\0")
-            h.update(hashlib.sha256(open(p, "rb").read()).digest())
+    for n in sorted(set(x for x in names if x)):
+        rel = n[len(task) + 1:]
+        if rel.split("/", 1)[0] == "audit" or (not at and not os.path.isfile(os.path.join(repo, n))):
+            continue
+        h.update(rel.encode() + b"\0")
+        h.update(hashlib.sha256(read(n)).digest())
     return h.hexdigest()
 
 
@@ -192,14 +202,14 @@ def main():
     repo = os.path.abspath(opt("--repo", os.getcwd()))
     task = a[0].rstrip("/").split("/")[-1]
     tdir = os.path.join(repo, task)
-    if not os.path.isdir(tdir):
+    if not os.path.isdir(tdir) and not ("--check-stamp" in a and opt("--at")):
         print(f"no task directory {tdir} (run from the task repo or pass --repo)")
         sys.exit(2)
-    if "--check-stamp" in a:  # used by push-task.sh: is there a clean full run for these exact files?
+    if "--check-stamp" in a:  # push-task.sh / pre-push hook: clean full run for these exact files? (--at <commit>)
         p = os.path.join(STAMPS, f"{task}.json")
         s = json.load(open(p)) if os.path.exists(p) else None
         why = ("no gate run recorded" if not s else
-               "task files changed since the last gate run" if s["hash"] != task_hash(tdir) else
+               "task files changed since the last gate run" if s["hash"] != task_hash(tdir, opt("--at")) else
                "last gate run was not a full run" if not s.get("full_run") else
                f"last gate verdict was {s['verdict']}" if s["verdict"] != "PASS" else "")
         print(f"gate stamp OK ({s['utc']})" if not why else f"gate stamp missing: {why}")

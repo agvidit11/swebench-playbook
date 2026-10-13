@@ -29,7 +29,9 @@ wtforms (human reviewer also said revise), k2n parser read 69's dropshot run as 
 Please exercise at least one of those.
 4. **Gate end to end**: `gate.py <task> --fast` on one task; confirm the verdict, the logs and the stamp
    in `~/swebench/gate-stamps/` make sense, and that `--check-stamp` flips after any task-file edit.
-5. **Wiring**: `push-task.sh` refuses without a stamp, accepts with one, and logs `GATE_OVERRIDE`.
+5. **Wiring**: `push-task.sh` and the pre-push hook (`tools/revision-gate/pre-push`, installed by
+   `install-hook.sh`) refuse without a stamp, accept with one, re-block after an edit, allow audit-only
+   changes, and log `GATE_OVERRIDE`. Test in a throwaway clone pushing to a local bare repo, never the real remote.
 6. Anything the gate claims to catch that it does not, or blocks that it should not.
 
 ## Post your result (one block each; edit this file, commit, push)
@@ -59,7 +61,8 @@ Please exercise at least one of those.
 Whoever posts the third CONFIRMED does this in one commit:
 1. Delete this file.
 2. Remove the PROVISIONAL lines from `tools/revision-gate/gate.py` (docstring, banner print, and
-   `"provisional": True` in the stamp) and from `tools/revision-gate/README.md`.
+   `"provisional": True` in the stamp), from `tools/revision-gate/README.md`, and drop the `GATE_OVERRIDE`
+   branch from `tools/revision-gate/pre-push`; then re-run `install-hook.sh` on every host.
 3. In `assets/skills/swebench-mt/push-task.sh`, drop the `GATE_OVERRIDE` branch and its comment, so a
    missing stamp always blocks. Do the same in RUNBOOK.md hard stop 2 and B5/C7, then run
    `tools/sync-skill.sh install` and tell agvidit-b0 (skill owner).

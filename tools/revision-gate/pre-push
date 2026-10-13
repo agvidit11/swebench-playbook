@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# revision-gate pre-push hook (Vidit 2026-10-13). Installed by tools/revision-gate/install-hook.sh.
+#
+# Blocks a push to the task repo unless every task it changes has a clean FULL gate run stamped for
+# the exact files being pushed. Catches every push path: push-task.sh, custom scripts, plain git push.
+# Changes only under <task>/audit/ need no new run.
+#
+# PROVISIONAL (ledger/VERIFY-revision-gate.md): GATE_OVERRIDE="<reason>" lets a push through and is
+# logged to ~/swebench/gate-stamps/overrides.log. (`git push --no-verify` also skips hooks: don't.)
+set -uo pipefail
+GATE="${SWEBENCH_PLAYBOOK:-$HOME/swebench-playbook}/tools/revision-gate/gate.py"
+REPO=$(git rev-parse --show-toplevel)
+Z=0000000000000000000000000000000000000000
+blocked=()
+
+# Run any pre-push hook that was here before us.
+here="$(dirname "$0")"
+if [ -x "$here/pre-push.local" ]; then
+    stdin=$(cat)
+    printf '%s\n' "$stdin" | "$here/pre-push.local" "$@" || exit 1
+else
+    stdin=$(cat)
+fi
+
+while read -r lref lsha rref rsha; do
+    [ -z "${lsha:-}" ] && continue
+    [ "$lsha" = "$Z" ] && continue                                   # deleting a remote ref
+    base="$rsha"
+    if [ "$rsha" = "$Z" ] || ! git cat-file -e "$rsha^{commit}" 2>/dev/null; then
+        base=$(git merge-base "$lsha" origin/main 2>/dev/null) || base=""
+    fi
+    [ -z "$base" ] && { echo "revision-gate hook: cannot find a base for $lref; fetch origin and retry"; exit 1; }
+    for t in $(git diff --name-only "$base" "$lsha" | cut -d/ -f1 | sort -u); do
+        git cat-file -e "$lsha:$t/task.toml" 2>/dev/null || continue  # not a task, or task removed
+        git diff --name-only "$base" "$lsha" -- "$t/" | grep -qv "^$t/audit/" || continue
+        if [ ! -f "$GATE" ]; then
+            msg="gate not installed ($GATE): cd ~/swebench-playbook && git pull"
+        elif msg=$(python3 "$GATE" "$t" --repo "$REPO" --check-stamp --at "$lsha"); then
+            continue
+        fi
+        if [ -n "${GATE_OVERRIDE:-}" ]; then
+            mkdir -p ~/swebench/gate-stamps
+            printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$(hostname -s)" "$t" "${lsha:0:12}" "$GATE_OVERRIDE" \
+                >> ~/swebench/gate-stamps/overrides.log
+            echo "revision-gate hook: GATE_OVERRIDE for $t: $GATE_OVERRIDE (logged)"
+            continue
+        fi
+        blocked+=("$t: $msg")
+    done
+done <<< "$stdin"
+
+if [ ${#blocked[@]} -gt 0 ]; then
+    echo "revision-gate hook: push BLOCKED. These tasks have no clean full gate run for the files being pushed:"
+    printf '  %s\n' "${blocked[@]}"
+    echo "Run:  python3 $GATE <task> --repo $REPO     (full run; fix every FAIL, then push again)"
+    echo "While the gate is provisional: GATE_OVERRIDE=\"<reason>\" git push ...   (logged)"
+    exit 1
+fi
+exit 0
