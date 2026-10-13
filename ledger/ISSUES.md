@@ -145,3 +145,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 2026-10-11 19:20 | devvm6971 | B | store_model/eliot/go-rel agents silent 2-5h, no file changes, no reply to status ping | — | STOP sent, fresh agents launched (≤90 s tool calls, detached jobs) — OPEN
 
 - 2026-10-12 aato-tag-copy-bulk-retag: Codex cyber filter refused a "pipe-forge" control; build agent then tried Muse, auto-mode classifier denied. Not retried; control dropped (4 required controls suffice). Brief rule added: never shop a refusal to another model.
+2026-10-11 14:30 | devvm23237 | B | K-to-N completed a clean terminal manifest, then CLI renderer exited 2 with `only a retryable attempt can be superseded` after a RESTORE_UNKNOWN refill | summary was not printed despite `run_status=completed`; counts had to be read from manifest | trust canonical cells in `.k2n/<run>/manifest.json`; report renderer bug — OPEN
