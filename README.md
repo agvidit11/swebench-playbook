@@ -40,8 +40,12 @@ reference/        pulled on demand, never read front-to-back
   R8-finding-to-file  R9-review-ledger     R10-step1-calibration
 
 assets/avocado/   the four immutable Avocado prompts + shared _INVARIANTS
+assets/swebench-home/  mirror of ~/swebench tools/libraries for other hosts
+assets/skills/swebench-mt/  snapshot of the swebench-mt Claude skill
 tools/            review-gate · bundle-hash · authorship-audit · task-budget
                   avocado-brief · probe-lint · reviewer-relay
+                  bootstrap-swebench-home (missing ~/swebench? run this)
+                  sync-skill (install | snapshot | diff the swebench-mt skill)
 
 ledger/           RUNS.md (evidence) · RULES.md (precedence) · PROVENANCE.md
                   POSTMORTEM-MT-2026-09.md (every MT task, per-task cause)

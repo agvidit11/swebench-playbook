@@ -22,6 +22,12 @@ def md_files():
         # part of it — doing so once turned 0 fail into 27.
         dirnames[:] = [d for d in dirnames
                        if d not in (".git", ".e2e", ".review", "node_modules")]
+        # assets/swebench-home/ and assets/skills/ are byte MIRRORS of ~/swebench
+        # and ~/.claude/skills/swebench-mt for other hosts (see tools/bootstrap-
+        # swebench-home.sh, tools/sync-skill.sh). Not playbook files; linting them
+        # double-counts every sentence the reference/ copies already carry.
+        if os.path.relpath(dirpath, ROOT) == "assets":
+            dirnames[:] = [d for d in dirnames if d not in ("swebench-home", "skills")]
         for fn in sorted(filenames):
             if fn.endswith(".md"):
                 yield os.path.join(dirpath, fn)
