@@ -39,22 +39,36 @@ FAST = ORDER[:5]
 
 def task_hash(task_dir, at=None):
     """Hash exactly what git would push for this task: tracked + untracked-not-ignored files (or the
-    files in commit `at`), excluding audit/. The same content hashes the same on disk and in a commit."""
+    files in commit `at`), excluding audit/, including each file's git mode (exec bit, symlink).
+    The same content hashes the same on disk and in a commit."""
     repo, task = os.path.dirname(task_dir), os.path.basename(task_dir)
     g = lambda *c: subprocess.run(["git", "-C", repo, *c], capture_output=True).stdout
+    entries = {}  # path -> (mode, content-bytes)
     if at:
-        names = g("ls-tree", "-r", "--name-only", at, "--", task + "/").decode().split("\n")
-        read = lambda n: g("cat-file", "blob", f"{at}:{n}")
+        for line in g("ls-tree", "-r", at, "--", task + "/").decode().split("\n"):
+            if not line:
+                continue
+            meta, path = line.split("\t", 1)
+            mode, _, sha = meta.split()
+            entries[path] = (mode, g("cat-file", "blob", sha))
     else:
-        names = g("ls-files", "-co", "--exclude-standard", "--", task + "/").decode().split("\n")
-        read = lambda n: open(os.path.join(repo, n), "rb").read()
+        for path in g("ls-files", "-co", "--exclude-standard", "--", task + "/").decode().split("\n"):
+            full = os.path.join(repo, path)
+            if not path or not os.path.lexists(full):
+                continue
+            if os.path.islink(full):
+                entries[path] = ("120000", os.readlink(full).encode())
+            elif os.path.isfile(full):
+                mode = "100755" if os.stat(full).st_mode & 0o111 else "100644"
+                entries[path] = (mode, open(full, "rb").read())
     h = hashlib.sha256()
-    for n in sorted(set(x for x in names if x)):
-        rel = n[len(task) + 1:]
-        if rel.split("/", 1)[0] == "audit" or (not at and not os.path.isfile(os.path.join(repo, n))):
+    for path in sorted(entries):
+        rel = path[len(task) + 1:]
+        if rel.split("/", 1)[0] == "audit":
             continue
-        h.update(rel.encode() + b"\0")
-        h.update(hashlib.sha256(read(n)).digest())
+        mode, data = entries[path]
+        h.update(rel.encode() + b"\0" + mode.encode() + b"\0")
+        h.update(hashlib.sha256(data).digest())
     return h.hexdigest()
 
 
@@ -128,10 +142,17 @@ def st_provenance(ctx):
 
 
 def st_carry(ctx):
-    rc, out = run([sys.executable, os.path.join(HERE, "carry_forward.py"), ctx["dir"]], ctx["log"]("carry"), timeout=120)
-    if "SKIP" in out:
+    log = ctx["log"]("carry")
+    rc, out = run([sys.executable, os.path.join(HERE, "carry_forward.py"), ctx["dir"], "--json"], log, timeout=120)
+    try:
+        r = json.loads(out[out.index("{"):])
+    except ValueError:
+        return "BLOCKED", tail(out)
+    if not r["applicable"]:
         return "SKIP", "single-turn"
-    return ("PASS" if rc == 0 else "FAIL"), tail(out, 8)
+    lines = [f"      {p['to']}: {p['graded'] - p['missing']}/{p['graded']} earlier graded tests re-run"
+             + "".join(f"\n        not re-run: {t}" for t in p["missing_sample"][:3]) for p in r["pairs"]]
+    return ("PASS" if rc == 0 and r["ok"] else "FAIL"), "\n".join(lines)
 
 
 def st_forge(ctx):
@@ -240,11 +261,13 @@ def main():
         results["integrity"] = "FAIL"
     levels = set(results.values())
     verdict = "FAIL" if "FAIL" in levels else "BLOCKED" if "BLOCKED" in levels else "PASS"
-    full = all(results.get(s) in ("PASS", "SKIP", "WARN") for s in ORDER)
+    full = all(s in results for s in ORDER)  # every stage ran (pass or fail): this run decides the push stamp
     os.makedirs(STAMPS, exist_ok=True)
     stamp = {"task": task, "hash": after, "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "results": results, "verdict": verdict, "full_run": full, "provisional": True, "logs": logdir}
-    json.dump(stamp, open(os.path.join(STAMPS, f"{task}.json"), "w"), indent=1)
+    # Only a full run writes <task>.json (the push stamp); partial runs go to <task>.partial.json so a
+    # quick diagnostic never revokes a valid push stamp for unchanged files.
+    json.dump(stamp, open(os.path.join(STAMPS, f"{task}.json" if full else f"{task}.partial.json"), "w"), indent=1)
     print(f"VERDICT  {verdict}" + ("  (push stamp issued)" if full and verdict == "PASS" else
                                   "  (no push stamp: needs a full run with every stage clear)"))
     sys.exit({"PASS": 0, "FAIL": 1, "BLOCKED": 4}[verdict])

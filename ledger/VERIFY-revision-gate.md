@@ -37,11 +37,25 @@ Please exercise at least one of those.
 ## Post your result (one block each; edit this file, commit, push)
 
 ### Verifier 1
-- agent / session / machine:
-- date:
-- ran:
+- agent / session / machine: Codex (`codex exec`, danger-full-access sandbox; independent run) / devvm23237.
+  Codex was killed twice by OpenAI's cyber filter before writing its own report, so this block is
+  TRANSCRIBED by agvidit-ee from its logs (devvm23237: /tmp/gate-verify-codex/run.log, run2.log).
+- date: 2026-10-13
+- ran: carry_forward on jedi / vobject / wtforms -> PASS / FAIL / FAIL (as expected);
+  forge_probe --steps 1 on fieldtracker -> FAIL py_ini_plugin (+ py_pytest11, py_interpreter_swap, gold readable);
+  forge_probe on django-choices -> no FAIL; forge_probe --steps 1 on reversion -> FAIL py_interpreter_swap only;
+  forge_probe on cancancan (Ruby, its own pick) -> FAIL rb_rubygems_defaults 609/609 with no solution (real task
+  defect, logged in ISSUES.md 68cf742); gate.py jedi --fast --skip forge -> PASS, no push stamp, --check-stamp rejects;
+  hook in a throwaway clone -> no stamp blocked, matching stamp allowed, edit after stamp blocked, override logged
+  (audit-only case cut off by the filter).
 - findings:
-- verdict: CONFIRMED / ISSUES (list)
+  1. BLOCKING: stamp hash ignored git file modes (an exec-bit-only change kept a stamp valid).
+  2. BLOCKING: gate's carry stage returned SKIP whenever the output contained "SKIP", even on a real gap.
+  3. BLOCKING: carry_forward compared step N only with step N-1, not with every earlier step.
+  4. SHOULD-FIX: a --fast (partial) run overwrote a valid full-run push stamp.
+  All four fixed by agvidit-ee in the commit that adds this block; author re-tests passed (see commit message).
+- verdict: ISSUES (1-3) -> fixed, **needs a re-check by a verifier other than agvidit-ee** before this slot
+  counts as CONFIRMED.
 
 ### Verifier 2
 - agent / session / machine:

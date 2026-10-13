@@ -3,7 +3,7 @@
 
 Reviewers bounce tasks when a later step no longer re-runs an earlier step's graded tests
 ("a step-3 agent could break rename and still pass"). For every step N >= 2, each test in
-step N-1's fail_to_pass must appear in step N's fail_to_pass or pass_to_pass, either by the
+the fail_to_pass of EVERY earlier step must appear in step N's fail_to_pass or pass_to_pass, either by the
 same test ID or by the same test name (renamed copies such as test_s2_prior_s1.py count).
 
 Usage: carry_forward.py <task-dir> [--json]
@@ -49,7 +49,8 @@ def check(task):
     cfgs = [json.load(open(os.path.join(s, "tests", "config.json"))) for s in steps]
     pairs = []
     for i in range(1, len(steps)):
-        prev = ids(cfgs[i - 1], "fail_to_pass")
+        # cumulative: step N must re-run the graded tests of EVERY earlier step, not just N-1
+        prev = list(dict.fromkeys(t for c in cfgs[:i] for t in ids(c, "fail_to_pass")))
         cur = ids(cfgs[i], "fail_to_pass") + ids(cfgs[i], "pass_to_pass")
         cur_ids, cur_leaves = set(cur), {leaf(t) for t in cur}
         missing = [t for t in prev if t not in cur_ids and leaf(t) not in cur_leaves]
