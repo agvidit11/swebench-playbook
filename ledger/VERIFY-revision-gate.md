@@ -113,11 +113,31 @@ Please exercise at least one of those.
 Verdict for this slot: ISSUES -> fixed, **needs a re-check by a verifier other than agvidit-ee**.
 
 ### Verifier 3
-- agent / session / machine:
-- date:
+- agent / session / machine: Codex worker (lane-pb `verify-gate`, launched by agvidit's Claude orchestrator; not agvidit-ee) / devvm23237.
+  Full report: devvm23237:~/scratch/lane-pb/workers/verify-gate/result.md
+- date: 2026-10-14
+- gate build: 86b0d43f802b (installed scripts byte-match playbook origin/master); tasks from a clean detached worktree at main c0ad32a.
 - ran:
+  - re-checks of verifier-1/2 fixes: mode-aware stamp hash; carry parses JSON (a task name containing SKIP gives the real FAIL);
+    cumulative all-earlier carry (wtforms FAIL 0/11 -> 0/24, vobject FAIL 0/20 -> 0/32, jedi PASS 6/6 -> 17/17);
+    ClsA/ClsB leaf collision now FAILs (1/2); partial runs write `<task>.partial.json` and leave the full stamp byte-identical;
+    UNCOVERED FAILs without `--accept-uncovered` (open62541), WARNs + records reason with it; forge `--jobs 2`; build id in banners/stamps -> all PASS
+  - forge_probe --steps 1: fieldtracker FAIL py_ini_plugin (+others); hardened choices all PASS; reversion FAIL py_interpreter_swap only;
+    origin/main vobject step 1 FAIL php_conf_d_prepend; unpushed local vobject revision blocks both PHP forges -> all as expected
+  - hook + push-task in a throwaway clone: no stamp blocked, matching stamp allowed, task edit re-blocked, audit-only allowed,
+    override logged with the unified 5 fields from both paths -> PASS
+  - live Stage 7 (full gate with calibration) on one task, plus synthetic Stage 7 / forge inputs
 - findings:
-- verdict: CONFIRMED / ISSUES (list)
+  1. BLOCKING: Stage 7 picks the newest `manifest.json` recursively (`gate.py:217-220`); a nested per-attempt artifact manifest (a JSON list)
+     was chosen after a complete 15/15-cell run 1 -> `AttributeError: 'list' object has no attribute 'get'` -> BLOCKED, run 2 never launched,
+     and the real result (FAIL: step 1 5/5 in both runs) was hidden.
+  2. BLOCKING: Stage 7 does not require five countable cells per step and treats an empty split as PASS (`gate.py:221-231`);
+     synthetic 2-cell (1/2) and 0-cell runs both returned PASS.
+  3. BLOCKING: forge exit 3 (`UNVERIFIED` control, reference not scoring 1) becomes WARN and WARN does not stop top-level PASS
+     (`gate.py:172-184,287-288`); synthetic: `forge_unverified: WARN ... top_level=PASS`.
+  4. SHOULD-FIX: gate.py BLOCKs on any running bench process while bench-gate.sh allows up to 3 machine-wide; caused hours of early BLOCKED attempts.
+- verdict: ISSUES (1-3 BLOCKING). Everything verifiers 1 and 2 raised re-tests as fixed, so slots 1 and 2 can count as re-checked
+  by a verifier other than agvidit-ee for those items.
 
 ## When all three say CONFIRMED (and every ISSUE is fixed and re-checked)
 Whoever posts the third CONFIRMED does this in one commit:
