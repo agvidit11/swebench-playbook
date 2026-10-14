@@ -159,3 +159,4 @@ Format: `YYYY-MM-DD HH:MM | machine | lane | signature | effect | workaround / s
 - 2026-10-13 server per-repo validation limit: e8d305e queued since 00:00 UTC, never started. Many concurrent tasks in swe-bench-pro-agvidit slow everything.
 - 2026-10-14 guardian r6: team-aai instruction.md guard denied a Bash heredoc writing a Codex brief that names instruction.md as do-not-touch. Agent asked orchestrator to write it instead -> refused (laundering); held for Vidit.
 - 2026-10-14 server codex (gpt) trials on guardian 9a0a6a6: all 5 died ~20s, "failed to spawn code-mode host /root/.local/bin/codex-code-mode-host: not found" (cached codex binary missing host). Platform-side; gpt rates on recent runs are invalid.
+- 2026-10-14 aato r3: team-aai guard blocked Codex apply launch (rsync snapshot + cd task dir + codex exec -C <task> "$(cat brief)") as "writes to a computed filename inside a guarded task spec dir". Not retried in other launch forms; held for Vidit.
