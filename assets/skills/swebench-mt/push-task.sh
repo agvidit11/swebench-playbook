@@ -27,7 +27,7 @@ GATE=~/swebench/revision-gate/gate.py   # installed by ~/swebench-playbook/tools
 if [ -f "$GATE" ] && python3 "$GATE" "$T" --repo "$REPO" --check-stamp; then :
 elif [ -n "${GATE_OVERRIDE:-}" ]; then
   mkdir -p ~/swebench/gate-stamps
-  printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$(hostname -s)" "$T" "$GATE_OVERRIDE" >> ~/swebench/gate-stamps/overrides.log
+  printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$(hostname -s)" "$T" "-" "$GATE_OVERRIDE" >> ~/swebench/gate-stamps/overrides.log  # same 5 fields as the hook; no commit yet
   echo "  GATE_OVERRIDE used: $GATE_OVERRIDE (logged to ~/swebench/gate-stamps/overrides.log)"
 else
   [ -f "$GATE" ] || echo "  gate not installed: run ~/swebench-playbook/tools/revision-gate/install-hook.sh"

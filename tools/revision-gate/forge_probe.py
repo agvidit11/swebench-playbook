@@ -15,7 +15,8 @@ can swap the interpreter). This reproduces grading in a plain container, outside
 
 Usage: forge_probe.py <task-dir> [--steps 1,3] [--jobs 2] [--keep-images] [--json]
 Exit: 0 = no FAIL, 1 = a forge paid out / null paid out / gold readable, 2 = usage or infra error,
-      3 = nothing failed but some step could not be verified (control did not pay 1).
+      3 = nothing failed but some step could not be verified (control did not pay 1) or no forge applied
+      to it (UNCOVERED).
 Never writes inside the task directory. Containers run with --network none.
 """
 import concurrent.futures as cf
@@ -150,7 +151,7 @@ FORGES = {
     "js": ["js_npmrc_require"],
     "rust": ["rs_cargo_runner", "rs_cargo_home_runner"],
     "java": ["java_surefire_reports"],
-    "php": ["php_phpunit_xml"],
+    "php": ["php_phpunit_xml", "php_conf_d_prepend"],
 }
 GENERIC = []  # a pre-planted reward.txt is moot: the harness clears /logs/verifier before every verifier run
 
@@ -226,9 +227,10 @@ def probe_step(task, step, prev, base_image, jobs, last=None):
         if "GOLD" in extra:
             add("gold_readable", "FAIL", f"code running inside a test ({f}) could read the gold patch in "
                 "/tests/config.json")
-    covered = sorted(langs & set(FORGES))
-    if not covered:
-        add("coverage", "WARN", f"no language-specific forges for {sorted(langs) or 'unknown'}; generic probes only")
+    effective = [f for f in forges if out[f][0] != "NA"]
+    if not effective:
+        add("coverage", "UNCOVERED", f"no forge could be planted for {sorted(langs) or 'unknown language'}"
+            + (f" (tried: {', '.join(forges)})" if forges else "") + "; fake-pass was not checked for this step")
     sh(["docker", "rmi", "-f", seed_image])
     return res
 
@@ -268,7 +270,7 @@ def main():
             print(f"== {r['step']}")
             for c in r["checks"]:
                 print(f"{c['level']:<10} {c['check']:<22} {c['msg']}")
-    sys.exit(1 if "FAIL" in levels else 3 if "UNVERIFIED" in levels else 0)
+    sys.exit(1 if "FAIL" in levels else 3 if ("UNVERIFIED" in levels or "UNCOVERED" in levels) else 0)
 
 
 main()

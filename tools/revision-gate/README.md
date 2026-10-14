@@ -31,5 +31,8 @@ python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iter
 - Stage 7 refuses to start while another `bench run` owns the host (one per host).
 - Validated so far: carry-forward, Python and Go forges, the reviewer-agent stage, the k2n parser.
   Not yet run end to end: stage 7 (two live k2n runs) and the Ruby/JS/Rust/Java/PHP forges.
-- Forge coverage: Python, Go, Ruby, JS/TS, Rust, Java (Surefire), PHP (PHPUnit). Other languages get
-  the controls only and a coverage WARN.
+- Forge coverage: Python, Go, Ruby, Rust, Java (Surefire), PHP (conf.d prepend + phpunit.xml). JS/TS is weak:
+  graders that run `node` directly with their own NODE_OPTIONS never load it. A step where no forge can be
+  planted is UNCOVERED: the gate FAILs it unless you check the grader by hand and pass
+  `--accept-uncovered "<what you checked>"` (recorded in the stamp).
+- `gate.py --version` prints the build id; it is also printed in every run and written into every stamp.

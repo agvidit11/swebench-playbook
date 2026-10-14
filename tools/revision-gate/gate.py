@@ -15,6 +15,8 @@ Stages (cheapest first; each prints PASS / FAIL / WARN / SKIP / BLOCKED):
 
 Usage:
   gate.py <task> [--repo DIR] [--fast] [--only s1,s2] [--skip s1,s2] [--k2n-agent metacode]
+          [--accept-uncovered "<what you checked by hand>"]   when no forge applies to a step's language
+  gate.py --version                                           build id (also printed and stamped)
     --fast   stages 1-5 only (minutes). A push stamp is only issued for a full run.
 Exit: 0 all clear, 1 a FAIL, 2 usage/infra, 4 BLOCKED (e.g. another bench owns the host).
 Writes nothing inside the task directory. Logs: /tmp/revision-gate/<task>-<utc>/. Stamp:
@@ -33,6 +35,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLAYBOOK = os.environ.get("SWEBENCH_PLAYBOOK", os.path.expanduser("~/swebench-playbook"))  # for presubmit.py
 SKILL = os.path.expanduser("~/.claude/skills/swebench-mt")
 STAMPS = os.path.expanduser("~/swebench/gate-stamps")
+def gate_version():
+    h = hashlib.sha256()
+    for f in ("gate.py", "carry_forward.py", "forge_probe.py", "forge_payloads/plant.sh", "pre-push"):
+        p = os.path.join(HERE, f)
+        if os.path.exists(p):
+            h.update(open(p, "rb").read())
+    return h.hexdigest()[:12]
+
+
 ORDER = ["preflight", "presubmit", "provenance", "carry", "forge", "review", "calibrate"]
 FAST = ORDER[:5]
 
@@ -156,11 +167,21 @@ def st_carry(ctx):
 
 
 def st_forge(ctx):
-    rc, out = run([sys.executable, os.path.join(HERE, "forge_probe.py"), ctx["dir"], "--jobs", "3"],
+    rc, out = run([sys.executable, os.path.join(HERE, "forge_probe.py"), ctx["dir"], "--jobs", "2"],
                   ctx["log"]("forge"), timeout=4 * 3600)
-    bad = [l for l in out.splitlines() if l.startswith(("FAIL", "UNVERIFIED", "WARN", "INFRA"))]
-    level = {0: "PASS", 1: "FAIL", 3: "WARN"}.get(rc, "BLOCKED")
-    return level, ("\n".join("      " + l[:220] for l in bad[:10]) or "no forge paid out, controls behaved")
+    shown = [l for l in out.splitlines() if l.startswith(("FAIL", "UNVERIFIED", "UNCOVERED", "WARN", "SKIP", "INFRA"))]
+    msg = "\n".join("      " + l[:220] for l in shown[:12]) or "      every applicable forge ran and none paid out; controls behaved"
+    if rc == 1:
+        return "FAIL", msg
+    if rc not in (0, 3):
+        return "BLOCKED", msg
+    if any(l.startswith("UNCOVERED") for l in shown):
+        why = ctx.get("accept_uncovered")
+        if not why:
+            return "FAIL", msg + ("\n      No effective forge ran for at least one step, so fake-pass was NOT checked. Review the"
+                                  "\n      grader by hand, then re-run with --accept-uncovered \"<what you checked>\" (recorded in the stamp).")
+        return "WARN", msg + f"\n      uncovered steps accepted by hand: {why}"
+    return ("WARN" if rc == 3 else "PASS"), msg
 
 
 def st_review(ctx):
@@ -216,6 +237,9 @@ STAGES = {"preflight": st_preflight, "presubmit": st_presubmit, "provenance": st
 
 def main():
     a = sys.argv[1:]
+    if a[:1] == ["--version"]:
+        print(f"revision-gate build {gate_version()}  ({HERE})")
+        sys.exit(0)
     if not a or a[0].startswith("-"):
         print(__doc__)
         sys.exit(2)
@@ -243,9 +267,10 @@ def main():
     logdir = f"/tmp/revision-gate/{task}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}"
     os.makedirs(logdir, exist_ok=True)
     ctx = {"repo": repo, "task": task, "dir": tdir, "logdir": logdir, "k2n_agent": opt("--k2n-agent", "metacode"),
+           "accept_uncovered": opt("--accept-uncovered"),
            "log": lambda n: os.path.join(logdir, n + ".log")}
     before = task_hash(tdir)
-    print(f"revision-gate  {task}  (PROVISIONAL: see ledger/VERIFY-revision-gate.md)\nlogs: {logdir}\n")
+    print(f"revision-gate  {task}  build {gate_version()}  (PROVISIONAL: see ledger/VERIFY-revision-gate.md)\nlogs: {logdir}\n")
     results = {}
     for s in stages:
         t0 = time.time()
@@ -264,6 +289,7 @@ def main():
     full = all(s in results for s in ORDER)  # every stage ran (pass or fail): this run decides the push stamp
     os.makedirs(STAMPS, exist_ok=True)
     stamp = {"task": task, "hash": after, "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             "build": gate_version(), "accepted_uncovered": opt("--accept-uncovered"),
              "results": results, "verdict": verdict, "full_run": full, "provisional": True, "logs": logdir}
     # Only a full run writes <task>.json (the push stamp); partial runs go to <task>.partial.json so a
     # quick diagnostic never revokes a valid push stamp for unchanged files.

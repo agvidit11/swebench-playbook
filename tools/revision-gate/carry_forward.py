@@ -31,6 +31,17 @@ def leaf(test_id):
     return t
 
 
+def ctx_leaf(test_id):
+    # leaf plus its enclosing class/context: a/b.py::Cls::test_x -> Cls::test_x; a.b.Cls.test_x -> Cls.test_x
+    parts = re.split(r"::|#", test_id)
+    if len(parts) >= 3 or (len(parts) == 2 and "/" not in parts[0] and "." not in parts[0]):
+        return "::".join(parts[-2:])
+    if len(parts) == 1 and "/" not in test_id:
+        name = test_id.partition("[")[0].split(".")
+        return ".".join(name[-2:]) + test_id[len(test_id.partition("[")[0]):]
+    return leaf(test_id)
+
+
 def step_dirs(task):
     sd = os.path.join(task, "steps")
     if not os.path.isdir(sd):
@@ -53,7 +64,15 @@ def check(task):
         prev = list(dict.fromkeys(t for c in cfgs[:i] for t in ids(c, "fail_to_pass")))
         cur = ids(cfgs[i], "fail_to_pass") + ids(cfgs[i], "pass_to_pass")
         cur_ids, cur_leaves = set(cur), {leaf(t) for t in cur}
-        missing = [t for t in prev if t not in cur_ids and leaf(t) not in cur_leaves]
+        cur_ctx = {ctx_leaf(t) for t in cur}
+        prev_count = {}
+        for t in prev:
+            prev_count[leaf(t)] = prev_count.get(leaf(t), 0) + 1
+        # A renamed copy may match by bare test name, but only when that name is unique among the earlier
+        # graded tests; otherwise ClsB::test_x would excuse a missing ClsA::test_x. Ambiguous names must
+        # match with their class/context.
+        missing = [t for t in prev if t not in cur_ids and not (
+            (prev_count[leaf(t)] == 1 and leaf(t) in cur_leaves) or ctx_leaf(t) in cur_ctx)]
         pairs.append({
             "from": os.path.basename(steps[i - 1]), "to": os.path.basename(steps[i]),
             "graded": len(prev), "missing": len(missing), "missing_sample": missing[:5],
