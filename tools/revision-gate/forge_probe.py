@@ -145,7 +145,7 @@ def plant(box, forge, ids):
 
 
 FORGES = {
-    "python": ["py_conftest", "py_ini_plugin", "py_sitecustomize", "py_pytest11", "py_interpreter_swap"],
+    "python": ["py_conftest", "py_ini_plugin", "py_sitecustomize", "py_pytest11"],
     "go": ["go_exec_wrapper"],
     "ruby": ["rb_dotrspec", "rb_rubygems_defaults"],
     "js": ["js_npmrc_require"],
@@ -153,7 +153,8 @@ FORGES = {
     "java": ["java_surefire_reports"],
     "php": ["php_phpunit_xml", "php_conf_d_prepend"],
 }
-GENERIC = []  # a pre-planted reward.txt is moot: the harness clears /logs/verifier before every verifier run
+GENERIC = ["any_interpreter_swap"]  # (a pre-planted reward.txt is moot: the harness clears /logs/verifier first)
+STATIC = {"java_surefire_reports"}  # no code runs; its files are the forge, so it counts as loaded
 
 
 def probe_step(task, step, prev, base_image, jobs, last=None):
@@ -195,9 +196,12 @@ def probe_step(task, step, prev, base_image, jobs, last=None):
             ok, log = plant(b, kind, ids)
             if not ok:
                 return kind, "NA", log, []
+            b.exec("rm -f /tmp/zz_gate_loaded /tmp/zz_gate_gold_readable")
             r, tail = run_verifier(b, step, tmo)
-            gold = b.exec("test -e /tmp/zz_gate_gold_readable && echo GOLD").stdout.strip() == "GOLD"
-            return kind, r, tail, ["GOLD"] if gold else []
+            flags = b.exec("test -e /tmp/zz_gate_gold_readable && echo GOLD; test -e /tmp/zz_gate_loaded && echo LOADED").stdout.split()
+            if kind in STATIC:
+                flags.append("LOADED")
+            return kind, r, tail, flags
         finally:
             b.close()
 
@@ -221,13 +225,20 @@ def probe_step(task, step, prev, base_image, jobs, last=None):
         if r == "NA":
             add(f, "SKIP", f"not applicable here: {tail.strip()[-160:]}")
         elif r == 1:
-            add(f, "FAIL", f"forge paid reward 1 with no solution. Verifier tail: {tail[-240:]}")
+            hint = (" Fix pattern (vobject): compute the reward in a private dir and copy it into place; never let the"
+                    " python the agent can reach write /logs/verifier/reward.txt directly. Root in the container can"
+                    " always defeat a smart enough wrapper; this probe checks the attack reviewers flag."
+                    if f == "any_interpreter_swap" else "")
+            add(f, "FAIL", f"forge paid reward 1 with no solution.{hint} Verifier tail: {tail[-200:]}")
+        elif "LOADED" not in extra:
+            out[f] = ("NOTLOADED",) + out[f][1:]
+            add(f, "SKIP", "planted but its code never ran during grading (the verifier isolates it), so this proves nothing")
         else:
-            add(f, "PASS", f"forge scored {r}")
+            add(f, "PASS", f"forge loaded during grading and scored {r}")
         if "GOLD" in extra:
             add("gold_readable", "FAIL", f"code running inside a test ({f}) could read the gold patch in "
                 "/tests/config.json")
-    effective = [f for f in forges if out[f][0] != "NA"]
+    effective = [f for f in forges if out[f][0] not in ("NA", "NOTLOADED")]
     if not effective:
         add("coverage", "UNCOVERED", f"no forge could be planted for {sorted(langs) or 'unknown language'}"
             + (f" (tried: {', '.join(forges)})" if forges else "") + "; fake-pass was not checked for this step")

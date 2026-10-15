@@ -106,20 +106,42 @@ def bench_busy():
     return [l for l in out.splitlines() if "codimango-bench" in l and " bench run" in l]
 
 
-def k2n_split(manifest):
-    m = json.load(open(manifest))
+def k2n_manifest(jobs_dir):
+    """The k2n RUN manifest: newest manifest.json under jobs_dir whose JSON is an object with a `cells`
+    list. Trial artifacts can contain other manifest.json files (some are JSON lists); never pick those."""
+    best = None
+    # os.walk, not glob("**"): glob skips dot-dirs, and k2n writes its run manifest under .k2n/
+    for p in (os.path.join(r, "manifest.json") for r, _, fs in os.walk(jobs_dir) if "manifest.json" in fs):
+        try:
+            m = json.load(open(p))
+        except (ValueError, OSError):
+            continue
+        if isinstance(m, dict) and isinstance(m.get("cells"), list):
+            if best is None or os.path.getmtime(p) > os.path.getmtime(best[0]):
+                best = (p, m)
+    return best
+
+
+def k2n_split(m):
     per = {}
     for c in m.get("cells", []):
         cur = next((a for a in c.get("attempts", []) if a.get("attempt_id") == c.get("current_attempt_id")), None)
-        v = (cur or {}).get("outcome", {}).get("verdict")
+        v = ((cur or {}).get("outcome") or {}).get("verdict")
         s = per.setdefault(c["step_index"] + 1, {"pass": 0, "fail": 0, "error": 0})
-        s[v if v in s else "error"] += 1
+        s[v if v in ("pass", "fail") else "error"] += 1
     return per
+
+
+def docker_lock(cmd):
+    """Run under the host-wide docker mutex push-task.sh uses, unless the caller already holds it."""
+    if os.environ.get("SWEBENCH_DOCKER_LOCK_HELD"):
+        return cmd
+    return ["flock", "/tmp/swebench-docker.lock", "env", "SWEBENCH_DOCKER_LOCK_HELD=1", *cmd]
 
 
 # ---------------------------------------------------------------- stages
 def st_preflight(ctx):
-    rc, out = run([os.path.join(SKILL, "preflight.sh"), ctx["task"], "--with-oracle"], ctx["log"]("preflight"),
+    rc, out = run(docker_lock([os.path.join(SKILL, "preflight.sh"), ctx["task"], "--with-oracle"]), ctx["log"]("preflight"),
                   cwd=ctx["repo"], timeout=5400)
     return ("PASS" if rc == 0 else "FAIL"), ("preflight exit 0, oracle 3/3" if rc == 0 else tail(out))
 
@@ -141,14 +163,17 @@ def st_provenance(ctx):
     tool = os.path.expanduser("~/swebench/prov_predict.py")
     if not os.path.exists(tool):
         return "BLOCKED", "~/swebench/prov_predict.py missing: run ~/swebench-playbook/tools/bootstrap-swebench-home.sh"
-    rc, out = run([sys.executable, tool, ctx["task"]], ctx["log"]("provenance"), cwd=ctx["repo"], timeout=600)
+    src = open(tool).read()
+    pat = r'^ROOT\s*=.*$'
+    if not re.search(pat, src, re.M):
+        return "BLOCKED", "prov_predict.py no longer defines ROOT; cannot point it at --repo"
+    patched = os.path.join(ctx["logdir"], "prov_predict_repo.py")
+    open(patched, "w").write(re.sub(pat, f"ROOT = {ctx['repo']!r}  # revision-gate: --repo", src, count=1, flags=re.M))
+    rc, out = run([sys.executable, patched, ctx["task"]], ctx["log"]("provenance"), cwd=ctx["repo"], timeout=600)
     if "PREDICTED CONTAMINATED" in out:
         return "FAIL", tail(out, 8)
     if rc != 0:
         return "BLOCKED", tail(out)
-    home = os.path.realpath(os.path.expanduser("~/swe-bench-pro-agvidit"))
-    if os.path.realpath(ctx["repo"]) != home:
-        return "WARN", f"prov_predict.py always reads {home}, not {ctx['repo']}; re-run there if the files differ"
     return "PASS", ("no surviving flagged blocks" if "PREDICTED CLEAR" in out else "no provenance evidence on the server for this task")
 
 
@@ -167,7 +192,7 @@ def st_carry(ctx):
 
 
 def st_forge(ctx):
-    rc, out = run([sys.executable, os.path.join(HERE, "forge_probe.py"), ctx["dir"], "--jobs", "2"],
+    rc, out = run(docker_lock([sys.executable, os.path.join(HERE, "forge_probe.py"), ctx["dir"], "--jobs", "2"]),
                   ctx["log"]("forge"), timeout=4 * 3600)
     shown = [l for l in out.splitlines() if l.startswith(("FAIL", "UNVERIFIED", "UNCOVERED", "WARN", "SKIP", "INFRA"))]
     msg = "\n".join("      " + l[:220] for l in shown[:12]) or "      every applicable forge ran and none paid out; controls behaved"
@@ -175,13 +200,16 @@ def st_forge(ctx):
         return "FAIL", msg
     if rc not in (0, 3):
         return "BLOCKED", msg
+    if any(l.startswith("UNVERIFIED") for l in shown):
+        return "BLOCKED", msg + "\n      the reference solution did not score 1 in the probe container, so nothing about fake-pass"\
+            "\n      was verified for that step. Fix the probe environment (or the oracle) and re-run."
     if any(l.startswith("UNCOVERED") for l in shown):
         why = ctx.get("accept_uncovered")
         if not why:
             return "FAIL", msg + ("\n      No effective forge ran for at least one step, so fake-pass was NOT checked. Review the"
                                   "\n      grader by hand, then re-run with --accept-uncovered \"<what you checked>\" (recorded in the stamp).")
         return "WARN", msg + f"\n      uncovered steps accepted by hand: {why}"
-    return ("WARN" if rc == 3 else "PASS"), msg
+    return "PASS", msg
 
 
 def st_review(ctx):
@@ -205,30 +233,52 @@ def st_review(ctx):
 
 
 def st_calibrate(ctx):
-    busy = bench_busy()
-    if busy:
-        return "BLOCKED", "another `bench run` owns this host (one per host, gateway 400 otherwise):\n" + \
-            "\n".join("      " + l[:160] for l in busy[:3])
+    # One `bench run` per host (gateway 400 otherwise): wait for the slot instead of failing at once.
+    deadline = time.time() + float(ctx.get("bench_wait_h", 6)) * 3600
+    while bench_busy():
+        if time.time() > deadline:
+            return "BLOCKED", "another `bench run` held this host for the whole wait window:\n" + \
+                "\n".join("      " + l[:160] for l in bench_busy()[:3])
+        time.sleep(120)
     splits = []
     for i in (1, 2):
         jobs = os.path.join(ctx["logdir"], f"k2n-{i}")
-        rc, out = run(["codimango", "bench", "run", "-p", ctx["task"], "-a", ctx["k2n_agent"], "--k2n", "-o", jobs],
+        rc, out = run(docker_lock(["codimango", "bench", "run", "-p", ctx["task"], "-a", ctx["k2n_agent"], "--k2n", "-o", jobs]),
                       ctx["log"](f"calibrate-{i}"), cwd=ctx["repo"], timeout=14 * 3600)
-        mans = sorted(glob.glob(os.path.join(jobs, "**", "manifest.json"), recursive=True), key=os.path.getmtime)
-        if not mans:
-            return "BLOCKED", f"k2n run {i} produced no manifest (exit {rc}):\n" + tail(out)
-        splits.append(k2n_split(mans[-1]))
-    lines, ok = [], True
-    for step in sorted(splits[0]):
-        cells = []
+        found = k2n_manifest(jobs)
+        if not found:
+            return "BLOCKED", f"k2n run {i} produced no run manifest (exit {rc}):\n" + tail(out)
+        splits.append(k2n_split(found[1]))
+    steps = sorted(set(splits[0]) | set(splits[1]))
+    last = steps[-1] if steps else None
+    lines, ok, incomplete, exempt_used = [], True, False, None
+    for step in steps:
+        cells, saturated = [], True
         for i, sp in enumerate(splits):
             s = sp.get(step, {"pass": 0, "fail": 0, "error": 0})
             n = s["pass"] + s["fail"]
-            band = n > 0 and 1 <= s["pass"] <= 3 and s["pass"] < n
-            ok &= band
-            cells.append(f"run{i + 1} {s['pass']}/{n}" + (f" (+{s['error']} infra)" if s["error"] else "") + ("" if band else " OUT"))
-        lines.append(f"      step {step}: " + ", ".join(cells))
-    return ("PASS" if ok else "FAIL"), "\n".join(lines) + ("" if ok else "\n      target: 1-3 passes of 5 on every step, in both runs")
+            if n < 5:
+                incomplete = True
+            saturated &= n >= 5 and s["pass"] == n
+            band = n >= 5 and 1 <= s["pass"] <= 3
+            cells.append((i, s, n, band))
+        # Server rule: one non-final step may sit at 1.0 when the task declares 3+ steps (single-1.0 exemption).
+        exempt = saturated and len(steps) >= 3 and step != last and exempt_used is None
+        if exempt:
+            exempt_used = step
+        txt = []
+        for i, s, n, band in cells:
+            good = band or exempt
+            ok &= good or n < 5
+            txt.append(f"run{i + 1} {s['pass']}/{n}" + (f" (+{s['error']} infra)" if s["error"] else "")
+                       + (" exempt" if exempt else "" if band else " OUT" if n >= 5 else " INCOMPLETE"))
+        lines.append(f"      step {step}: " + ", ".join(txt))
+    msg = "\n".join(lines) or "      no cells"
+    if not steps or incomplete:
+        return "BLOCKED", msg + "\n      fewer than 5 countable (pass/fail) cells on some step: infra errors or an unfinished run. Re-run."
+    if ok:
+        return "PASS", msg + (f"\n      step {exempt_used} used the single-1.0 exemption (3+ steps, not the last)" if exempt_used else "")
+    return "FAIL", msg + "\n      target: 1-3 passes of 5 on every step in both runs (one non-final 5/5 allowed when the task has 3+ steps)"
 
 
 STAGES = {"preflight": st_preflight, "presubmit": st_presubmit, "provenance": st_provenance, "carry": st_carry,

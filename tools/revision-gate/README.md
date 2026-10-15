@@ -19,7 +19,7 @@ python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iter
 | 4 | carry | later steps not re-running earlier steps' graded tests |
 | 5 | forge | grader pays reward 1 with no solution (planted conftest/pytest.ini/plugins, runner wrappers) |
 | 6 | review | the reviewer's own agent (`review-task-swebench-v2`); fix every finding (R-026) |
-| 7 | calibrate | `bench run --k2n` twice; every step 1-3/5 in both runs |
+| 7 | calibrate | `bench run --k2n` twice; every step 1-3/5 in both runs (one non-final 5/5 allowed when the task has 3+ steps, as on the server); waits for the one-per-host bench slot |
 
 - Writes nothing inside the task directory. Logs go to `/tmp/revision-gate/`, stamps to `~/swebench/gate-stamps/`.
 - `push-task.sh` refuses to push without a clean full-run stamp for the exact task files.
@@ -28,7 +28,8 @@ python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iter
   push-task.sh run), so re-run it after every gate update. Install in every task-repo clone on a host:
   `~/swebench-playbook/tools/revision-gate/install-hook.sh` (`--list` to check, `--uninstall` to remove).
   Changes only under `<task>/audit/` need no new run. Never use `git push --no-verify`.
-- Stage 7 refuses to start while another `bench run` owns the host (one per host).
+- Stages 1, 5 and 7 run under `/tmp/swebench-docker.lock`; stage 7 also waits up to 6 h for the one-per-host bench slot.
+- A forge only counts if a marker shows its code actually ran during grading.
 - Validated so far: carry-forward, Python and Go forges, the reviewer-agent stage, the k2n parser.
   Not yet run end to end: stage 7 (two live k2n runs) and the Ruby/JS/Rust/Java/PHP forges.
 - Forge coverage: Python, Go, Ruby, Rust, Java (Surefire), PHP (conf.d prepend + phpunit.xml). JS/TS is weak:
