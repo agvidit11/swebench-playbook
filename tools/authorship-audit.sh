@@ -33,9 +33,12 @@
 # instruction.md -- on a file that was 100% model-written.
 #
 # SCOPE, corrected 2026-10-02: every instruction.md is Muse-only and everything under tests/
-# is Codex/Muse-only. Claude may write solve.sh, Dockerfile, task.toml, README, CLIs, and
-# author-side audit evidence. This scan is an early warning; the server provenance report for
-# the submitted commit is authoritative.
+# is Codex/Muse-only. Every other file in a task dir (solve.sh, Dockerfile, task.toml, README,
+# audit/) is Codex-authored (Muse if clearly better). Claude writes NOTHING inside a task dir
+# (Vidit 2026-09-30, reaffirmed 2026-10-02; canonical table: swebench-mt RUNBOOK.md -> "Who
+# writes what"). This scan only checks instruction.md and tests/**, so it does not prove that
+# rule for the other files. It is an early warning; the server provenance report for the
+# submitted commit is authoritative.
 
 set -uo pipefail
 TASK="${1:?usage: authorship-audit.sh <task-name>}"
