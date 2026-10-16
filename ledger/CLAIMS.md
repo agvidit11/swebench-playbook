@@ -6,6 +6,10 @@ task or card. A lane may not start work on a repo seam another row holds ACTIVE.
 Status: `CARD` (idea, not built) · `PROBING` · `ACTIVE` (building) · `READY` (all local checks pass,
 waiting on Vidit) · `PUSHED` · `RETIRED` · `RELEASED` (given up, seam free again)
 
+## Task logs and handoffs (Vidit, 2026-10-15)
+
+Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/TASK-LOG/README.md`). Only the owner named there pushes. Append one line per push/result/review; hand off with a HANDOFF entry so history and latest state are never lost.
+
 ## Lane rules (Vidit, 2026-10-06)
 
 - **Each machine's lanes source and build their OWN cases.** Never claim another lane's `CARD`,
