@@ -1,6 +1,6 @@
 # lektor-output-liveness-prune
 **Owner:** devvm23237 / current lane orchestrator (Vidit 2026-10-15 direct pickup)
-**State:** local e5f06fb restores a three-step cascade after 2d4e437 saturated at 1.0|0.8. Cheap revision-gate fully passed; full gate must be rerun after the host benchmark lock clears. Nothing new pushed yet.
+**State:** PARK RECOMMENDED 2026-10-16 — a5e15e5 (= ec0d1b9) failed 0.8|1.0; consistently too easy since 2026-10-14.
 
 ## History
 - 2026-10-04..08 · devvm6971/lane-p · 3-step builds 6ad3a40, 83c7449 · S2/S3 too easy; parked with PROGRESS in ~/scratch/lane-p/lektor-output-liveness-prune/
@@ -21,3 +21,4 @@ Rerun the full gate from the exact e5f06fb tree after the lock clears. Push only
 - 2026-10-16 02:45 UTC · devvm23237/orchestrator · e5f06fb local · changed the saturated two-step shape to three progressive steps: output liveness, live project settings, and live project-path switching; both new protected statements written by Muse · exact patch cascade, step-2 48/48, step-3 49/49, local presubmit 0 FAIL/0 WARN
 - 2026-10-16 03:25 UTC · devvm23237/orchestrator · cheap revision-gate · presubmit/provenance/carry/forge all PASS and independent reviewer Accept · PASS
 - 2026-10-16 05:27 UTC · devvm23237/orchestrator · full revision-gate attempt · preflight timed out after waiting 5400s for `/tmp/swebench-docker.lock`; stopped before it could consume a later slot · infrastructure-only retry required
+- 2026-10-16 · lane-i · a5e15e5 (byte-identical ec0d1b9 restore) · S1 0.8 | S2 1.0 — FAILED. Post-ec0d1b9 server history S1 0.6,1.0,1.0,0.8 / S2 0.8,0.8,1.0,1.0: the 0.2|0.6 pass was a lucky draw (or Avocado improved). No fair lever left (50+ measured candidates). RECOMMEND PARK; awaiting Vidit. Do not push further without a new difficulty source (new step or pivot).
