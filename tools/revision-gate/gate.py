@@ -132,11 +132,22 @@ def k2n_split(m):
     return per
 
 
+LOCK = "/tmp/swebench-docker.lock"
+
+
 def docker_lock(cmd):
-    """Run under the host-wide docker mutex push-task.sh uses, unless the caller already holds it."""
+    """Run a SHORT container stage (preflight, forge) under the host-wide docker mutex push-task.sh uses,
+    unless the caller already holds it. Long stages (calibration) must not hold it: a whole-gate or
+    k2n-long hold starved other lanes' preflight for ~2 h (verifier 3, 2026-10-16)."""
     if os.environ.get("SWEBENCH_DOCKER_LOCK_HELD"):
         return cmd
-    return ["flock", "/tmp/swebench-docker.lock", "env", "SWEBENCH_DOCKER_LOCK_HELD=1", *cmd]
+    busy = subprocess.run(["flock", "-n", LOCK, "true"], capture_output=True).returncode != 0
+    if busy:  # queue visibility: say who holds it before waiting
+        holders = subprocess.run(["bash", "-c", f"for p in $(fuser {LOCK} 2>/dev/null); do ps -o pid=,etime=,args= -p $p; done"],
+                                 capture_output=True, text=True).stdout.strip()
+        print(f"         waiting for {LOCK}; held by:\n" + "\n".join("           " + l[:150] for l in holders.splitlines()[:4]),
+              flush=True)
+    return ["flock", "-w", "7200", LOCK, "env", "SWEBENCH_DOCKER_LOCK_HELD=1", *cmd]
 
 
 # ---------------------------------------------------------------- stages
@@ -243,7 +254,7 @@ def st_calibrate(ctx):
     splits = []
     for i in (1, 2):
         jobs = os.path.join(ctx["logdir"], f"k2n-{i}")
-        rc, out = run(docker_lock(["codimango", "bench", "run", "-p", ctx["task"], "-a", ctx["k2n_agent"], "--k2n", "-o", jobs]),
+        rc, out = run(["codimango", "bench", "run", "-p", ctx["task"], "-a", ctx["k2n_agent"], "--k2n", "-o", jobs],
                       ctx["log"](f"calibrate-{i}"), cwd=ctx["repo"], timeout=14 * 3600)
         found = k2n_manifest(jobs)
         if not found:

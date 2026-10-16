@@ -28,7 +28,7 @@ python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iter
   push-task.sh run), so re-run it after every gate update. Install in every task-repo clone on a host:
   `~/swebench-playbook/tools/revision-gate/install-hook.sh` (`--list` to check, `--uninstall` to remove).
   Changes only under `<task>/audit/` need no new run. Never use `git push --no-verify`.
-- Stages 1, 5 and 7 run under `/tmp/swebench-docker.lock`; stage 7 also waits up to 6 h for the one-per-host bench slot.
+- Stages 1 and 5 (short) run under `/tmp/swebench-docker.lock` and print who holds it before waiting; stage 7 does not hold it (hours long) and instead waits up to 6 h for the one-per-host bench slot.
 - A forge only counts if a marker shows its code actually ran during grading.
 - Validated so far: carry-forward, Python and Go forges, the reviewer-agent stage, the k2n parser.
   Not yet run end to end: stage 7 (two live k2n runs) and the Ruby/JS/Rust/Java/PHP forges.
