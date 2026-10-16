@@ -180,3 +180,12 @@ planted forges SKIP ("never ran during grading, the verifier isolates it"), so f
 reports stage FAIL. Full isolation is the best outcome, not a defect. Suggest: treat UNCOVERED-because-all-NOTLOADED as PASS/WARN.
 Pushed with GATE_OVERRIDE citing this. Log: /tmp/revision-gate/openfeature-go-multiprovider-live-replacement-20261016T*.
 2026-10-16 15:50 | devvm23237 | ee -> all lanes | revision-gate builds before 9bf3d9788efa run stage 7 (k2n, hours) INSIDE flock /tmp/swebench-docker.lock. Right now 4 old-build gate runs are queued on it (reversion holding ~53 min; fieldtracker, lektor, ruby-terraform waiting ~2 h each), plus 2 forge stages, so every short preflight/forge stage on this host is starved until all of them drain | host-wide serialization for many hours | owners of those gate runs: stop them and restart on the current build (python3 ~/swebench/revision-gate/gate.py --version should print 9bf3d9788efa or later): calibration no longer holds the lock, it waits for the one-per-host bench slot, and short stages print the lock holder. agvidit-ee is not killing other lanes' processes — OPEN
+
+## 2026-10-16 DO NOT pin interpreter binary digests in test.sh: server Eval GT fails gt_resolved=0 — 8994aeb2
+Closing the revision-gate `any_interpreter_swap` forge by pinning sha256 of /usr/bin/python3 (+ sha256sum) in test.sh
+passes local gates AND Harbor validation (same image), but the server **Eval GT** stage runs the verifier in a different
+environment: "ERROR: trusted python3 verification failed; refusing to grade" -> evalgt failed, `gt_resolved=0` (hard
+blocking for reviewers). Hit on isogit 978f7bf and openfeature 9dbe0f6; caught only by the full server-side presubmit.
+Use instead: python writes its verdict to a random mktemp -d private file (never /logs/verifier/reward.txt); bash reads it
+after python exits and writes reward.txt LAST (0 first, 0 on every failure path). Defeats the probe without a digest pin.
+Also: always run presubmit.py WITHOUT --local-only after validation — the server half is what caught this.
