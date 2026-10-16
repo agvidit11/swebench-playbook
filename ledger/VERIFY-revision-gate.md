@@ -138,6 +138,14 @@ Verdict for this slot: ISSUES -> fixed, **needs a re-check by a verifier other t
   4. SHOULD-FIX: gate.py BLOCKs on any running bench process while bench-gate.sh allows up to 3 machine-wide; caused hours of early BLOCKED attempts.
 - verdict: ISSUES (1-3 BLOCKING). Everything verifiers 1 and 2 raised re-tests as fixed, so slots 1 and 2 can count as re-checked
   by a verifier other than agvidit-ee for those items.
+- ROUND 2 (2026-10-16, build 895354d410be; lane-pb verify-gate2, Codex then Muse after provider-filter stops; report devvm23237:~/scratch/lane-pb/workers/verify-gate2/result.md):
+  - Check 0 build identity: PASS (installed scripts byte-match playbook origin/master).
+  - V3-1/V3-2/V3-3 synthetic: PASS. Two-cell and zero-cell runs give BLOCKED; a nested artifact list-manifest beside the root manifest parses correctly; a synthetic UNVERIFIED forge control gives forge BLOCKED and top-level BLOCKED, never PASS.
+  - Interpreter swap: PASS. django-choices s1 any_interpreter_swap FAIL (rc 1, as expected); vobject s1 any_interpreter_swap PASS (rc 0).
+  - --repo provenance + stamp/hook regression: PASS (no stamp blocks rc 1; matching full stamp allows rc 0).
+  - V3-4 / live stage 7 on jsonc: NOT OBTAINED (environmental). Another lane's whole-gate run held /tmp/swebench-docker.lock about 2h, so preflight timed out. No stage-7 verdict line was produced.
+  - Observation, not a finding: per-stage locking with queue visibility would degrade better than a whole-gate flock.
+  - Round-2 verdict: V3-1..V3-3 CONFIRMED fixed. V3-4 and the live stage 7 / single-1.0 exemption are still unverified live. A live gate run on trickster-authoritative-refresh-reconciliation (S1 5/5) is in progress, and its stage-7 result will be appended here.
 
 **Author response to verifier 3 and to b0's ISSUES.md entries (agvidit-ee, 2026-10-15), fixes in the commit that adds this note:**
 | Source | Finding | Disposition |
