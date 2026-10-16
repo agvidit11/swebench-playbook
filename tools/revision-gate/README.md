@@ -19,7 +19,7 @@ python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iter
 | 4 | carry | later steps not re-running earlier steps' graded tests |
 | 5 | forge | grader pays reward 1 with no solution (planted conftest/pytest.ini/plugins, runner wrappers) |
 | 6 | review | the reviewer's own agent (`review-task-swebench-v2`); fix every finding (R-026) |
-| 7 | calibrate | `bench run --k2n` twice; every step 1-3/5 in both runs (one non-final 5/5 allowed when the task has 3+ steps, as on the server); waits for the one-per-host bench slot |
+| 7 | calibrate | `bench run --k2n` once, and only when difficulty can have moved; every step 1-3/5 (one non-final 5/5 allowed when the task has 3+ steps, as on the server); waits for the one-per-host bench slot |
 
 - Writes nothing inside the task directory. Logs go to `/tmp/revision-gate/`, stamps to `~/swebench/gate-stamps/`.
 - `push-task.sh` refuses to push without a clean full-run stamp for the exact task files.
@@ -37,3 +37,15 @@ python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iter
   planted is UNCOVERED: the gate FAILs it unless you check the grader by hand and pass
   `--accept-uncovered "<what you checked>"` (recorded in the stamp).
 - `gate.py --version` prints the build id; it is also printed in every run and written into every stamp.
+
+## Why calibration runs once, and only when difficulty can have moved (2026-10-16)
+
+- **Cost:** a local k2n run takes about 2 hours and only one can run per host. Two runs per gate, with four
+  revisions in flight, queued about 16 hours of benching on one host and made revisions slower, which is the
+  opposite of what the gate is for.
+- **Skip when nothing that moves difficulty changed** since the commit the server last validated: no change
+  to any instruction.md, tests/, solution/, environment/, or a timeout in task.toml. The server already
+  calibrated that content; README-, metadata- or audit-only revisions skip stage 7 entirely.
+- **One local run, not two:** the server calibrates every pushed commit itself, so it is the second sample.
+  The local run is there to catch a step that clearly left the band before spending a server cycle.
+- `--calibrate-runs N` forces N local runs when you want more confidence (for example a step sitting at 3/5).

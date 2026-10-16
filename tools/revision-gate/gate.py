@@ -11,11 +11,13 @@ Stages (cheapest first; each prints PASS / FAIL / WARN / SKIP / BLOCKED):
   4 carry         carry_forward.py                            later steps re-run earlier steps' graded tests
   5 forge         forge_probe.py                              grader cannot be made to pay without a solution
   6 review        codimango bench ai-review review-task-swebench-v2   the reviewer's own agent
-  7 calibrate     codimango bench run --k2n, twice            every step 1-3/5 on both runs
+  7 calibrate     codimango bench run --k2n, once             every step 1-3/5; skipped when nothing that moves
+                                                              difficulty changed since the server-validated commit
 
 Usage:
   gate.py <task> [--repo DIR] [--fast] [--only s1,s2] [--skip s1,s2] [--k2n-agent metacode]
           [--accept-uncovered "<what you checked by hand>"]   when no forge applies to a step's language
+          [--calibrate-runs N]   force N local k2n runs (default: 1 run, and only if difficulty can have moved)
   gate.py --version                                           build id (also printed and stamped)
     --fast   stages 1-5 only (minutes). A push stamp is only issued for a full run.
 Exit: 0 all clear, 1 a FAIL, 2 usage/infra, 4 BLOCKED (e.g. another bench owns the host).
@@ -243,7 +245,44 @@ def st_review(ctx):
                     "      requirement to Muse (mc2.sh). Test/plumbing fixes go to Codex.")
 
 
+DIFFICULTY_PATHS = re.compile(r"(^|/)(instruction\.md$|tests/|solution/|environment/)")
+
+
+def difficulty_change(ctx):
+    """Why calibration must run, or None when nothing that moves difficulty changed since the commit the
+    server last validated (its calibration of that commit stands). Difficulty moves with an instruction,
+    a test, the reference solution, the environment, or an agent/verifier timeout in task.toml."""
+    r = subprocess.run(["codimango", "task", "show", ctx["task"], "--json"], capture_output=True, text=True)
+    try:
+        sha = json.loads(r.stdout).get("validationCommitSha")
+    except ValueError:
+        sha = None
+    if not sha:
+        return "no server-validated commit for this task yet"
+    g = lambda *c: subprocess.run(["git", "-C", ctx["repo"], *c], capture_output=True, text=True)
+    if g("cat-file", "-e", f"{sha}^{{commit}}").returncode != 0:
+        g("fetch", "-q", "origin")
+        if g("cat-file", "-e", f"{sha}^{{commit}}").returncode != 0:
+            return f"server-validated commit {sha[:8]} is not available locally"
+    t = ctx["task"] + "/"
+    changed = g("diff", "--name-only", sha, "--", t).stdout.split() + \
+        g("ls-files", "-o", "--exclude-standard", "--", t).stdout.split()
+    hits = [f for f in changed if DIFFICULTY_PATHS.search(f[len(t):])]
+    if t + "task.toml" in changed and re.search(r"^[-+].*timeout", g("diff", sha, "--", t + "task.toml").stdout, re.M):
+        hits.append(t + "task.toml (timeout)")
+    ctx["validated_sha"] = sha
+    return (f"{len(hits)} difficulty-affecting file(s) changed since server-validated {sha[:8]}, e.g. "
+            + ", ".join(h[len(t):] for h in hits[:3])) if hits else None
+
+
 def st_calibrate(ctx):
+    # Run only when difficulty can have moved, and once: the server's own calibration after the push is the
+    # second sample. Two local k2n runs per gate (~2 h each, one bench per host) queued ~16 h of benching
+    # with four revisions in flight (2026-10-16), which defeated the point of the gate.
+    why = None if ctx.get("calibrate_runs_forced") else difficulty_change(ctx)
+    if why is None and not ctx.get("calibrate_runs_forced"):
+        return "SKIP", (f"no instruction/test/solution/environment/timeout change since server-validated "
+                        f"{ctx.get('validated_sha', '?')[:8]}; the server's calibration of that commit stands")
     # One `bench run` per host (gateway 400 otherwise): wait for the slot instead of failing at once.
     deadline = time.time() + float(ctx.get("bench_wait_h", 6)) * 3600
     while bench_busy():
@@ -252,7 +291,7 @@ def st_calibrate(ctx):
                 "\n".join("      " + l[:160] for l in bench_busy()[:3])
         time.sleep(120)
     splits = []
-    for i in (1, 2):
+    for i in range(1, ctx["calibrate_runs"] + 1):
         jobs = os.path.join(ctx["logdir"], f"k2n-{i}")
         rc, out = run(["codimango", "bench", "run", "-p", ctx["task"], "-a", ctx["k2n_agent"], "--k2n", "-o", jobs],
                       ctx["log"](f"calibrate-{i}"), cwd=ctx["repo"], timeout=14 * 3600)
@@ -260,7 +299,7 @@ def st_calibrate(ctx):
         if not found:
             return "BLOCKED", f"k2n run {i} produced no run manifest (exit {rc}):\n" + tail(out)
         splits.append(k2n_split(found[1]))
-    steps = sorted(set(splits[0]) | set(splits[1]))
+    steps = sorted(set().union(*splits))
     last = steps[-1] if steps else None
     lines, ok, incomplete, exempt_used = [], True, False, None
     for step in steps:
@@ -287,9 +326,11 @@ def st_calibrate(ctx):
     msg = "\n".join(lines) or "      no cells"
     if not steps or incomplete:
         return "BLOCKED", msg + "\n      fewer than 5 countable (pass/fail) cells on some step: infra errors or an unfinished run. Re-run."
+    head = f"      calibrated because: {why}\n" if why else ""
     if ok:
-        return "PASS", msg + (f"\n      step {exempt_used} used the single-1.0 exemption (3+ steps, not the last)" if exempt_used else "")
-    return "FAIL", msg + "\n      target: 1-3 passes of 5 on every step in both runs (one non-final 5/5 allowed when the task has 3+ steps)"
+        return "PASS", head + msg + (f"\n      step {exempt_used} used the single-1.0 exemption (3+ steps, not the last)" if exempt_used else "") + \
+            ("\n      one local run; the server's calibration after the push is the second sample" if len(splits) == 1 else "")
+    return "FAIL", head + msg + "\n      target: 1-3 passes of 5 on every step in every run (one non-final 5/5 allowed when the task has 3+ steps)"
 
 
 STAGES = {"preflight": st_preflight, "presubmit": st_presubmit, "provenance": st_provenance, "carry": st_carry,
@@ -329,6 +370,7 @@ def main():
     os.makedirs(logdir, exist_ok=True)
     ctx = {"repo": repo, "task": task, "dir": tdir, "logdir": logdir, "k2n_agent": opt("--k2n-agent", "metacode"),
            "accept_uncovered": opt("--accept-uncovered"),
+           "calibrate_runs": int(opt("--calibrate-runs", "1")), "calibrate_runs_forced": "--calibrate-runs" in a,
            "log": lambda n: os.path.join(logdir, n + ".log")}
     before = task_hash(tdir)
     print(f"revision-gate  {task}  build {gate_version()}  (PROVISIONAL: see ledger/VERIFY-revision-gate.md)\nlogs: {logdir}\n")
