@@ -9,3 +9,4 @@
 - 2026-10-15 · lane-i · 1a3a22e · revision-gate fixes: GOENV/GOFLAGS pinned (go_exec_wrapper forge 0), python -I, step-1 partition, no go.mod in test_patch, README
 ## Next
 Watch step 2 (stated named-types rule may saturate it). Fallback: merge steps 1+2 (exempt) and split step 3 (rollback vs long-running op).
+- 2026-10-16 · lane-i · 34bdbfdf · RESTRUCTURE: new S1 = old S1+S2 (exempt), S2 = transactional decode for ordinary handlers + RegisterService (group A, 10 tests), S3 = long-running WaitOperation (group B). Replay: S2 2/5-3/5, S3|S2 ~1/5 (thin). 1a3a22e had 1|1|0. Gate fast PASS · pending
