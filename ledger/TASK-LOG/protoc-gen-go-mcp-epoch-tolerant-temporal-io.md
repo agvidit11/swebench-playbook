@@ -1,6 +1,6 @@
 # protoc-gen-go-mcp-epoch-tolerant-temporal-io
 **Owner:** devvm6971 / lane-i
-**State:** 8631e37 + 1a3a22e pushed 2026-10-15 (gate: all content stages PASS; calibrate blocked by host contention -> logged override). Server validation pending. Reviewer request changes 2026-10-14.
+**State:** PARK RECOMMENDED 2026-10-17 — restructure 34bdbfd failed (S2 4/5, S3 5/5).
 
 ## History
 - 2026-09-30..10-03 · lane-i (overnight) · split-the-hard-step 3-step shape, 65b7ceb · avocado 1|0.2|0, gpt 1|0.6|1
@@ -10,3 +10,4 @@
 ## Next
 Watch step 2 (stated named-types rule may saturate it). Fallback: merge steps 1+2 (exempt) and split step 3 (rollback vs long-running op).
 - 2026-10-16 · lane-i · 34bdbfdf · RESTRUCTURE: new S1 = old S1+S2 (exempt), S2 = transactional decode for ordinary handlers + RegisterService (group A, 10 tests), S3 = long-running WaitOperation (group B). Replay: S2 2/5-3/5, S3|S2 ~1/5 (thin). 1a3a22e had 1|1|0. Gate fast PASS · pending
+- 2026-10-17 · lane-i · 34bdbfd server · S2 0.8 | S3 1.0 — FAILED (replay predicted 2-3/5 and ~1/5). Pattern across lektor/protoc this week: server Avocado now clears steps that replays of its own earlier trees put in band. RECOMMEND PARK pending Vidit.
