@@ -17,3 +17,4 @@
 ## Next
 Wait for validation; if S1 and S2 both <= 3/5 -> Vidit resubmits with the reviewer note (same-mtime rows dropped, gradient on preview row). If S2 saturates again, there is no fair test-only lever left (27+27 candidates measured).
 - 2026-10-16 · lane-i · 2d4e437 server · S1 1.0 | S2 0.8 (both too easy). Step history S1 0.8,0.2,0.4,0.6,0.2,0.6,1.0 / S2 0.6,0.6,0.8,0.8 = near-ceiling variance, ~1/3 chance both in band per run. Rerun triggered (Vidit authorized).
+- 2026-10-16 · lane-i · a5e15e59 · rerun of 2d4e437 = 1|1; restored whole task dir to ec0d1b9 (last server-validated state) · pending
