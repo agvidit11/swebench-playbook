@@ -215,6 +215,8 @@ RESUBMIT-PROOF <task>  base <old sha> -> <new sha>
 1 ALL REVIEWS PULLED   REVIEW-INVENTORY.md: <n> entries, <n> mapped, 0 unmapped
 2 ALL ASKS ANSWERED    ledger: <n> rows · FIXED <a> · ESCALATED <b> · OPEN 0   (grep cmd + output)
 3 EACH FIX HAS A CHECK per row: commit + the test/probe/gate that now fails on the old behaviour
+3b FINAL-COMMIT RECHECK each reviewer 'Fixed when:' condition re-verified against the FINAL pushed SHA (not an earlier one),
+                 incl. README per-step rates citing that exact SHA (presubmit does not check this)
 4 NOTHING ELSE BROKE   baseline vs after diff: 0 green->red   (paste the diff)
 5 NO NEW ISSUES        reviewer agent: <verdict, n new> · Codex re-read: <n flags> · authorship 0 · prov 0
 6 GATE                 gate.py full: PASS, stamp <hash>  (or GATE_OVERRIDE "<reason>", logged)
@@ -222,7 +224,8 @@ RESUBMIT-PROOF <task>  base <old sha> -> <new sha>
 8 SERVER               after push: validationStatus, every row, balance string with every arm (B5)
 ```
 
-Line 8 can only be filled after the push. Until it is filled the task is **pushed, not ready**.
+Line 8 can only be filled after the push. Note that "validationStatus=passing" alone is not enough: run presubmit WITHOUT
+`--local-only`, because it catches hard-blocking engine stages (e.g. Eval GT `gt_resolved=0`) that the status hides. Until it is filled the task is **pushed, not ready**.
 Nobody presses resubmit or replies to the reviewer before line 8 is green.
 
 **Then draft the reviewer message, for Vidit to send.** Claude never posts it. Replying to a
