@@ -13,3 +13,4 @@
 
 ## Next
 Resubmit for review (UI). Difficulty rests on the documented-contract local-bundle return (justification posted).
+- 2026-10-15 · other worker (unlogged) · 3912bad, eac95bc · Eval-GT vendor preflight tolerance + validation metadata · avocado 1/5, AI Accept, validation passing. PLEASE log here before pushing (see TASK-LOG/README.md).
