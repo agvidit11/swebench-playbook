@@ -449,6 +449,7 @@ def check_server(name, task_dir):
         ok("agentic verdict", "GOOD")
 
     check_trials(name, sha)
+    check_failure_legitimacy(name, sha, failed_trial_count=LAST_FAILED.get(name))
 
     # human review history
     try:
@@ -461,6 +462,9 @@ def check_server(name, task_dir):
         d0 = decs[0]
         lvl = warn if not d0[1].lower().startswith("accept") else ok
         lvl("human review", f"latest decision {d0[1].strip()} @ {d0[0][:16]} — make sure every point is addressed")
+
+
+LAST_FAILED = {}
 
 
 def check_trials(name, sha):
@@ -532,6 +536,7 @@ def check_trials(name, sha):
         warn("solvers", f"only {solvers[0]} solved it — reviewers ask for a second model (concourse review)")
     else:
         ok("solvers", f"solved by {solvers}")
+    LAST_FAILED[name] = failed_trials
     if failed_trials >= 2 and fail_tests:
         top, n = fail_tests.most_common(1)[0]
         if n / failed_trials >= 0.8:
@@ -540,6 +545,44 @@ def check_trials(name, sha):
 
 
 # ───────────────────────────── main ─────────────────────────────
+
+LEGIT = {"FAIL_REASONING", "PASSED", "PASS"}
+
+
+def check_failure_legitimacy(name, sha, failed_trial_count=None):
+    """Are the FAILURES real model mistakes, or grader/infra false negatives? (gson stale report,
+    jsondiffpatch vite cache, isogit fixture: all looked like ordinary 0-reward trials to the census.)
+    Source: the server's agentic full-task review, which reads each attempt's trajectory and verifier
+    output and classifies it (FAIL_REASONING = legit miss; GRADING_FAILURE / INFRA / etc. = not)."""
+    if not sha:
+        return
+    try:
+        d = command_json(["codimango", "job", "review", name, "--commit", sha, "--json"])
+    except (CommandError, RuntimeError) as e:
+        infra("failure legitimacy", str(e)[:160])
+        return
+    attempts = ((d or {}).get("review") or {}).get("attemptResults") or []
+    if not attempts:
+        warn("failure legitimacy", f"no per-attempt classification in the agentic review at {sha[:8]} — "
+             "read failing trajectories by hand (trial artifacts: verifier/test-stdout.txt) before submitting")
+        return
+    bad = [a for a in attempts if str(a.get("result", "")).upper() not in LEGIT]
+    fails = [a for a in attempts if str(a.get("result", "")).upper() == "FAIL_REASONING"]
+    if bad:
+        ex = "; ".join(f"{a.get('attemptId','?').split('/')[-1]}={a.get('result')}: "
+                       f"{(a.get('explanation') or '')[:120]}" for a in bad[:3])
+        fail("failure legitimacy", f"{len(bad)}/{len(attempts)} attempt(s) are NOT legitimate model failures "
+             f"({ex}). Fix the grader/harness (C2) before submitting; a false negative is not difficulty.")
+        return
+    note = ""
+    if failed_trial_count is not None and len(fails) < failed_trial_count:
+        note = (f" — but the review classified only {len(fails)} of {failed_trial_count} failed trials; "
+                "replay or read the rest (verifier/test-stdout.txt) before claiming every failure is legit")
+        warn("failure legitimacy", f"{len(fails)} FAIL_REASONING, 0 grader/infra{note}")
+    else:
+        ok("failure legitimacy", f"all {len(fails)} classified failures are FAIL_REASONING (legit model misses), "
+           f"0 grader/infra, from {len(attempts)} reviewed attempts")
+
 
 def check_ref_freshness(repo, ref):
     """Check a remote-tracking ref without updating it."""

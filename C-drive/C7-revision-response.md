@@ -220,6 +220,8 @@ RESUBMIT-PROOF <task>  base <old sha> -> <new sha>
 4 NOTHING ELSE BROKE   baseline vs after diff: 0 green->red   (paste the diff)
 5 NO NEW ISSUES        reviewer agent: <verdict, n new> · Codex re-read: <n flags> · authorship 0 · prov 0
 6 GATE                 gate.py full: PASS, stamp <hash>  (or GATE_OVERRIDE "<reason>", logged)
+6b FAILURES LEGIT      presubmit `failure legitimacy`: every failed trial is FAIL_REASONING in the agentic review's attemptResults,
+                 and any trial the review did not classify is read by hand (verifier/test-stdout.txt or jest/ctrf results)
 7 HARNESS              oracle 3/3 per step · per-step band <local/replay> · C6 PROVEN|UNPROVEN per change
 8 SERVER               after push: validationStatus, every row, balance string with every arm (B5)
 ```
