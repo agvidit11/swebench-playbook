@@ -1,6 +1,6 @@
 # lektor-output-liveness-prune
-**Owner:** devvm6971 / lane-i (Vidit 2026-10-15: "if your work is better, go with it")
-**State:** 2d4e437 pushed 2026-10-15, server validation pending. Human review: Ahmed Rayan, request changes 2026-10-13 (same-mtime rows) — addressed in ec0d1b9; needs RESUBMIT after validation passes.
+**Owner:** devvm23237 / current lane orchestrator (Vidit 2026-10-15 direct pickup)
+**State:** local e5f06fb restores a three-step cascade after 2d4e437 saturated at 1.0|0.8. Cheap revision-gate fully passed; full gate must be rerun after the host benchmark lock clears. Nothing new pushed yet.
 
 ## History
 - 2026-10-04..08 · devvm6971/lane-p · 3-step builds 6ad3a40, 83c7449 · S2/S3 too easy; parked with PROGRESS in ~/scratch/lane-p/lektor-output-liveness-prune/
@@ -15,6 +15,9 @@
 - 2026-10-15 · lane-i · 2d4e437 · kept 44a5bec hygiene, restored ec0d1b9 S2 statement byte-identical (Muse) · fast gate PASS, pushed with logged override (calibrate host contention) · server pending
 
 ## Next
-Wait for validation; if S1 and S2 both <= 3/5 -> Vidit resubmits with the reviewer note (same-mtime rows dropped, gradient on preview row). If S2 saturates again, there is no fair test-only lever left (27+27 candidates measured).
+Rerun the full gate from the exact e5f06fb tree after the lock clears. Push only with a full gate stamp, then let push-triggered validation run and resubmit with the reviewer note.
 - 2026-10-16 · lane-i · 2d4e437 server · S1 1.0 | S2 0.8 (both too easy). Step history S1 0.8,0.2,0.4,0.6,0.2,0.6,1.0 / S2 0.6,0.6,0.8,0.8 = near-ceiling variance, ~1/3 chance both in band per run. Rerun triggered (Vidit authorized).
 - 2026-10-16 · lane-i · a5e15e59 · rerun of 2d4e437 = 1|1; restored whole task dir to ec0d1b9 (last server-validated state) · pending
+- 2026-10-16 02:45 UTC · devvm23237/orchestrator · e5f06fb local · changed the saturated two-step shape to three progressive steps: output liveness, live project settings, and live project-path switching; both new protected statements written by Muse · exact patch cascade, step-2 48/48, step-3 49/49, local presubmit 0 FAIL/0 WARN
+- 2026-10-16 03:25 UTC · devvm23237/orchestrator · cheap revision-gate · presubmit/provenance/carry/forge all PASS and independent reviewer Accept · PASS
+- 2026-10-16 05:27 UTC · devvm23237/orchestrator · full revision-gate attempt · preflight timed out after waiting 5400s for `/tmp/swebench-docker.lock`; stopped before it could consume a later slot · infrastructure-only retry required
