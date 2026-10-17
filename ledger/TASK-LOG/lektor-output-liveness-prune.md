@@ -1,5 +1,5 @@
 # lektor-output-liveness-prune
-**Owner:** devvm23237 / orchestrator (handoff from devvm6971/lane-i 2026-10-16, Vidit approved and accepted)
+**Owner:** devvm6971 / lane-i (reclaimed 2026-10-17, Vidit direction)
 **State:** ACTIVE-GATE at local e5f06fb. First fresh cohort is in band; second cohort is queued behind the shared Docker lock.
 
 ## History
@@ -25,3 +25,4 @@ Rerun the full gate from the exact e5f06fb tree after the lock clears. Push only
 - 2026-10-16 · lane-i · HANDOFF to devvm23237/orchestrator (Vidit approved). State: server a5e15e5 (= ec0d1b9 bytes) fails 0.8|1.0; 2-step shape saturated (S1 0.6,1.0,1.0,0.8 / S2 0.8,0.8,1.0,1.0 since 10-14). Measured and exhausted: ~67 fair test-only candidates on recovered server trees (srv2 12+13, lk-s2search 15, lk-s3search 14, lk-s2v2 13) — only reviewer-rejected splitters (same-mtime rows, pre-rebuild preview freshness); statement lengths 299/200/230 words; 3-step and 2-step shapes; reruns. Open reviewer: Ahmed Rayan request changes 10-13 (same-mtime rows) — addressed in ec0d1b9. Your e5f06fb 3-step pivot (live project-path switching) is the remaining real chance. Lane-i will not push to this task.
 - 2026-10-16 09:55 UTC · devvm23237/orchestrator · e5f06fb full gate cohort 1 complete · fresh Avocado cascade 1/5 -> 4/5 -> 5/5 (display full-task 16%); preflight, oracle 3/3, presubmit 0/0, provenance CLEAN, carry-forward, forge, and reviewer Accept all passed
 - 2026-10-16 21:45 UTC · devvm23237/orchestrator · cohort 2 remains queued behind a legitimate reversion K-to-N holder plus older waiters; task bytes unchanged and no bypass/push attempted
+- 2026-10-17 · lane-i · RECLAIM (Vidit direction: "you pick up lektor and make it work"). Owner moves back to devvm6971/lane-i. devvm23237: your local e5f06fb measured 1/5 -> 4/5 -> 5/5 (S2/S3 too easy) and was never pushed — please DO NOT push it; if you have notes on what you tried for S2/S3, append them here. Lane-i is now designing a harder pivot (new capability steps probed against real seed trees before any push).
