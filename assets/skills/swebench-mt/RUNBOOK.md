@@ -123,7 +123,12 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    pivot, replay, or archive decision. Never begin proper work from stale local
    state, an old report, or remembered calibration numbers.
 1. **End of phase 1** — no measured 1-3/5 split, no build.
-2. **Before push** — `revision-gate/gate.py <task>` must pass (it runs `preflight.sh --with-oracle` plus presubmit, provenance, step carry-forward, fake-pass probes, the reviewer agent and k2n x2). PROVISIONAL until `ledger/VERIFY-revision-gate.md` has 3 sign-offs; see the playbook's `tools/revision-gate/README.md`.
+2. **Before push** — README check first (Vidit 2026-10-16; presubmit FAILs on it): the README has
+   **no internal links** (internalmeta.com, workplace.com, fburl.com, internalfb.com), and its
+   **Completion Rates / Model Analysis describe the commit being pushed** — no stale "0/5 / not reached /
+   not calibrated / RELEASE / WAITING / out of band" text left by a calibration loop. commonmark d711592
+   shipped a stale 4/5|0/5|not-reached table; a bounce for this costs a revision round. Then
+   `revision-gate/gate.py <task>` must pass (it runs `preflight.sh --with-oracle` plus presubmit, provenance, step carry-forward, fake-pass probes, the reviewer agent and k2n x2). PROVISIONAL until `ledger/VERIFY-revision-gate.md` has 3 sign-offs; see the playbook's `tools/revision-gate/README.md`.
 3. **After the verdict** — is the number real? `references/signal-integrity.md`
    before touching anything.
 4. **Before submit** — human review, preceded by a **deep-review pass**.
