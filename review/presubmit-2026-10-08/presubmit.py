@@ -198,9 +198,22 @@ def check_readme(task_dir, cfgs):
     internal = re.findall(r"(internalmeta\.com|internalfb\.com|workplace\.com|fburl\.com|"
                           r"fb\.workplace|our\.internmc)", text)
     if internal:
-        warn("README internal URLs", f"internal links in README: {sorted(set(internal))}")
+        fail("README internal URLs", f"internal links in README: {sorted(set(internal))} -- remove them. "
+             f"Intentionally FAIL (Vidit 2026-10-16): trivial to fix, and a reviewer bounce for it costs a revision round")
     else:
         ok("README internal URLs", "none")
+    # Stale status text left by calibration loops ("not reached", "not calibrated", "RELEASE", ...) contradicts
+    # the submitted bundle; commonmark d711592 shipped a 4/5,0/5,not-reached table and a "not calibrated" sentence.
+    status = re.findall(r"(?i)(not calibrat\w*|not (?:yet )?ready to (?:push|submit)|DO NOT PUSH|WAITING-[A-Z-]+|"
+                        r"out of (?:the )?band|outside the (?:required )?band)", text)
+    status += re.findall(r"\b(RELEASE|NOT READY)\b", text)   # upper-case worker verdict words only
+    if status:
+        fail("README status freshness", f"stale/negative calibration status text: {sorted(set(status))} -- "
+             f"rewrite Completion Rates / Model Analysis from the numbers for THIS commit")
+    else:
+        ok("README status freshness", "no 'not calibrated' / RELEASE / WAITING text")
+    if re.search(r"(?i)not reached", text):
+        warn("README status freshness", "'not reached' in README -- confirm the Completion Rates table reflects THIS commit")
     # graded-count claims vs config (single-turn / task-level only; MT counts vary per step)
     if cfgs and cfgs[0][0] == "task" and len(cfgs) == 1:
         c = json.loads(SRC.read(cfgs[0][1]))
