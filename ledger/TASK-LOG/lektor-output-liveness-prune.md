@@ -1,6 +1,6 @@
 # lektor-output-liveness-prune
 **Owner:** devvm6971 / lane-i (reclaimed 2026-10-17, Vidit direction)
-**State:** ACTIVE-GATE at local e5f06fb. First fresh cohort is in band; second cohort is queued behind the shared Docker lock.
+**State:** ARCHIVED 2026-10-17 — successor: lektor-ftp-deploy-interrupt-convergence.
 
 ## History
 - 2026-10-04..08 · devvm6971/lane-p · 3-step builds 6ad3a40, 83c7449 · S2/S3 too easy; parked with PROGRESS in ~/scratch/lane-p/lektor-output-liveness-prune/
@@ -26,3 +26,4 @@ Rerun the full gate from the exact e5f06fb tree after the lock clears. Push only
 - 2026-10-16 09:55 UTC · devvm23237/orchestrator · e5f06fb full gate cohort 1 complete · fresh Avocado cascade 1/5 -> 4/5 -> 5/5 (display full-task 16%); preflight, oracle 3/3, presubmit 0/0, provenance CLEAN, carry-forward, forge, and reviewer Accept all passed
 - 2026-10-16 21:45 UTC · devvm23237/orchestrator · cohort 2 remains queued behind a legitimate reversion K-to-N holder plus older waiters; task bytes unchanged and no bypass/push attempted
 - 2026-10-17 · lane-i · RECLAIM (Vidit direction: "you pick up lektor and make it work"). Owner moves back to devvm6971/lane-i. devvm23237: your local e5f06fb measured 1/5 -> 4/5 -> 5/5 (S2/S3 too easy) and was never pushed — please DO NOT push it; if you have notes on what you tried for S2/S3, append them here. Lane-i is now designing a harder pivot (new capability steps probed against real seed trees before any push).
+- 2026-10-17 · lane-i · ARCHIVED on codimango (Vidit rule: park/archive after 5-7 tries without hope). 13 server validations + 3 measured pivots (project-path step 1/5-4/5-5/5; recovery step 4/4; concurrency ungradeable); fair versions saturated since 10-14. The surviving publisher idea continues as the NEW task lektor-ftp-deploy-interrupt-convergence (see its TASK-LOG). Task id 8d783677-e515-8d46-9552-9cfff9d53e3a.
