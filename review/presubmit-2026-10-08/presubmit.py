@@ -393,7 +393,17 @@ def check_server(name, task_dir):
     sha = str(t.get("commitSha") or "")
     vsha = str(t.get("validationCommitSha") or "")
     local = SRC.last_commit() if SRC is not None else None
-    if local and len(local) == 40 and sha and local != sha:
+    readme_only = False
+    if local and len(local) == 40 and sha and local != sha and SRC is not None:
+        # Vidit 2026-10-18: a README-only push after validation is expected (README refreshed
+        # with server numbers); it needs no rerun, so it must not FAIL freshness.
+        changed = SRC._git("diff", "--name-only", sha, local, "--", SRC.task)
+        if changed is not None:
+            files = [f for f in changed.splitlines() if f.strip()]
+            readme_only = bool(files) and all(f == f"{SRC.task}/README.md" for f in files)
+    if readme_only:
+        ok("server freshness", f"server at {sha[:8]}; only README.md changed since (at {local[:8]}) — expected, no rerun needed")
+    elif local and len(local) == 40 and sha and local != sha:
         fail("server freshness", f"server task is at {sha[:8]} but origin/main last touched this task at "
              f"{local[:8]} — stale import: run `codimango task rerun {name}` (free)")
     elif vsha and sha and vsha != sha:
