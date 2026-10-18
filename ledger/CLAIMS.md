@@ -333,3 +333,4 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 | devvm23237 | A1(G8-G10)+A2-A3 on taglib/taglib | taglib/taglib | finish screen, then MT/ST idea gen -> gate (LGPL-2.1/MPL-1.1 eligible; avoid APE-format seam peer) | P | SCREENING | 2026-10-18 | Claude session 8994aeb2 agent seed-oidc (reassigned). A1 evidence a1-cpp.md |
 
 | devvm23237 | A1(G10)+A2-A3 on igniterealtime/Smack | igniterealtime/Smack | finish G10 timing, then MT/ST idea gen -> gate (Apache-2.0; JIRA tracker discloses some gaps: check G4/public-fix per card) | P | SCREENING | 2026-10-18 | Claude session 8994aeb2 agent seed-ldaptive (reassigned). A1 evidence a1-jvm.md |
+| devvm23237 | wiremock-net-mapping-model-reconciliation (MT3) | wiremock/WireMock.Net | mapping-model reconciliation (C#) | B | BUILDING (build-wiremock, lane-pb) | 2026-10-18 | seeds107 Muse n=3: S2 1/3, S3 1/3 two roots each; metacode K-to-N decides |
