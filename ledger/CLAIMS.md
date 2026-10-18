@@ -338,3 +338,4 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 | devvm23237 | A1(G10)+A2-A3 on grpc/grpc-node | grpc/grpc-node | finish G10 (build proto-loader before grpc-js), then MT/ST idea gen -> gate | P | SCREENING | 2026-10-18 | Claude session 8994aeb2 agent seed-oidc (reassigned). A1 evidence a1-ts.md |
 
 | devvm23237 | A1(full)+A2-A3 on tink-crypto/tink-java | tink-crypto/tink-java | finish A1 G1-G10, then MT/ST idea gen -> gate (Muse-only if Codex refuses crypto) | P | SCREENING | 2026-10-18 | Claude session 8994aeb2 agent seed-libevent (reassigned). |
+| devvm6971 | django-codemod-rename-name-fidelity | browniebroke/django-codemod | MT3 deprecation codemod name fidelity | P | RELEASED | 2026-10-18 | KILL: last step 2 native mechanisms (needs 3), one tree solves all; flynt (AI Rust rewrite), unimport (Claude), pycln (stale), absolufy (archived) killed at gates. Two-Django differential harness reusable |
