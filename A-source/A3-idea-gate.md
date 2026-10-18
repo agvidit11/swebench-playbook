@@ -1,5 +1,10 @@
 # A3 — IDEA GATE
 
+> **ACCEPTABLE BAND (Vidit 2026-10-17): 0–3/5 on avocado is acceptable; 1–3/5 is preferred.** A step at 0/5 passes the
+> server gate only when another model (gpt/opus) shows a pass AND a fail on that step ("carried by a third-party gradient"),
+> and every 0/5 failure must be a genuine model miss (presubmit `failure legitimacy`), with at least one valid
+> implementation proving the step solvable. Aim for 1–3/5; take a measured 0/5 rather than discard a fair card.
+
 > **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
 
 | | |
