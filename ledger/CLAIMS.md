@@ -319,3 +319,5 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 | devvm23237 | openspout-transactional-sheet-replacement (MT3) | openspout/openspout | transactional sheet replacement (PHP) | B | BUILDING (build-openspout, lane-pb) | 2026-10-17 | seedfix-openspout n=5: S1 5/5, S2 2/5, S3 1/5 |
 
 | devvm23237 | A2-A3 on apache/arrow-js | apache/arrow-js | MT idea gen -> corpus prior -> gate (graded tests need fixed fixtures; random test data) | P | IDEATING | 2026-10-18 | Claude session 8994aeb2 agent seed-oidc (reassigned). A1 evidence a1-ts.md |
+| devvm23237 | single-turn fast lane on panva/node-oidc-provider parked defects | panva/node-oidc-provider | ST: probe parked single-turn defects (seed-oidc kill-ledger) -> build best survivor | P/B | PROBING | 2026-10-18 | Claude session 8994aeb2 agent st-oidc. Vidit 2026-10-17: aim 1-2 tasks ready by morning; 0-3/5 acceptable. |
+| devvm23237 | A2-A3 on vt-middleware/ldaptive | vt-middleware/ldaptive | MT idea gen -> corpus prior -> gate (Apache-2.0 arm of dual licence; span packages) | P | IDEATING | 2026-10-18 | Claude session 8994aeb2 agent seed-ldaptive. A1 evidence a1-jvm.md |
