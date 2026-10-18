@@ -327,7 +327,7 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 
 | devvm23237 | A2-A3 on openpgpjs/openpgpjs | openpgpjs/openpgpjs | MT idea gen -> corpus prior -> gate (LGPL-3.0, eligible per all playbook licence sources); single-turn survivor acceptable | P | EXHAUSTED (2 rounds NO SURVIVOR: C1 Key.update order 4/5; r2 0 cards) | 2026-10-18 | Claude session 8994aeb2 agent seed-oidc (reassigned). Avoid signature-packet parsing (Go-port peer). |
 
-| devvm23237 | A2-A3 on PeculiarVentures/PKI.js | PeculiarVentures/PKI.js | MT idea gen -> corpus prior -> gate; single-turn survivor acceptable | P | IDEATING | 2026-10-18 | Claude session 8994aeb2 agent seed-libevent (reassigned). BSD-3; 1.4k stars accepted by Vidit 10-17. |
+| devvm23237 | A2-A3 on PeculiarVentures/PKI.js | PeculiarVentures/PKI.js | MT idea gen -> corpus prior -> gate; single-turn survivor acceptable | P | ROUND2 (r1 NO SURVIVOR: PSS 5/5, path-len 5/5, CMS attrs disclosed #402; Codex refuses repo) | 2026-10-18 | Claude session 8994aeb2 agent seed-libevent (reassigned). BSD-3; 1.4k stars accepted by Vidit 10-17. |
 | devvm6971 | djmoney-value-layer (MT3) | django-money/django-money | lane A pick 3 (pre-staged design gate while modeltranslation re-screens): Money<->amount/currency column value layer across descriptor/query/serializer paths | b0 laneA | PROBING | 2026-10-18 | agvidit-b0 lane A. Base b255e27, BSD, AI 0/25, llc 0 hits, org hits are apps only. Kit ~/swebench/st-lane/laneA/dm |
 
 | devvm23237 | A1(G8-G10)+A2-A3 on taglib/taglib | taglib/taglib | finish screen, then MT/ST idea gen -> gate (LGPL-2.1/MPL-1.1 eligible; avoid APE-format seam peer) | P | SCREENING | 2026-10-18 | Claude session 8994aeb2 agent seed-oidc (reassigned). A1 evidence a1-cpp.md |
