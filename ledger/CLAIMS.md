@@ -360,3 +360,4 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 
 | devvm23237 | A2-A3 on oguimbal/pg-mem | oguimbal/pg-mem | MT/ST idea gen -> gate (casts/overloads, NULL semantics, txn rollback visibility) | P | IDEATING | 2026-10-19 | Claude session 8994aeb2 agent seed-pgmem. A1 evidence sourcing-20261019/a1r2-ts.md |
 | devvm23237 | A2-A3 on bufbuild/protobuf-es | bufbuild/protobuf-es | MT/ST idea gen -> gate (registry Any/extensions, editions inheritance, text format; avoid schema-evolution + WKT JSON peers) | P | IDEATING | 2026-10-19 | Claude session 8994aeb2 agent seed-protoes. A1 evidence a1r2-ts.md |
+| devvm23237 | A2-A3 on taozhi8833998/node-sql-parser | taozhi8833998/node-sql-parser | MT/ST idea gen -> gate (per-dialect precedence/ambiguity, AST->SQL round-trip) | P | IDEATING | 2026-10-19 | Claude session 8994aeb2 agent seed-sqlparser. A1 evidence a1r2-ts.md |
