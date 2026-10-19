@@ -1,6 +1,6 @@
 # lektor-ftp-deploy-interrupt-convergence
 **Owner:** devvm6971 / lane-i
-**State:** READY TO SUBMIT 2026-10-18 — validation passing at 8724188, presubmit 0 FAIL.
+**State:** revalidating after reviewer runner fix (2026-10-19).
 
 ## History
 - 2026-10-17 · lane-i · design+probe in ~/scratch/lane-i/lk-pivot (PIVOT-REPORT.md §5-§9): recovery capability 4/4 (too easy); publisher capability: blind statement + real pyftpdlib probe -> 0/4 genuine passes, hardened reference ref-ftp-v2 passes all, trivial delete-all-not-live passes. Upstream check: FtpConnection.delete_file bytes bug present on master; #555 fixed login/upload only; no issue/PR on interrupted-deploy convergence.
@@ -11,3 +11,4 @@
 - 2026-10-18 · lane-i · 1bd7e23 rerun (unneeded per Vidit; README-only) · avocado 1/5, agentic BAD_GRADING_WEAK R06/R07/R12: listing-only solutions not graded on pre-corrupted remotes; golden also missed it
 - 2026-10-18 · lane-i · a733975 pushed · S4/S5 corrupted-remote scenarios, golden enumerates remote; replay gpt 5/5 6/6, avocado 51838564 6/6, new failures genuine (extra stale file); oracle 3/3; gate fast PASS · validation pending
 - 2026-10-18 · lane-i · 8724188 server PASSING (avocado 1/5, agentic GOOD genuinely hard, AI Accept); b33ff5e README-only refresh (no rerun); presubmit 0 FAIL / 2 WARN (only-avocado-solved at this commit — gpt 5/5 by replay documented; ref freshness) — READY TO SUBMIT (Vidit to click)
+- 2026-10-19 · lane-i · 4bc958b6 pushed · external review: p2p suite pytest ran as root importing agent code (could forge hidden results) + run-on sentence. Fixed: suites run as ftpprobe with own scratch, hidden JUnit frozen+hashed before agent code reruns; 13 forges 0; replay unchanged; instruction split (Muse) · validation pending
