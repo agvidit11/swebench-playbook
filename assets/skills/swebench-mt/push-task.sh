@@ -2,6 +2,7 @@
 # push-task.sh — commit and push ONE task without touching anything else.
 #
 #   ./push-task.sh <task-dir> [--dry-run]
+#   PUSH_MODE=documentation-only ./push-task.sh <task-dir> [--dry-run]
 #
 # The shared repo routinely holds dozens of unrelated uncommitted files: other
 # agents' in-progress task dirs, another session's remediation, old sweeps. A
@@ -14,6 +15,9 @@ set -uo pipefail
 REPO="${REPO:-$HOME/swe-bench-pro-agvidit}"
 T="${1:?usage: push-task.sh <task-dir> [--dry-run]}"; T="${T%/}"
 DRY=""; [ "${2:-}" = "--dry-run" ] && DRY=1
+MODE="${PUSH_MODE:-full}"
+[ "$MODE" = "full" ] || [ "$MODE" = "documentation-only" ] || {
+  echo "invalid PUSH_MODE=$MODE (expected full or documentation-only)"; exit 2; }
 cd "$REPO" || exit 2
 [ -d "$T" ] || { echo "no such task dir: $T"; exit 2; }
 
@@ -24,7 +28,10 @@ echo "== 0. revision-gate stamp (precheck, Vidit 2026-10-13)"
 # PROVISIONAL until 3 independent agents verify the gate (ledger/VERIFY-revision-gate.md):
 # while provisional, GATE_OVERRIDE="<reason>" pushes without a stamp and logs the reason.
 GATE=~/swebench/revision-gate/gate.py   # installed by ~/swebench-playbook/tools/revision-gate/install-hook.sh
-if [ -f "$GATE" ] && python3 "$GATE" "$T" --repo "$REPO" --check-stamp; then :
+if [ "$MODE" = "documentation-only" ] && [ -f "$GATE" ]; then
+  python3 "$GATE" "$T" --repo "$REPO" --documentation-only || exit 1
+  python3 "$GATE" "$T" --repo "$REPO" --check-stamp || exit 1
+elif [ -f "$GATE" ] && python3 "$GATE" "$T" --repo "$REPO" --check-stamp; then :
 elif [ -n "${GATE_OVERRIDE:-}" ]; then
   mkdir -p ~/swebench/gate-stamps
   printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$(hostname -s)" "$T" "-" "$GATE_OVERRIDE" >> ~/swebench/gate-stamps/overrides.log  # same 5 fields as the hook; no commit yet
@@ -36,17 +43,21 @@ else
   exit 1
 fi
 
-echo; echo "== 1. preflight (must exit 0)"
+echo; echo "== 1. preflight"
 # Take the Docker mutex. Without it this oracle run races any other container
 # work on the host: measured 2026-09-23, a concurrent oracle turned a stable
 # 3/3 into 2/3, which reads as a golden defect (R13) and is really contention.
 # Re-entrancy: a caller may ALREADY hold the docker mutex. Taking it again here
 # deadlocks -- measured 2026-09-24, a push wrapped in flock hung at this line until
 # its timeout and silently pushed nothing. Acquire only if we are the outermost.
-if [ -n "${SWEBENCH_DOCKER_LOCK_HELD:-}" ]; then PF_LOCK=""; else
-  PF_LOCK="flock /tmp/swebench-docker.lock"; export SWEBENCH_DOCKER_LOCK_HELD=1; fi
-$PF_LOCK bash ~/.claude/skills/swebench-mt/preflight.sh "$T" --with-oracle || {
-  echo "PREFLIGHT FAILED — not pushing."; exit 1; }
+if [ "$MODE" = "documentation-only" ]; then
+  echo "  SKIP Docker/oracle: documentation-only gate reused the exact green server revision."
+else
+  if [ -n "${SWEBENCH_DOCKER_LOCK_HELD:-}" ]; then PF_LOCK=""; else
+    PF_LOCK="flock /tmp/swebench-docker.lock"; export SWEBENCH_DOCKER_LOCK_HELD=1; fi
+  $PF_LOCK bash ~/.claude/skills/swebench-mt/preflight.sh "$T" --with-oracle || {
+    echo "PREFLIGHT FAILED — not pushing."; exit 1; }
+fi
 
 echo; echo "== 2. isolate the index"
 # A PRIVATE index. The checkout is shared with other live sessions -- on 2026-09-23
@@ -90,6 +101,14 @@ if [ -n "$OUTSIDE" ]; then
   echo; echo "ABORT: files staged OUTSIDE $T/:"; echo "$OUTSIDE" | sed 's/^/     /'
   git reset -q; exit 1
 fi
+[ "$MODE" != "documentation-only" ] || {
+  DOC_OUTSIDE=$(echo "$STAGED" | grep -Ev "^$T/(README\.md|audit/)" || true)
+  if [ -n "$DOC_OUTSIDE" ]; then
+    echo; echo "ABORT: documentation-only push contains graded or agent-visible files:"
+    echo "$DOC_OUTSIDE" | sed 's/^/     /'
+    git reset -q; exit 1
+  fi
+}
 [ -z "$STAGED" ] && { echo "ABORT: nothing staged"; exit 1; }
 echo "     ($(echo "$STAGED" | wc -l) files, all inside $T/)"
 
@@ -109,4 +128,8 @@ git push ssh://git@github.com:22/codimango/swe-bench-pro-agvidit.git HEAD:main |
 unset GIT_INDEX_FILE
 git reset -q
 echo; echo "pushed. verify with:  codimango task errors $T"
+if [ "$MODE" = "documentation-only" ]; then
+  echo "documentation-only push: do not manually rerun validation. Verify Nest advanced the head,"
+  echo "retained the green validation SHA, and created no job for this commit; report any unexpected new run."
+fi
 echo "shared index left clean: $(git diff --cached --name-only | wc -l) staged"

@@ -6,6 +6,7 @@ One command before ANY push of a SWE-bench task, first push or revision:
 cd ~/swe-bench-pro-agvidit
 python3 ~/swebench/revision-gate/gate.py <task>          # full run, issues the push stamp
 python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iterating
+python3 ~/swebench/revision-gate/gate.py <task> --documentation-only
 ```
 
 **PROVISIONAL (2026-10-13).** Not yet verified by 3 independent agents. See
@@ -20,6 +21,28 @@ python3 ~/swebench/revision-gate/gate.py <task> --fast   # stages 1-5 while iter
 | 5 | forge | grader pays reward 1 with no solution (planted conftest/pytest.ini/plugins, runner wrappers) |
 | 6 | review | the reviewer's own agent (`review-task-swebench-v2`); fix every finding (R-026) |
 | 7 | calibrate | `bench run --k2n` once, and only when difficulty can have moved; every step 1-3/5 (one non-final 5/5 allowed when the task has 3+ steps, as on the server); waits for the one-per-host bench slot |
+
+## Documentation-only pushes
+
+Use `--documentation-only` only when every task change since the exact
+server-validated commit is under `<task>/README.md` or `<task>/audit/`. It
+refuses any graded or agent-visible change; re-reads task status, reviews and
+comments; requires validation passing, TBR pass, oracle 3/3 and all six
+displayed validation gates passing; checks README headings, SHA and per-step
+rates against server truth; requires `OPEN count: 0` in the review ledger when
+revision was requested; and runs mechanical presubmit. It does not run Docker,
+oracle, carry/forge, reviewer AI or calibration because those inputs are
+byte-identical to the validated commit.
+
+```bash
+PUSH_MODE=documentation-only ~/.claude/skills/swebench-mt/push-task.sh <task>
+```
+
+This prevents redundant local compute. Nest now also content-skips this exact
+case: Dogpile `c32ce74f` advanced the head while retaining green validation at
+`697b4ddc`, with no job for the README commit. Never manually rerun after a
+documentation-only push. Verify the new head, retained validation SHA and
+absence of a new job; if a run nevertheless appears, monitor and report it.
 
 - Writes nothing inside the task directory. Logs go to `/tmp/revision-gate/`, stamps to `~/swebench/gate-stamps/`.
 - `push-task.sh` refuses to push without a clean full-run stamp for the exact task files.

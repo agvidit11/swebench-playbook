@@ -14,10 +14,15 @@ Stages (cheapest first; each prints PASS / FAIL / WARN / SKIP / BLOCKED):
   7 calibrate     codimango bench run --k2n, once             every step 1-3/5; skipped when nothing that moves
                                                               difficulty changed since the server-validated commit
 
+Documentation-only mode (README.md and audit/** only):
+  D1 server-evidence  exact validated commit; all server gates green; review ledger closed
+  D2 presubmit        README sections/counts and all mechanical checks
+
 Usage:
   gate.py <task> [--repo DIR] [--fast] [--only s1,s2] [--skip s1,s2] [--k2n-agent metacode]
           [--accept-uncovered "<what you checked by hand>"]   when no forge applies to a step's language
           [--calibrate-runs N]   force N local k2n runs (default: 1 run, and only if difficulty can have moved)
+  gate.py <task> --documentation-only [--repo DIR]           reuse server evidence; never run Docker/k2n
   gate.py --version                                           build id (also printed and stamped)
     --fast   stages 1-5 only (minutes). A push stamp is only issued for a full run.
 Exit: 0 all clear, 1 a FAIL, 2 usage/infra, 4 BLOCKED (e.g. another bench owns the host).
@@ -48,6 +53,7 @@ def gate_version():
 
 ORDER = ["preflight", "presubmit", "provenance", "carry", "forge", "review", "calibrate"]
 FAST = ORDER[:5]
+DOC_ORDER = ["server-evidence", "presubmit"]
 
 
 def task_hash(task_dir, at=None):
@@ -96,6 +102,34 @@ def run(cmd, log, cwd=None, timeout=None):
             f.write("\nTIMEOUT\n")
             rc = 124
     return rc, open(log).read()
+
+
+def git_output(repo, *args):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+
+
+def changed_task_paths(repo, task, validated_sha):
+    """Return task-relative paths changed from the validated commit, including untracked files."""
+    tracked = git_output(repo, "diff", "--name-only", validated_sha, "--", task + "/")
+    if tracked.returncode != 0:
+        raise RuntimeError(tracked.stderr.strip() or f"cannot diff validated commit {validated_sha}")
+    untracked = git_output(repo, "ls-files", "--others", "--exclude-standard", "--", task + "/")
+    prefix = task + "/"
+    names = set(tracked.stdout.splitlines()) | set(untracked.stdout.splitlines())
+    return sorted(n[len(prefix):] for n in names if n.startswith(prefix))
+
+
+def codimango_json(ctx, subcommand, log_name):
+    cmd = ["codimango", "task", subcommand, ctx["task"], "--json"]
+    p = subprocess.run(cmd, cwd=ctx["repo"], capture_output=True, text=True, timeout=120)
+    with open(ctx["log"](log_name), "w") as f:
+        f.write("$ " + " ".join(cmd) + "\n")
+        if p.stderr:
+            f.write(p.stderr + "\n")
+        f.write(p.stdout)
+    if p.returncode != 0:
+        raise RuntimeError(f"{' '.join(cmd)} failed ({p.returncode}): {p.stderr.strip()}")
+    return json.loads(p.stdout)
 
 
 def tail(text, n=6):
@@ -157,6 +191,84 @@ def st_preflight(ctx):
     rc, out = run(docker_lock([os.path.join(SKILL, "preflight.sh"), ctx["task"], "--with-oracle"]), ctx["log"]("preflight"),
                   cwd=ctx["repo"], timeout=5400)
     return ("PASS" if rc == 0 else "FAIL"), ("preflight exit 0, oracle 3/3" if rc == 0 else tail(out))
+
+
+def st_server_evidence(ctx):
+    """Reuse authoritative server evidence only when every non-document task byte is unchanged."""
+    task = codimango_json(ctx, "show", "server-task")
+    reviews = codimango_json(ctx, "reviews", "server-reviews")
+    comments = codimango_json(ctx, "comments", "server-comments")
+    sha = task.get("validationCommitSha")
+    if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+        return "BLOCKED", f"server has no full validationCommitSha: {sha!r}"
+    exists = git_output(ctx["repo"], "cat-file", "-e", sha + "^{commit}")
+    if exists.returncode != 0:
+        return "BLOCKED", f"validated commit {sha} is not in the local clone; fetch it and retry"
+
+    changed = changed_task_paths(ctx["repo"], ctx["task"], sha)
+    disallowed = [p for p in changed if p != "README.md" and not p.startswith("audit/")]
+    if not changed:
+        return "FAIL", "no documentation change relative to the server-validated commit"
+    if disallowed:
+        return "FAIL", "documentation-only mode refused non-document changes:\n" + \
+            "\n".join("      " + p for p in disallowed)
+
+    details = task.get("validationDetails") or []
+    bad_details = [d for d in details if d.get("status") != "passed"]
+    required_labels = {
+        "Structural checks", "Oracle validation", "Metacode or Opus pass/fail balance",
+        "Agentic trial-output review", "Contamination check", "Provenance check",
+    }
+    missing = sorted(required_labels - {d.get("label") for d in details})
+    problems = []
+    if task.get("validationStatus") != "passing":
+        problems.append(f"validationStatus={task.get('validationStatus')!r}")
+    if task.get("tbdReviewStatus") != "pass":
+        problems.append(f"tbdReviewStatus={task.get('tbdReviewStatus')!r}")
+    if task.get("oraclePassCount") != 3 or task.get("oracleTotalCount") != 3:
+        problems.append(f"oracle={task.get('oraclePassCount')}/{task.get('oracleTotalCount')}")
+    if bad_details:
+        problems.extend(f"{d.get('label')}: {d.get('status')}" for d in bad_details)
+    if missing:
+        problems.append("missing server gates: " + ", ".join(missing))
+    if problems:
+        return "FAIL", "server evidence is not reusable:\n" + "\n".join("      " + p for p in problems)
+
+    readme_path = os.path.join(ctx["dir"], "README.md")
+    readme = open(readme_path, errors="replace").read() if os.path.exists(readme_path) else ""
+    headings = ["# Description", "# Completion Rates", "# Model Analysis", "# Anti-Cheating Analysis"]
+    readme_problems = [f"README missing {h}" for h in headings if h not in readme]
+    if sha[:7] not in readme and sha[:8] not in readme:
+        readme_problems.append(f"README does not name validated commit {sha[:8]}")
+    if not re.search(r"Oracle:\s*3/3", readme, re.I):
+        readme_problems.append("README does not record Oracle: 3/3")
+
+    balance = next((d.get("detail", "") for d in details if d.get("label") == "Metacode or Opus pass/fail balance"), "")
+    rates = re.search(r"avocado\s*\[[^]]+\]\s*([0-9.]+)\|([0-9.]+)\|([0-9.]+)", balance, re.I)
+    step_dirs = sorted(glob.glob(os.path.join(ctx["dir"], "steps", "*")))
+    if rates and len(step_dirs) == 3:
+        expected = [int(round(float(x) * 5)) for x in rates.groups()]
+        for step_dir, passed in zip(step_dirs, expected):
+            step = os.path.basename(step_dir)
+            if not re.search(rf"`?{re.escape(step)}`?\s*:\s*{passed}/5", readme):
+                readme_problems.append(f"README does not record current {step}: {passed}/5")
+    else:
+        readme_problems.append("could not derive the three current Avocado rates from server evidence")
+    if readme_problems:
+        return "FAIL", "README/server mismatch:\n" + "\n".join("      " + p for p in readme_problems)
+
+    review_decisions = [r.get("decision") for r in reviews.get("reviews", []) if r.get("decision")]
+    if task.get("reviewStatus") == "needs_revision" or "revision" in review_decisions:
+        ledger_path = os.path.join(ctx["dir"], "audit", "REVIEW-LEDGER.md")
+        ledger = open(ledger_path, errors="replace").read() if os.path.exists(ledger_path) else ""
+        if "OPEN count: 0" not in ledger:
+            return "FAIL", "task needs revision, but audit/REVIEW-LEDGER.md does not state OPEN count: 0"
+        if re.search(r"\|\s*OPEN\s*\|", ledger, re.I):
+            return "FAIL", "audit/REVIEW-LEDGER.md still contains an OPEN finding"
+
+    return "PASS", (f"reused {sha[:8]}: validation passing, oracle 3/3, all {len(details)} server gates passed; "
+                    f"{len(reviews.get('reviews', []))} review(s), {len(comments.get('comments', []))} comment(s), "
+                    f"documentation diff only ({', '.join(changed)})")
 
 
 def st_presubmit(ctx):
@@ -333,7 +445,7 @@ def st_calibrate(ctx):
     return "FAIL", head + msg + "\n      target: 1-3 passes of 5 on every step in every run (one non-final 5/5 allowed when the task has 3+ steps)"
 
 
-STAGES = {"preflight": st_preflight, "presubmit": st_presubmit, "provenance": st_provenance, "carry": st_carry,
+STAGES = {"server-evidence": st_server_evidence, "preflight": st_preflight, "presubmit": st_presubmit, "provenance": st_provenance, "carry": st_carry,
           "forge": st_forge, "review": st_review, "calibrate": st_calibrate}
 
 
@@ -361,7 +473,8 @@ def main():
                f"last gate verdict was {s['verdict']}" if s["verdict"] != "PASS" else "")
         print(f"gate stamp OK ({s['utc']})" if not why else f"gate stamp missing: {why}")
         sys.exit(0 if not why else 1)
-    stages = FAST if "--fast" in a else ORDER
+    documentation_only = "--documentation-only" in a
+    stages = DOC_ORDER if documentation_only else FAST if "--fast" in a else ORDER
     if opt("--only"):
         stages = [s for s in ORDER if s in opt("--only").split(",")]
     if opt("--skip"):
@@ -389,10 +502,12 @@ def main():
         results["integrity"] = "FAIL"
     levels = set(results.values())
     verdict = "FAIL" if "FAIL" in levels else "BLOCKED" if "BLOCKED" in levels else "PASS"
-    full = all(s in results for s in ORDER)  # every stage ran (pass or fail): this run decides the push stamp
+    required = DOC_ORDER if documentation_only else ORDER
+    full = all(s in results for s in required)  # every required stage ran: this run decides the push stamp
     os.makedirs(STAMPS, exist_ok=True)
     stamp = {"task": task, "hash": after, "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "build": gate_version(), "accepted_uncovered": opt("--accept-uncovered"),
+             "mode": "documentation-only" if documentation_only else "full",
              "results": results, "verdict": verdict, "full_run": full, "provisional": True, "logs": logdir}
     # Only a full run writes <task>.json (the push stamp); partial runs go to <task>.partial.json so a
     # quick diagnostic never revokes a valid push stamp for unchanged files.
