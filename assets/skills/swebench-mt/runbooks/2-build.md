@@ -697,19 +697,6 @@ task pass.
         environment/Dockerfile steps/*/solution/solve.sh
       ```
 
-### README (presubmit FAILs — check before every push)
-
-- [ ] No internal links anywhere in README (internalmeta.com, workplace.com,
-      fburl.com, internalfb.com) — presubmit `README internal URLs` is a FAIL.
-- [ ] Completion Rates and Model Analysis are rewritten from the numbers for
-      THIS commit (latest server validation or the final local K-to-N on the
-      frozen bundle); say which measurement each row is. No leftover
-      "not reached / not calibrated / RELEASE / WAITING-… / out of band" text —
-      presubmit `README status freshness` is a FAIL ("not reached" WARNs).
-- [ ] After any calibration round that changes tests or instructions, the README
-      is updated in the same push (Codex edits it; Claude reads it against the
-      numbers).
-
 ### Provenance
 
 Authorship follows RUNBOOK.md → "Who writes what" (the single source of truth).

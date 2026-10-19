@@ -93,6 +93,7 @@ def graded_symbols(task, only=None):
     test_patch is readable yet, which means the pairing cannot be judged.
     """
     syms, locally_defined, saw_patch = set(), set(), False
+    test_defined = set()
     pinned_extra = set()   # reflection / interface-assertion pins; survive selector + local stripping
     for c in (only or configs(task)):
         if not os.path.exists(c):
@@ -114,6 +115,19 @@ def graded_symbols(task, only=None):
             added = "\n".join(l[1:] for l in body.splitlines()
                               if l.startswith("+") and not l.startswith("+++"))
             code = code_only(added)
+            # Collect unambiguously test-local Go declarations up front. Keep
+            # this independent from the language-specific filtering below so
+            # broad pinning fallbacks cannot reclassify a helper function or a
+            # short-declared channel variable as production API.
+            test_defined |= set(re.findall(
+                r'(?m)^\s*func\s+(?:\([^)]*\)\s*)?(\w+)', added
+            ))
+            for lhs in re.findall(
+                r'(?:^\s*|\b(?:for|if|switch)\s+)([\w,\s]+?)\s*:=',
+                added,
+                re.M,
+            ):
+                test_defined |= {t.strip() for t in lhs.split(",") if t.strip()}
             # A method or field pinned BY REFLECTION -- reflect MethodByName("X") / FieldByName("X") --
             # is graded even though its name lives in a string literal code_only() strips. Tests do
             # this so the package compiles at a step's starting tree where X does not exist yet.
@@ -246,7 +260,14 @@ def graded_symbols(task, only=None):
             for lhs in re.findall(r'(?:^\s*|\b(?:for|if|switch)\s+)([\w,\s]+?)\s*:=',
                                   code, re.M):
                 syms -= {t.strip() for t in lhs.split(",") if t.strip()}
-    return ((syms - locally_defined) | pinned_extra) if saw_patch else None
+    # Test-local declarations win even when the same identifier was collected
+    # by one of the broad pinning fallbacks.  Unioning pinned_extra after the
+    # subtraction reintroduced helpers and local channel variables (for
+    # example awaitCoalescingProbeResult, fetchReturned, and releaseOld) as
+    # purported production APIs, yielding a blocking silent-contract false
+    # positive.  Real interface/reflection pins are unaffected unless the test
+    # patch also defines that exact identifier locally.
+    return ((syms | pinned_extra) - locally_defined - test_defined) if saw_patch else None
 
 
 def contract_symbols(text):

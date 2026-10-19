@@ -338,6 +338,48 @@ if [ "$MT" = 1 ]; then
   [ "$MISS" = 0 ] && pass "SWE Step Parsers: all steps have tests/parser.py"
 fi
 
+# --- Test result parser: subtest-aware (template generation >= 2) ----------
+# Server-only structural check, verbatim (djmoney-money-expressions-pair 8f387e95,
+# 2026-10-18): "Test result parser: FAIL tests/parser.py is an older version of
+# the test-result parser, which can grade this task incorrectly: failures inside
+# a sub-test are not detected (tests/parser.py: subtest-blind)".
+# Under unittest subTest / the subtests fixture the parent's verbose line still
+# reads PASSED; the failure only appears as SUBFAIL / SUBFAILED, so a parser
+# that doesn't read those words pays a full reward for a failed solution.
+# Markers, from diffing generation 1 vs 2 of the template:
+#   - `# codimango-parser-version: 2` stamp on line 1 (gen 1 says `: 1`)
+#   - SUBFAIL / SUBFAILED in the status-word map (absent from every gen-1 file)
+# SUBFAIL is the behavioural marker and is what blocks; the stamp only warns.
+# Scope: pytest-graded parsers only (the server only proposes the refresh to
+# tasks that grade pytest output) -- detected by a non-comment pytest mention in tests/*.sh.
+# Fix: `codimango task template sync --file tests/parser.py --type <type>
+#   codimango/<task>` writes parser.py.new; adopt it verbatim (append any CTRF
+#   or output-shape adaptation inside main() only).
+SB_BAD=""; SB_WARN=""; SB_N=0
+for P in "$T"/tests/parser.py "$T"/steps/*/tests/parser.py; do
+  [ -f "$P" ] || continue
+  D=$(dirname "$P")
+  # Comment lines are stripped: the stock scaffold test.sh mentions pytest in
+  # comments even on go/cargo tasks (concourse false positive, 2026-10-19).
+  cat "$D"/*.sh 2>/dev/null | grep -vE '^[[:space:]]*#' | grep -qiw pytest || continue
+  SB_N=$((SB_N+1))
+  REL=${P#"$T"/}
+  GEN=$(grep -m1 -oE 'codimango-parser-version:[[:space:]]*[0-9]+' "$P" | grep -oE '[0-9]+$')
+  if ! grep -qE '\bSUBFAIL(ED)?\b' "$P"; then
+    SB_BAD="$SB_BAD $REL(gen ${GEN:-unstamped})"
+  elif [ -z "$GEN" ] || [ "$GEN" -lt 2 ]; then
+    SB_WARN="$SB_WARN $REL(gen ${GEN:-unstamped})"
+  fi
+done
+if [ "$SB_N" = 0 ]; then
+  pass "Test result parser: no pytest-graded parser.py (subtest check n/a)"
+elif [ -n "$SB_BAD" ]; then
+  fail "Test result parser: subtest-blind (no SUBFAIL/SUBFAILED handling):$SB_BAD — run \`codimango task template sync --file tests/parser.py\` and adopt parser.py.new"
+else
+  pass "Test result parser: subtest-aware ($SB_N pytest-graded parser(s))"
+  [ -n "$SB_WARN" ] && warn "Test result parser: reads SUBFAIL but lacks the gen-2 stamp:$SB_WARN — server may compare against the template; prefer the synced file"
+fi
+
 hdr "TIER 3 — landmines no validator catches"
 
 # 0. AUTHORSHIP — BLOCKING on the restricted surfaces: every instruction.md and everything
@@ -677,6 +719,17 @@ for cfgp in sorted(glob.glob(os.path.join(task,"steps","*","tests","config.json"
         continue
     sh=os.path.join(os.path.dirname(cfgp),"test.sh")
     s=open(sh).read() if os.path.exists(sh) else ""
+    # Private-tree graders (ssort-import-time-semantics-preservation, 2026-10-17):
+    # test.sh never applies anything; its runner copies the repo into a mkdtemp
+    # tree, applies test_patch THERE, and the EXIT trap deletes that tree. The
+    # test-patch files never reach /app, so nothing can collide on a re-run
+    # (TIER 4b replay PASSED while this read as FAIL). Skip only that exact shape.
+    rsp=os.path.join(os.path.dirname(cfgp),"run_script.sh")
+    rs=open(rsp).read() if os.path.exists(rsp) else ""
+    applies=[l for l in rs.split("\n") if '"apply"' in l and "--numstat" not in l]
+    if (s and not re.search(r'\bapply\b', s) and re.search(r'^tree\s*=.*mkdtemp', rs, re.M)
+            and applies and all("str(tree)" in l for l in applies)):
+        continue
     # Map every `name() { ... \n}` body. The cleanup function is NOT always
     # literally named `cleanup` (rustcrypto ships `cleanup_and_reward`) and may
     # delegate the purge to a helper it calls. Matching only "cleanup() {" read

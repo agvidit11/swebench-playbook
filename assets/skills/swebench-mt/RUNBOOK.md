@@ -19,7 +19,7 @@ A dispatched agent reads **one** phase runbook. Do not hand it four files.
 
 | # | Runbook | Does | Entry condition | Exit condition |
 |---|---|---|---|---|
-| 1 | `1-brainstorm.md` | pick repo, find candidates, **measure** variance | — | a candidate with a MEASURED 0-3/5 split (1-3/5 preferred; 0/5 needs a third-party gradient + legit failures) |
+| 1 | `1-brainstorm.md` | pick repo, find candidates, **measure** variance | — | a candidate with a MEASURED 1-3/5 split |
 | 2 | `2-build.md` | instruction, tests, solve/docker/toml, preflight | phase 1 measured the split | `preflight.sh --with-oracle` exit 0 |
 | 3 | `3-harness.md` | read verdict, tune the harness, salvage | a server verdict exists | in band, or an evidenced kill |
 
@@ -122,13 +122,8 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    trials. Reconcile that server commit with the local checkout before any edit,
    pivot, replay, or archive decision. Never begin proper work from stale local
    state, an old report, or remembered calibration numbers.
-1. **End of phase 1** — no measured 0-3/5 split, no build (1-3/5 preferred; see 00-ROUTER §4 acceptable band).
-2. **Before push** — README check first (Vidit 2026-10-16; presubmit FAILs on it): the README has
-   **no internal links** (internalmeta.com, workplace.com, fburl.com, internalfb.com), and its
-   **Completion Rates / Model Analysis describe the commit being pushed** — no stale "0/5 / not reached /
-   not calibrated / RELEASE / WAITING / out of band" text left by a calibration loop. commonmark d711592
-   shipped a stale 4/5|0/5|not-reached table; a bounce for this costs a revision round. Then
-   `revision-gate/gate.py <task>` must pass (it runs `preflight.sh --with-oracle` plus presubmit, provenance, step carry-forward, fake-pass probes, the reviewer agent and k2n x2). PROVISIONAL until `ledger/VERIFY-revision-gate.md` has 3 sign-offs; see the playbook's `tools/revision-gate/README.md`.
+1. **End of phase 1** — no measured 1-3/5 split, no build.
+2. **Before push** — `revision-gate/gate.py <task>` must pass (it runs `preflight.sh --with-oracle` plus presubmit, provenance, step carry-forward, fake-pass probes, the reviewer agent and k2n x2). PROVISIONAL until `ledger/VERIFY-revision-gate.md` has 3 sign-offs; see the playbook's `tools/revision-gate/README.md`.
 3. **After the verdict** — is the number real? `references/signal-integrity.md`
    before touching anything.
 4. **Before submit** — human review, preceded by a **deep-review pass**.
