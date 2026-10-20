@@ -1,6 +1,6 @@
 # spire-bundle-configuration-epoch-fencing
 **Owner:** devvm6971 / lane-i
-**State:** 21c2302 (another worker, "harden concurrency verifier timing") on server; last full green run 3ffabb5 (avocado 3/5, agentic GOOD, AI Accept). Reviewer Christopher Wong request changes 2026-10-12; Vidit replied 2026-10-13; NOT yet resubmitted.
+**State:** ARCHIVED 2026-10-19 — fair version saturates (5/5).
 
 ## History
 - 2026-10-08 · lane-i · 1ab15a5 · first review fixes (root-owned grading, pinned toolchain, deterministic tests) · avocado 2/5, AI Revise
@@ -15,3 +15,4 @@
 Resubmit for review (UI). Difficulty rests on the documented-contract local-bundle return (justification posted).
 - 2026-10-15 · other worker (unlogged) · 3912bad, eac95bc · Eval-GT vendor preflight tolerance + validation metadata · avocado 1/5, AI Accept, validation passing. PLEASE log here before pushing (see TASK-LOG/README.md).
 - 2026-10-19 · lane-i · f51c6cfe pushed · reviewer (Christopher Wong) critical: canceled/timed-out local-bundle return unstated; independent review-skill check FLAGS (override not viable); statement now states it (Muse), README nits fixed. FINAL attempt (try limit): if Avocado saturates -> archive.
+- 2026-10-19 · lane-i · f51c6cf server: avocado 5/5 (too easy) once the canceled/timed-out return contract was stated — confirms it was the only discriminator. Reviewer (critical) would not accept it unstated; review-skill check flagged the override argument. ARCHIVED (try limit, Vidit rule). Task id c257d933-bcd6-8276-9e7d-1df336e9db74.
