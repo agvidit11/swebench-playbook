@@ -333,7 +333,7 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 | devvm23237 | A1(G8-G10)+A2-A3 on taglib/taglib | taglib/taglib | finish screen, then MT/ST idea gen -> gate (LGPL-2.1/MPL-1.1 eligible; avoid APE-format seam peer) | P | EXHAUSTED (A1 G8-G10 PASS; 2 rounds NO SURVIVOR: C-1 MP4 atom round-trip 5/5) | 2026-10-18 | Claude session 8994aeb2 agent seed-oidc (reassigned). A1 evidence a1-cpp.md |
 
 | devvm23237 | A1(G10)+A2-A3 on igniterealtime/Smack | igniterealtime/Smack | finish G10 timing, then MT/ST idea gen -> gate (Apache-2.0; JIRA tracker discloses some gaps: check G4/public-fix per card) | P | RELEASED (agent stalled twice before G10; no results; seam free) | 2026-10-18 | Claude session 8994aeb2 agent seed-ldaptive (reassigned). A1 evidence a1-jvm.md |
-| devvm23237 | wiremock-net-mapping-model-reconciliation (MT3) | wiremock/WireMock.Net | mapping-model reconciliation (C#) | B | PUSHED 05f16b5 (oracle OOM fix; validation pending) | 2026-10-19 | seeds107 Muse n=3: S2 1/3, S3 1/3 two roots each; metacode K-to-N decides |
+| devvm23237 | wiremock-net-mapping-model-reconciliation (MT3) | wiremock/WireMock.Net | mapping-model reconciliation (C#) | B | VALIDATION PASSING de5a249 (avocado 5/5,3/5,1/5; agentic GOOD) — ready to submit | 2026-10-20 | seeds107 Muse n=3: S2 1/3, S3 1/3 two roots each; metacode K-to-N decides |
 
 | devvm23237 | A1(G10)+A2-A3 on grpc/grpc-node | grpc/grpc-node | finish G10 (build proto-loader before grpc-js), then MT/ST idea gen -> gate | P | EXHAUSTED (G10 PASS 55s; 2 rounds NO SURVIVOR: 5/6 cards premise false at HEAD, R2-2 LB swap-back 5/5) | 2026-10-18 | Claude session 8994aeb2 agent seed-oidc (reassigned). A1 evidence a1-ts.md |
 
