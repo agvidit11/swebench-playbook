@@ -150,6 +150,11 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    step solvable in time, then re-validate and re-check. Before writing any Model Analysis, read each
    failing trial's duration/exception — a trial failing every F2P test is a timeout or crash
    signature, not a design miss. cancancan 044517c was returned for exactly this (4/5 timed out).
+4c. **Before submit — multi-turn root config is task-level only (Tongdi on pact-broker, 2026-10-21, MUST).**
+   Root `tests/config.json` holds exactly `repo`, `instance_id`, `base_commit`; patch, test_patch, F2P/P2P,
+   selected files, hidden-test paths, before_repo_set_cmd etc. live only in `steps/*/tests/config.json`.
+   `readme-server-check.py` R8 enforces it. Never push a fix to a task that is in review unless asked —
+   any push pulls it back to draft.
 5. **Before submit** — human review, preceded by a **deep-review pass**.
    Green gates are not enough. Calibration, provenance and the AI assessment do
    not check sourcing or duplication; only the server's deep review (Validation

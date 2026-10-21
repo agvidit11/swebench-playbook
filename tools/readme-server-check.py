@@ -80,6 +80,15 @@ def check(repo, st):
     il = INTERNAL.search(text)
     res.append(("R5", "FAIL" if il else "PASS", f"internal reference: '{il.group(0)}'" if il else "no internal refs"))
     res.append(("R6", "FAIL" if len(ma.strip()) < 200 else "PASS", f"model analysis {len(ma.strip())} chars"))
+    root_cfg = Path(repo) / t / "tests" / "config.json"
+    if (Path(repo) / t / "steps").is_dir() and root_cfg.exists():
+        try:
+            extra = sorted(set(json.loads(root_cfg.read_text())) - {"repo", "instance_id", "base_commit"})
+        except Exception:
+            extra = ["<unparseable>"]
+        # R8 (Tongdi on pact-broker 2026-10-21; MT Reviewer Guide): task-level config holds only repo,
+        # instance_id, base_commit — every other field belongs in steps/*/tests/config.json.
+        res.append(("R8", "FAIL" if extra else "PASS", f"root tests/config.json has step-level keys {extra[:6]}" if extra else "root config is task-level only"))
     if st.get("commit"):
         bad = trial_problems(t, st["commit"][:8])
         res.append(("R7", "FAIL" if bad else "PASS", ("non-genuine trials: " + "; ".join(bad)) if bad else "no timeout/error trials"))
