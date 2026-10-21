@@ -685,6 +685,17 @@ task pass.
 - [ ] `Declared Steps`: every manifest step ships files and every shipped step
       is declared.
 
+### Multi-turn root config and README (presubmit FAILs)
+
+- [ ] Root `tests/config.json` holds ONLY `repo`, `instance_id`, `base_commit`.
+      Patches, test_patch, F2P/P2P (either spelling), selected test files and
+      hidden-test paths live only in `steps/*/tests/config.json`; harness scripts
+      read the step config. Older accepted tasks carried a cumulative root config,
+      but the MT Reviewer Guide / Task Quality Q&A reject it (pact-broker 7324c8f
+      sent back 2026-10-21). Presubmit check `MT root config` FAILs otherwise.
+- [ ] README: no internal links; Completion Rates and Model Analysis match the
+      commit being pushed (server rates + per-trial failures before submit).
+
 ### Contamination
 
 - [ ] Remove the scaffold canary immediately. It ships on line 1 of
