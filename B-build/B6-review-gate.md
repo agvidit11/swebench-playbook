@@ -116,6 +116,9 @@ or `inconclusive` — never carry a finding forward as "addressed" without re-ru
        proof: the ledger line
 [ ] 7. After any repair, the FULL gate re-run, not just the complaining reviewer
        proof: the second check output
+[ ] 8. Before submit/resubmit: independent presubmit by a FRESH agent on the pushed SHA
+       (README, failures, review skill Accept, both-way coverage) — C7 §5d, VERDICT READY
+       proof: $D/INDEPENDENT-PRESUBMIT.md
 ```
 
 ## HANDOFF

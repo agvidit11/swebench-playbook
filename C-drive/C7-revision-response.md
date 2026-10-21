@@ -246,6 +246,52 @@ Re-ran oracle, the full gate and validation on the new commit, all green. <one r
 
 Keep it under ~120 words unless the review had more than six asks.
 
+**No reviewer message before §5d says READY.** Not a draft "for when it passes", not a
+placeholder. Vidit, 2026-10-21: a jedi reply was handed over twice off green gates alone, and both
+times the task still had a stale README, unclassified failures and a half-answered review ask.
+
+## 5d. INDEPENDENT PRESUBMIT — a fresh agent runs the whole checklist
+
+`STATUS: LIVE`, Vidit 2026-10-21. Mandatory before every first submit AND every resubmit.
+
+**Who runs it.** A *separate* agent that did not build or revise the task: a fresh `codex exec`
+or a fresh Claude subagent with no conversation history. Never the session that wrote the fix. The
+author has already convinced itself the fix is right; that belief transfers through a summary, so
+**the brief carries only the task name, the pushed SHA, the evidence-dir path and this section.** No
+rationale, no "we already checked X", no prior verdicts, no reviewer-reply draft.
+
+**What it does, in order — each line reported with its proof:**
+
+```
+INDEPENDENT-PRESUBMIT <task> @ <sha>   agent: <codex|claude-subagent>   playbook: <sha after pull>
+0 RUNBOOK     git pull ~/swebench-playbook (and sync-skill.sh install); re-read the swebench-mt
+              RUNBOOK, B5, B6 and this file AT THAT SHA before anything else
+1 SERVER      task show/errors on <sha>: validationStatus passing, every row green, balance string
+              with every arm; presubmit.py WITHOUT --local-only: 0 FAIL, every WARN dispositioned
+2 README      tools/readme-server-check.py <repo> <task> exit 0, plus a read: the four headings; no
+              internal links or paths; Completion Rates cite THIS sha with the per-step, per-model
+              numbers from the balance string; no "TBD", "pending", "not reached", "will be
+              refreshed" left over
+3 FAILURES    tools/failure-audit.py <task> --repo <checkout> --judge exit 0, and every failed trial on <sha> read (agentic attemptResults, else ctrf / test-stdout):
+              each is a genuine reasoning miss, or named as infra (AgentTimeoutError,
+              ApiServerShuttingDown, 0 tests, grader) with its fix or written justification;
+              0 unexplained
+4 REVIEW      review-task-swebench-v2 (multi-turn: review-task-swebench-multiturn) run on the
+              final tree by this agent: verdict Accept; every Medium+ finding fixed, not argued
+5 COVERAGE    requirement <-> test matrix per step, BOTH directions: every requirement in each
+              step's instruction maps to >=1 graded test (0 UNTESTED / COVERED-BUT-UNASSERTED,
+              lh-coverage --auto matrix or equivalent), and every graded test maps to a stated
+              or repo-derivable requirement (0 unstated-but-graded); carried tests re-run in
+              later steps
+6 PROOF       C7 RESUBMIT-PROOF lines 1-8 (or B5 block on a first submit) all green
+VERDICT       READY | NOT READY: <the failing lines>
+```
+
+It writes the report to `$D/INDEPENDENT-PRESUBMIT.md`, outside the task tree, and edits nothing.
+NOT READY goes back to the author, gets fixed (Codex / Muse per the authorship table), is pushed,
+and §5d is re-run by a **new** fresh agent. Only on READY does the author draft the §5c reviewer
+message.
+
 ## 6. CHECKLIST — the reviewer-feedback check
 
 ```
@@ -279,7 +325,10 @@ Keep it under ~120 words unless the review had more than six asks.
        proof: baseline.md, after.md, the diff
 [ ] 14. RESUBMIT-PROOF.md complete; lines 1-7 green before push, line 8 after (§5c)
        proof: the file
-[ ] 15. Reviewer message drafted in Vidit's voice and handed to Vidit, NOT sent (§5c)
+[ ] 16. Independent presubmit by a FRESH agent on the pushed SHA: VERDICT READY (§5d)
+       proof: $D/INDEPENDENT-PRESUBMIT.md, lines 0-6 with proof
+[ ] 15. Reviewer message drafted in Vidit's voice and handed to Vidit, NOT sent (§5c) —
+       only after line 16 is READY
        proof: the draft in the final report
 ```
 

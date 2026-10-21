@@ -172,6 +172,14 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    - a **dedup check** against codimango peers on the same repo and seam
      (`team-aai:dedup-judge`).
    Do these at sourcing time too, so a task never gets built on a public fix.
+6. **Before submit or resubmit — independent presubmit (Vidit 2026-10-21, MUST).** A FRESH agent
+   (new `codex exec` or a Claude subagent with no history) that did not build or revise the task runs
+   the whole checklist on the pushed SHA, so the author's bias does not carry over: pull the playbook
+   and re-read this RUNBOOK first, then server rows + `presubmit.py` without `--local-only`, the
+   README check (stop 4), the failure audit (stop 4b), `review-task-swebench-v2` to an Accept, and a
+   both-directions requirement <-> test coverage matrix per step (no untested requirement, no graded
+   behaviour the instruction does not state). Brief it with only the task, SHA and
+   `C-drive/C7-revision-response.md` §5d. No reviewer reply is drafted until it says READY.
 
 ---
 

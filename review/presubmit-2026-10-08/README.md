@@ -16,6 +16,12 @@
 > stale. Evidence was first captured 2026-10-08 and regenerated after the portability fixes below.
 > Reviewer comments in `evidence/nonaccept.md` include reviewer names: keep this repo private.
 
+> **Who runs presubmit (Vidit 2026-10-21):** not the author. Before any submit or resubmit, a fresh
+> Codex or Claude agent with no history on the task runs this tool and the rest of the checklist in
+> `C-drive/C7-revision-response.md` §5d (latest playbook pulled first; README, failure audit,
+> review skill to Accept, both-way requirement <-> test coverage). Its READY verdict gates the
+> reviewer reply.
+
 ---
 
 ## 1. Problem
