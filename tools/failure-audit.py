@@ -67,6 +67,8 @@ def trials_at(task, commit8):
 
 def failing_tests(text):
     names = set(x.split("::")[-1] for x in re.findall(r"FAILED (\S+)", text))
+    for grp in re.findall(r"non-passing configured ids: \[([^\]]*)\]", text):
+        names |= {x.strip().strip("'\"").split("::")[-1] for x in grp.split(",") if x.strip()}
     if not names and "{" in text:
         try:
             d = json.loads(text[text.index("{"):])
@@ -119,7 +121,7 @@ def classify(t):
         ev["class"] = "TIMEOUT"
     elif t["exc"] or exc.get("exception_type") or t["status"] == "error":
         ev["class"] = "INFRA"
-    elif not vkey or re.search(r"GRADER FAILURE|missing configured id|could not be installed|Traceback \(most recent call last\):\s+File \"/tests/", blob):
+    elif not vkey or re.search(r"missing configured id|could not be installed", blob) or (not ev["failing_tests"] and not t["reward"].startswith("1")):
         ev["class"] = "GRADER-ABORT"
     elif concluded is False:
         ev["class"] = "INCOMPLETE"
