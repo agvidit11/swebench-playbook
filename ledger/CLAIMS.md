@@ -385,3 +385,7 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 | devvm23237 | wiremock-net-mapping-model-reconciliation | wiremock/WireMock.Net | timeout fix | B | PUSHED — agent timeout 2700->5400 (2 Avocado AgentTimeoutError at de5a249) | 2026-10-21 | cbb9a2cb at Vidit's direction (owner idle 13h) |
 | devvm23237 | libcst-rename-codemod-reference-fidelity | Instagram/LibCST | timeout fix | B | PUSHED — agent timeout 3600->5400 (2 AgentTimeoutError at 2f4888b) | 2026-10-21 | cbb9a2cb at Vidit's direction (owner idle 15h) |
 | devvm23237 | django-model-utils-fieldtracker-db-truth | jazzband/django-model-utils | timeout fix | B | PUSHED — agent timeout 3600->5400 (step-3 AgentTimeoutError at 9783fe1) | 2026-10-21 | cbb9a2cb at Vidit's direction |
+| devvm23237 | paperjs-hosted-document-reconciliation (MT3) | paperjs/paper.js | hosted document reconciliation (JS) | B | BUILDING (build-paperjs, lane-pb) | 2026-10-21 | seeds143 |
+| devvm23237 | mobx-computed-cache-refresh (MT3) | mobxjs/mobx | computed cache refresh (TS) | B | BUILDING (build-mobx, lane-pb) | 2026-10-21 | seeds143 |
+| devvm23237 | wiremock-net-atomic-scenario-reservations (MT3) | wiremock/WireMock.Net | scenario state store reservations (C#) | B | BUILDING (build-wiremock-scen, lane-pb) | 2026-10-21 | siblings-a |
+| devvm23237 | openspout-formula-result-provenance (MT3) | openspout/openspout | formula result provenance/freshness (PHP) | B | BUILDING (build-openspout-formula, lane-pb) | 2026-10-21 | siblings-a |
