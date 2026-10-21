@@ -131,7 +131,15 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    `revision-gate/gate.py <task>` must pass (it runs `preflight.sh --with-oracle` plus presubmit, provenance, step carry-forward, fake-pass probes, the reviewer agent and k2n x2). PROVISIONAL until `ledger/VERIFY-revision-gate.md` has 3 sign-offs; see the playbook's `tools/revision-gate/README.md`.
 3. **After the verdict** — is the number real? `references/signal-integrity.md`
    before touching anything.
-4. **Before submit** — human review, preceded by a **deep-review pass**.
+4. **Before submit — README must match the server (Vidit 2026-10-20, MUST).** Run
+   `python3 <playbook>/tools/readme-server-check.py <repo> <task>` against the server-validated
+   commit; any FAIL blocks submit. It requires the four sections, the server commit and every server
+   Avocado rate in Completion Rates, no placeholder/"pending" text, no internal refs, and a real Model
+   Analysis. A code push cannot carry the new rates, so the flow is always: push → wait for server
+   validation → README-only push with the server's commit, rates and per-trial failure analysis
+   (README-only pushes do not retrigger validation) → re-run the check → submit. Recently accepted
+   tasks were flagged for stale READMEs; this closes that gap.
+5. **Before submit** — human review, preceded by a **deep-review pass**.
    Green gates are not enough. Calibration, provenance and the AI assessment do
    not check sourcing or duplication; only the server's deep review (Validation
    Engine) does. dropshot-option-return-nullable-openapi went fully green on
