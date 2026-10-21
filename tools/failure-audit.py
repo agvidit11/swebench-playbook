@@ -66,7 +66,19 @@ def trials_at(task, commit8):
 
 
 def failing_tests(text):
-    names = set(x.split("::")[-1] for x in re.findall(r"FAILED (\S+)", text))
+    names = set()
+    for chunk in re.split(r"(?=\{\s*\"(?:tests|results|reward)\")", text):
+        if chunk.lstrip().startswith("{"):
+            try:
+                d, _ = json.JSONDecoder().raw_decode(chunk.lstrip())
+                tests = d.get("tests") or d.get("results", {}).get("tests")
+                if isinstance(tests, dict):
+                    names |= {k.split("::")[-1] for k, v in tests.items() if str(v.get("status", "")).upper() != "PASSED"}
+                elif isinstance(tests, list):
+                    names |= {t.get("name", "").split("::")[-1] for t in tests if str(t.get("status", "")).lower() not in ("passed", "skipped")}
+            except Exception:
+                pass
+    names |= set(x.split("::")[-1] for x in re.findall(r"FAILED (\S+)", text))
     for grp in re.findall(r"non-passing configured ids: \[([^\]]*)\]", text):
         names |= {x.strip().strip("'\"").split("::")[-1] for x in grp.split(",") if x.strip()}
     if not names and "{" in text:
@@ -98,8 +110,9 @@ def classify(t):
     except Exception:
         pass
     keys = sh("codimango", "trial", "artifacts", tid)
-    vkey = next((k for k in re.findall(r"(\S*verifier/(?:test-stdout\.txt|output\.json|ctrf\.json))", keys)), "")
-    vtext = artifact(tid, vkey)[0] if vkey else ""
+    vkeys = re.findall(r"(\S*verifier/(?:output\.json|ctrf\.json|test-stdout\.txt|run-script-stdout\.txt))", keys)
+    vkey = vkeys[0] if vkeys else ""
+    vtext = "\n".join(artifact(tid, k)[0] for k in vkeys)
     stderr_key = next(iter(re.findall(r"(\S*verifier/run-script-stderr\.txt)", keys)), "")
     stderr = artifact(tid, stderr_key)[0] if stderr_key else ""
     ev["failing_tests"] = failing_tests(vtext)[:40]
@@ -114,6 +127,10 @@ def classify(t):
             concluded = bool(steps) and bool((steps[-1].get("message") or "").strip()) and not steps[-1].get("tool_calls")
         except Exception:
             pass
+    if not traj_key:
+        nsteps = res.get("n_tool_calls") or 0 if isinstance(res, dict) else 0
+        concluded = None
+        last_msgs = ["(no trajectory.json exported; agent made %s tool calls per result.json)" % nsteps]
     ev.update({"agent_steps": nsteps, "last_agent_messages": last_msgs, "concluded": concluded,
                "exception_type": exc.get("exception_type", ""), "exception_message": (exc.get("exception_message") or "")[:300]})
     blob = vtext + "\n" + stderr
