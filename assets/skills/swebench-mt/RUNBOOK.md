@@ -143,7 +143,10 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    trial at the validated commit with `exc=` (AgentTimeoutError, ApiServerShuttingDownError, ...) or
    `status=error` blocks submit: Codimango policy forbids failures that come from timeouts, and a
    timed-out pass is not a measured pass either. `tools/readme-server-check.py` R7 enforces it from
-   `codimango trial list`. Fix by raising `[agent].timeout_sec` (5400 s is the norm) or making the
+   `codimango trial list`, and `tools/failure-audit.py <task> --repo <checkout> --judge` is the full
+   check: it pulls every failed Avocado/GPT trajectory, classifies TIMEOUT / INFRA / GRADER-ABORT /
+   INCOMPLETE (all blocking), and has a Codex judge confirm each remaining failure is a GENUINE reasoning
+   miss against the instruction (UNFAIR-TEST or HARNESS also block). Exit 0 is required to submit. Fix by raising `[agent].timeout_sec` (5400 s is the norm) or making the
    step solvable in time, then re-validate and re-check. Before writing any Model Analysis, read each
    failing trial's duration/exception — a trial failing every F2P test is a timeout or crash
    signature, not a design miss. cancancan 044517c was returned for exactly this (4/5 timed out).
