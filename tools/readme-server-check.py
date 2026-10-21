@@ -80,7 +80,32 @@ def check(repo, st):
     il = INTERNAL.search(text)
     res.append(("R5", "FAIL" if il else "PASS", f"internal reference: '{il.group(0)}'" if il else "no internal refs"))
     res.append(("R6", "FAIL" if len(ma.strip()) < 200 else "PASS", f"model analysis {len(ma.strip())} chars"))
+    if st.get("commit"):
+        bad = trial_problems(t, st["commit"][:8])
+        res.append(("R7", "FAIL" if bad else "PASS", ("non-genuine trials: " + "; ".join(bad)) if bad else "no timeout/error trials"))
     return res
+
+
+def trial_problems(task, commit8):
+    """R7: model trials at the validated commit that timed out or errored are not genuine
+    failures (Codimango policy: failures must not come from timeouts). Vidit 2026-10-21, cancancan."""
+    jobs = subprocess.run(["codimango", "job", "list", task], capture_output=True, text=True).stdout
+    out = []
+    for line in jobs.splitlines():
+        if f"commit={commit8}" not in line:
+            continue
+        jid = line.split()[0]
+        trials = subprocess.run(["codimango", "trial", "list", jid], capture_output=True, text=True).stdout
+        for tl in trials.splitlines():
+            if "stage=" not in tl or "stage=oracle" in tl or "agentic-review" in tl:
+                continue
+            if "exc=" in tl or "status=error" in tl:
+                tid = tl.split()[0]
+                exc = re.search(r"exc=(\S+)", tl)
+                rew = re.search(r"reward=(\S+)", tl)
+                stg = re.search(r"stage=(\S+)", tl)
+                out.append(f"{tid} {stg.group(1) if stg else ''} {exc.group(1) if exc else 'status=error'} reward={rew.group(1) if rew else '?'}")
+    return out
 
 
 def main():

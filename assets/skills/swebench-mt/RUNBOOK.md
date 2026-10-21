@@ -139,6 +139,14 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    validation → README-only push with the server's commit, rates and per-trial failure analysis
    (README-only pushes do not retrigger validation) → re-run the check → submit. Recently accepted
    tasks were flagged for stale READMEs; this closes that gap.
+4b. **Before submit — every failure must be genuine (Vidit 2026-10-21, MUST, hard rule).** Any model
+   trial at the validated commit with `exc=` (AgentTimeoutError, ApiServerShuttingDownError, ...) or
+   `status=error` blocks submit: Codimango policy forbids failures that come from timeouts, and a
+   timed-out pass is not a measured pass either. `tools/readme-server-check.py` R7 enforces it from
+   `codimango trial list`. Fix by raising `[agent].timeout_sec` (5400 s is the norm) or making the
+   step solvable in time, then re-validate and re-check. Before writing any Model Analysis, read each
+   failing trial's duration/exception — a trial failing every F2P test is a timeout or crash
+   signature, not a design miss. cancancan 044517c was returned for exactly this (4/5 timed out).
 5. **Before submit** — human review, preceded by a **deep-review pass**.
    Green gates are not enough. Calibration, provenance and the AI assessment do
    not check sourcing or duplication; only the server's deep review (Validation
