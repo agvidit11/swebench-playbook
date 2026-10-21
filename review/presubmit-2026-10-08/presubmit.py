@@ -268,6 +268,21 @@ def check_configs(cfgs, fmt):
     if not cfgs:
         fail("config.json", "no tests/config.json found")
         return
+    # Multi-turn: the task-level config must hold only repo/instance_id/base_commit (MT Reviewer Guide +
+    # Task Quality Q&A). pact-broker 7324c8f was sent back for step-level patch/test_patch/F2P/P2P at the root.
+    step_cfgs = [c for c in cfgs if c[0] != "task"]
+    root = [c for c in cfgs if c[0] == "task"]
+    if step_cfgs and root:
+        try:
+            rk = set(json.loads(SRC.read(root[0][1])).keys())
+            extra = sorted(rk - {"repo", "instance_id", "base_commit"})
+            if extra:
+                fail("MT root config", f"root tests/config.json must hold only repo, instance_id, base_commit; "
+                     f"move/remove: {extra}")
+            else:
+                ok("MT root config", "root tests/config.json holds only repo/instance_id/base_commit")
+        except Exception as e:  # noqa: BLE001
+            fail("MT root config", f"unreadable root tests/config.json: {e}")
     per_step = []
     for label, p in cfgs:
         try:
