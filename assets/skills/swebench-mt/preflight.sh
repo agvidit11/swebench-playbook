@@ -835,8 +835,10 @@ if [ "$WITH_ORACLE" = "--with-oracle" ] && [ -d "$T/steps" ]; then
       docker cp "$SD/tests/." "$CID:/tests/" >/dev/null
       docker exec "$CID" bash /tests/test.sh >/dev/null 2>&1        # baseline pass
       B=$(docker exec "$CID" cat /logs/verifier/reward.txt 2>/dev/null)
-      docker cp "$SD/solution/solve.sh" "$CID:/tmp/solve.sh" >/dev/null
-      docker exec "$CID" bash /tmp/solve.sh >/dev/null 2>&1
+      # copy the whole solution/ dir like the harness does (solve.sh may apply a sibling oracle.patch)
+      docker exec "$CID" rm -rf /tmp/solution >/dev/null 2>&1
+      docker cp "$SD/solution/." "$CID:/tmp/solution/" >/dev/null
+      docker exec "$CID" bash /tmp/solution/solve.sh >/dev/null 2>&1
       G=$(docker exec "$CID" bash -c 'bash /tests/test.sh >/dev/null 2>&1; cat /logs/verifier/reward.txt')
       [ "$B" = "1" ] && { fail "replay: $SN passes BEFORE solve.sh — no-op step (eval-GT defect)"; RC=1; }
       [ "$G" = "1" ] || { fail "replay: $SN graded reward=$G after a prior verifier pass in the same tree"; RC=1; }
