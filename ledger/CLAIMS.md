@@ -399,5 +399,7 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 | devvm23237 | wiremock-net-mapping-model-reconciliation | - | OWNERSHIP (Vidit 2026-10-22: allotted to session cbb9a2cb end-to-end) | B | OWNED by cbb9a2cb — other sessions/loops: do not push | 2026-10-22 | Claude session cbb9a2cb |
 | devvm23237 | libcst-rename-codemod-reference-fidelity | - | OWNERSHIP (Vidit 2026-10-22: allotted to session cbb9a2cb end-to-end) | B | OWNED by cbb9a2cb — other sessions/loops: do not push | 2026-10-22 | Claude session cbb9a2cb |
 | devvm23237 | django-model-utils-fieldtracker-db-truth | - | OWNERSHIP (Vidit 2026-10-22: allotted to session cbb9a2cb end-to-end) | B | OWNED by cbb9a2cb — other sessions/loops: do not push | 2026-10-22 | Claude session cbb9a2cb |
-| devvm23237 | javaparser-lexical-reconcile (MT3) | javaparser/javaparser | LexicalPreservingPrinter reconcile (Java) | B | BUILDING (build-javaparser, lane-pb) | 2026-10-21 | seeds144 |
-| devvm23237 | doctrine-dbal-merge-tables (MT3) | doctrine/dbal | Comparator mergeTables three-way (PHP) | B | BUILDING (build-dbal-merge, lane-pb) | 2026-10-21 | seeds144 |
+| devvm23237 | javaparser-lexical-reconcile (MT3) | javaparser/javaparser | LexicalPreservingPrinter reconcile (Java) | B | PUSHED 0be72c8 (draft; server validation pending) | 2026-10-22 | seeds144 |
+| devvm23237 | doctrine-dbal-merge-tables (MT3) | doctrine/dbal | Comparator mergeTables three-way (PHP) | B | PUSHED 0be72c8 (draft; server validation pending) | 2026-10-22 | seeds144 |
+| devvm23237 | r3-reset-aware-held-viewers (MT3) | Cysharp/R3 | reset-aware held viewers (C#) | B | BUILDING (build-r3, lane-pb) | 2026-10-22 | pivots-run1 |
+| devvm23237 | ospos-giftcard-correction-running-preview (MT3) | opensourcepos/opensourcepos | gift-card correction + running preview (PHP) | B | BUILDING (build-ospos, lane-pb) | 2026-10-22 | pivots-run1 |
