@@ -67,10 +67,10 @@ def trials_at(task, commit8):
 
 def failing_tests(text):
     names = set()
-    for chunk in re.split(r"(?=\{\s*\"(?:tests|results|reward)\")", text):
-        if chunk.lstrip().startswith("{"):
+    for m in re.finditer(r"(?m)^\{", text):
+        if True:
             try:
-                d, _ = json.JSONDecoder().raw_decode(chunk.lstrip())
+                d, _ = json.JSONDecoder().raw_decode(text[m.start():])
                 tests = d.get("tests") or d.get("results", {}).get("tests")
                 if isinstance(tests, dict):
                     names |= {k.split("::")[-1] for k, v in tests.items() if str(v.get("status", "")).upper() != "PASSED"}
