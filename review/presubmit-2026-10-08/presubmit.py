@@ -471,6 +471,35 @@ def check_server(name, task_dir):
         else:
             ok("TBR", "pass")
 
+    # fairness gate: non-blocking server-side, but reviewers send tasks back on it
+    # (paperjs 0be72c8, pact b81cb46 — Vidit 2026-10-22)
+    try:
+        sj = json.loads(command_text(["codimango", "task", "show", name, "--json"]))
+        found = False
+        def _walk(o):
+            nonlocal found
+            if isinstance(o, dict):
+                if o.get("name") == "multi-turn-post-runs" and (not sha or str(o.get("commitSha", "")) == sha):
+                    found = True
+                    crit = [f.get("title", "")[:110] for f in o.get("findings") or []
+                            if f.get("severity") == "blocking"]
+                    bad = [p.get("label") for p in o.get("policies") or [] if p.get("status") == "FAIL"]
+                    if crit or bad:
+                        fail("fairness gate", f"{bad or ''} {len(crit)} Critical finding(s): {crit} — "
+                             "every flagged test must trace to the step wording or be dropped")
+                    else:
+                        ok("fairness gate", "no Critical findings")
+                for v in o.values():
+                    _walk(v)
+            elif isinstance(o, list):
+                for v in o:
+                    _walk(v)
+        _walk(sj)
+        if not found:
+            warn("fairness gate", "no multi-turn-post-runs result at this commit; inspect manually")
+    except Exception as e:  # noqa: BLE001
+        infra("fairness gate", str(e)[:160])
+
     # agentic verdict
     try:
         rv = command_text(["codimango", "job", "review", name])
