@@ -2,151 +2,118 @@
 
 ## A. Verdict
 
-- Yes: today it is genuinely useful as a read-only triage screen for status, validation failures, ownership hints, and weekly output.
-- No: it is not yet trustworthy as the coordination authority for parallel Claude/Codex sessions across two servers.
-- The biggest gap is truth latency: claims and checks can arrive 3–4 minutes late, refresh failure is hidden, and “live” can mean an old snapshot.
-- The next-step, ETA, and assignee UI looks more certain than the underlying data; hard-coded durations and server-only load balancing should not ship as advice.
-- Call it a strong personal beta, not a finished control plane; the supplied terminal captures are only `./board: No such file or directory`, so terminal usability is not demonstrated by the review artifacts.
+Workboard is already a useful action-first control plane, not merely a status table.
+The board, compact hovers, task drawer, links, grouping, stats, and basic Team feed substantially meet the author feedback.
+The remaining gap is trust: several labels imply stronger freshness, assignment, review, and delivery guarantees than the data supports.
+The next release should prioritize an explicit freshness/authority model and a closed-loop session inbox over more visual polish.
+Verdict: keep and harden; the information architecture is sound, but it is not yet the single dependable place for two-server agent operations.
+
+### Author-feedback check
+
+| Feedback | Status | What is still not met |
+|---|---|---|
+| Problem-only, few-word hovers with a next step | **Mostly met** | Validation hover is compact and fix-oriented, but generic/infra failures can produce the wrong next step; pin/copy and keyboard access are missing. |
+| Useful Review column: grey/green `✓/✓✓` plus human state | **Mostly met** | It exists exactly as requested, but grey means both absent and stale, the human state is visually subordinate, and superseded verdicts can still count. |
+| Task links | **Met** | Card has codimango, server-commit, and latest-main links; terminal uses OSC-8 links. A row-level affordance is optional, not a gap. |
+| Card starts with next steps, ETA, and who to assign | **Partial** | The next-step block is near the top, but external links precede it; ETAs are constants and “assignee” is only a host/load string with a placeholder command, not an assignment. |
+| Sync meaning is obvious | **Partial** | Header hover and legend explain the two ticks, but row cells remain icon-only and “server last sync” is actually last ledger activity. |
+| Header help | **Met in code** | Web column headers explain themselves and the TUI has Help; neither is keyboard-complete on the web. |
+| Copyable hovers | **Partial** | `user-select:text`, pointer events, and “select to copy” exist; the 280 ms hover transfer is fragile and there is no pin or Copy action. |
+| `needs-you / ready / validating / with-reviewers / done` plus Done subgroups | **Met** | The grouping and accepted/in-training/archived chips exist. “Accepted” also includes in-training, which should be explained or made independent. |
+| Small cute animations without hurting readability | **Not met** | There are at least six simultaneous motion patterns and no `prefers-reduced-motion` path. |
+| Data freshness | **Partial** | Codimango age, page timestamp, source health, and server “quiet” are shown; git/claims/ledger/inbox ages and refresh failures are not truthfully represented. |
+| One shared place for claims, presubmit, new tasks, messages | **Partial** | Data is aggregated, but a pre-scaffold claim-only task is invisible, docs/skill omit the communication commands, CLAIMS.md is still a required second write, and automatic inbox injection exists only for Claude Code—not Codex. |
+| Expandable card | **Met in code** | Drawer has an expand control and `e` shortcut. The supplied screenshots do not show the current Team tab despite it existing in source, so the live artifact appears behind the checkout. |
 
 ## B. DELETE
 
-| Delete | Why |
-|---|---|
-| Hard-coded `~2h`, `~45m`, `~3h`, and “any time now” ETAs in `insights.next_steps` | They are guesses presented as measurements. A wrong ETA is worse than `unknown`; remove them until observed transition history exists. |
-| Review confidence scores and `▰▰▰▰▱` bars | Self-rated 1–5 confidence is false precision, is not used to choose an action, and remains in the terminal after the web UI moved to ticks. Keep verdict and note only. |
-| The default **Presubmit** column | It is mostly grey ticks, duplicates the draft ladder in **Next**, and even leaks into the Review hover. Fold a failed/stale/not-run prerequisite into **Next** or **Blocker**; expose full check detail in the card. |
-| Green “all N checks passed” validation hover cards | This is exactly the noise the author rejected. A clean cell needs no hover; reserve the surface for at most three warnings/failures and their fixes. |
-| Funnel conversion percentages in the main Stats view | The screenshot says `imported 144 = 101% of built 143`: these are different source populations, not a valid sequential funnel. Keep raw inventory under diagnostics only, or compute a task-intersection cohort. |
-| `tui.watch()` | `app_ui.run()` is the actual interactive path and repeats its refresh loop, alternate-screen handling, animation, and rendering. Delete the dead duplicate and its one-off test. |
-| The requirement to update both `board` and `CLAIMS.md` | `skill/SKILL.md:16-22` tells a session to claim in Workboard *and* add a CLAIMS row. That is the overlap risk the product is meant to remove. Keep CLAIMS.md as a read-only compatibility source during migration, never as a second required write. |
-| ROUND, PUSHES, and TRACK from the normal `--wide` workflow | They do not change the next decision. Put them in `show`/history; a “wide” board should reveal blockers and handoff state, not archaeology. |
+1. **Delete decorative motion from operational data surfaces.** The shimmer over the weekly bar and staggered row/card entrances continuously spend attention without encoding state. Keep one restrained live pulse and a brief, non-repeating changed-row highlight; honor `prefers-reduced-motion`.
+2. **Delete false precision from default ETAs.** Repeated `~2h`, `~45m`, and `~3h` estimates are constants, not estimates. Until backed by task/check history, label them as rough effort bands or show `unknown`.
+3. **Delete icon-only semantics where failure is costly.** Bare ticks in Presubmit and Sync force hover discovery and are especially ambiguous when grey. Use compact words (`clean`, `stale`, `importing`, `not run`) beside the glyphs.
+4. **Delete “delivered” language for queued ledger messages.** The system currently proves written/surfaced/acked states separately; it cannot safely collapse those into delivery.
+5. **Delete mandatory dual-writing to CLAIMS.md after migration.** An atomic board claim plus “also add your CLAIMS.md row” creates two ownership truths and directly contradicts the single-place goal. Keep CLAIMS.md as read-only legacy import until retired.
 
-## C. ADD
+## C. ADD (ranked)
 
-| Rank | Missing feature | Problem | Concrete design | Effort |
-|---:|---|---|---|:---:|
-| 1 | Canonical task-intent registry | A new slug cannot be claimed before it exists in git/codimango, contradicting the primary anti-duplication workflow. | Add a ledger `task_created` entity and `board start <slug> --repo/--idea --to <session>` transaction that creates/reserves the slug and atomically claims it. Event-only tasks must project as `Not started`, including CLAIMS.md-only rows. | M |
-| 2 | Fresh coordinator loop | Cron + server refresh + browser polling causes the observed 3–4 minute lag; failures are swallowed. | One long-running coordinator performs ledger pull/push, source refresh, presence, review refresh, and publishes a monotonically versioned snapshot. Use file notification/SSE locally; target claim/check visibility under 10 seconds and codimango visibility under 60 seconds. | M |
-| 3 | Real cross-agent session identity | Every Codex CLI invocation currently becomes the same `human:user@host`; separate Codex sessions can overlap undetected. | Register `{session_id, agent kind, host, title, cwd, last_seen, capabilities}` for Claude and Codex. Issue a Workboard session token/env var to spawned agents and require it for claim/review attribution. | L |
-| 4 | Atomic handoff and acceptance | `--to <title fragment>` assigns immediately to a possibly stale session, with no acknowledgement or context. | `board handoff <task> --to <session> --note ...` creates `offered`; target runs `board accept`, which transfers the lease. Show pending handoffs and allow timeout/cancel. | M |
-| 5 | Actionable task card controls | The card reports state but still makes the user translate it into commands. | Put **Do now** first, with copy buttons for the exact `board claim/check/review/release` or codimango command; offer “assign to live session” choices and show the evidence behind the recommendation. | M |
-| 6 | Observed-duration history | No source records import/validation state transitions over time, so honest validation ETAs cannot be learned. | Append compact transition events whenever `(status, head SHA, validation SHA/status)` changes; derive duration cohorts by track, action, and failure type. | M |
-| 7 | Conflict radar | Multiple recent presences are listed but do not become a conflict unless there are multiple claim events. | Raise `POSSIBLE_OVERLAP` when two live sessions touch the same task without a shared reviewer/builder role; show both sessions and one-click ownership resolution. | S |
-| 8 | Pinned, keyboard-accessible details | Hover is fragile for copying and unavailable on touch/keyboard. | Hover previews; click or Space pins the same popover; add Copy action, focus management, Escape close, and ARIA labels. | S |
+1. **P0 — Problem:** operators cannot tell whether a row is current enough to act on. **Design:** a global freshness strip plus per-source timestamps (`codimango`, git per server, claims ledger, presence/inbox), explicit `stale`/`offline` thresholds, last refresh success/error, and a Refresh action. Disable or qualify risky recommendations when an authoritative source is stale. **Effort:** M.
+2. **P0 — Problem:** messaging is not a closed loop. **Design:** Team inbox with message states `queued → synced to target server → surfaced to session → acknowledged`, unread count, reply/thread context, retry/error state, and task-scoped messages visible on the task card. **Effort:** L.
+3. **P0 — Problem:** “who should take this” is a suggestion string, not capacity-aware assignment. **Design:** show each live session's host, current task, state (`working/waiting/free/stale`), last activity, and capacity; provide Claim, Assign, Handoff, and Release actions with atomic conflict feedback. **Effort:** L.
+4. **P1 — Problem:** next steps are computed but not auditable at a glance. **Design:** show the top action in the row; expand to ordered steps with provenance (`validation`, `presubmit`, `human review`, `sync`) and one-click copy of the exact command. **Effort:** M.
+5. **P1 — Problem:** stale CLAIMS.md, claim refs, touch presence, and explicit ownership can disagree. **Design:** an authority/conflict badge with a resolver that names the winning source and offers a safe handoff/release path. **Effort:** M.
+6. **P1 — Problem:** a claimed new slug is invisible until git/codimango knows it, and decisions have no durable task narrative. **Design:** materialize event/ref-only tasks immediately, then add task-scoped events for “new task”, scope decision, blocker, and handoff summary in both Feed and card timeline. **Effort:** M.
+7. **P2 — Problem:** keyboard and accessibility support lag the visual UI. **Design:** focusable rows/tooltips, click-to-pin/copy hovers, visible focus rings, ARIA labels/live regions, contrast audit, and `prefers-reduced-motion`. **Effort:** S.
 
 ## D. MODIFY
 
-| Area | Before | After |
-|---|---|---|
-| Default columns | `Task · Next · Status · Owner · Validation · Review · Presubmit · Sync` | `Task · Do next / ETA · Status / age · Working on it · Blocker · Human review · Server`. Put agent approvals and presubmit as compact prerequisites under **Do next**, only when relevant. |
-| Next wording | `FIX validation`, `GET R2`, `RERUN server`, `WAIT reviewer` | `Fix calibration: step 2 too easy`, `Need 1 independent review`, `Re-run validation for 1 newer push`, `Human review · waiting 1d`. Name the problem, quantity, and verb. |
-| Validation cell | `✔ clean`, `✘ 1 issue`, with an all-passed hover | Blank/dim `—` when clean; otherwise `Calibration: step 2 easy` or `2 blockers`. Hover shows at most three lines: `problem → suggested fix`; never list passes. |
-| Review column | Grey/green one/two ticks plus grey human text; Review hover also includes presubmit | Two explicit agent slots `●○`/`●●` labelled “agent checks” in the header help, `↻` for old commit, then a high-contrast human tag (`Not submitted`, `Waiting`, `In review`, `Sent back ×2`). Review hover contains review only. This is better than the old inaccurate bars, but the current grey single tick cannot distinguish current from stale without hovering. |
-| Sync | One/two green ticks mean imported/validated; a failed validation can still receive two green ticks | Rename the column **Server** and show words: `On server`, `Importing`, `1 push behind`, `Validation stale`, `Unknown`. Validation success/failure belongs only in **Blocker**, not in server synchronization. |
-| Header help | Hover text exists, but the symbols still require the tooltip | Keep concise hover definitions, add a visible `?` legend trigger and focusable headers. A user should understand the cell text without hovering. |
-| Hover copy | `user-select:text` plus “select to copy”; moving into a floating popover is timing-sensitive | Click pins; each command gets a copy icon and transient “Copied”. Do not open the drawer when the click was used to pin/copy. |
-| Task link | The task name only opens a drawer; three drawer buttons compete (`codimango`, `server commit`, `main`) | Task name is a normal codimango link with an external-link icon; clicking elsewhere on the row opens the card. In the card, label commit links `Reviewed commit abc1234` and `Current main def5678`, showing why both exist. |
-| Card hierarchy | Title → taxonomy → status → three links → next steps → assignee | Title → **Do now** → total active-time range/confidence → **Assign to** live session/server → blocker → human review → history → links/taxonomy. The author’s latest card request is still not met. |
-| ETA | Fixed constants and `historical median - age` | Observed range + confidence + sample: `Validation: 25–55m · medium · n=18`. For human waits use conditional remaining time, not subtraction. If unsupported: `ETA unknown · no comparable history`. |
-| Assignee | “keep with owner” or least-loaded server by raw active-task count, ending in a `<host session>` placeholder | Keep a healthy current owner. Otherwise recommend an actual live, unclaimed session with agent kind, host, idle time, capability, and weighted load; if none exists say `Unassigned — start/claim on 23237`, not a fake person. |
-| Groups | The five requested groups exist; Done’s “accepted” filter includes in-training tasks and double-counts them | Keep `Needs you · Ready · Validating · With reviewers · Done`; make Done’s children disjoint: `Accepted`, `In training`, `Archived`. “Needs you” means a human/agent action is possible now, not every warning. |
-| Freshness | “live”, codimango age, and page time; ledger can be minutes behind and refresh failure stays green | Show `snapshot 8s · codimango 42s · ledger 6s · presence 9s`, turn the live dot amber/red by thresholds, and show the last refresh error. A claim/check event should optimistically appear immediately with `syncing`. |
-| Colour | Red/green/blue/violet encode groups while red/amber/green also encode severity/status | Reserve red for blocking, amber for action/warning, blue for waiting/system work, green for genuinely ready or completed, violet for ownership/review metadata. Always pair colour with text/icon. |
-| Animation | Floating logo, pulsing dot, shimmering bar, row entrances, twinkles, chip rotations all run continuously | Keep one subtle state-change sparkle and drawer easing; stop decorative loops after one cycle and honor `prefers-reduced-motion`. Cuteness should mark change, not consume attention. |
+- **Columns:** `Task | Next | Status | Owner | Validation | Review | Presubmit | Sync` → `Task | Action | Stage/age | Working on it | Validation | Review | Preflight | Server`. Keep eight columns, but replace ambiguous nouns with questions/statuses and collapse low-value detail on narrow screens.
+- **Wording:** `needs you` → `Blocked / act`; `ready` → `Ready to work`; `with reviewers` → `Human review`; `done` → `Done`; `Sent back` stays because it is plain and useful. `Review` hover should lead with the human state, then agent approvals and preflight.
+- **Colours:** reserve red for an actionable blocker, amber for stale/at-risk, blue for running/importing, green for verified-current success, grey for unknown/not applicable. Never use grey both for “not done” and “old result” without text.
+- **Hovers:** keep the compact problem-first format, but make click/keyboard pinning primary, include only the reason and next command, and add Copy. Do not repeat the entire drawer.
+- **Card:** move “Next steps” above the external-link buttons, then place `Assign/claim/handoff` and confidence beside it. Follow with Problems, human/agent review, commits/rounds, then metadata. Collapsed card should fit one screen; expanded mode may show chronology and raw evidence.
+- **ETA:** show `effort` and `wait` separately, e.g. `30–90m work · then external wait, typical 45m`; add `low/medium/high confidence` and the evidence window. Unknown becomes `estimate unavailable`, not a fabricated default.
+- **Assignee:** `host (lighter load)` → `session alias on host · 0 active / waiting` with why, plus a command/action that targets a real session ID. If no live eligible session exists, say `unassigned — start or select a session`.
+- **Grouping:** keep `Blocked / act`, `Ready to work`, `Validating`, `Human review`, and `Done`; retain Done subfilters `Accepted`, `In training`, `Archived`. Put claim conflicts and stale-source uncertainty ahead of validation failures.
+- **Freshness:** `live · codimango data 1m old · page …` → `Page refreshed 12s ago | codimango 1m ✓ | git: hostA 40s ✓, hostB 7m stale | ledger 35s ✓ | inbox 35s ✓`. A green live dot must mean all required sources are within policy, not merely that the page is polling.
 
-## E. Making better use of the structure
+## E. Agents & servers
 
-Workboard should be the one coordination write surface. The private ledger is already the right substrate, but the projection needs a first-class task-intent record rather than requiring codimango/git to create identity. CLAIMS.md should remain an advisory, visibly stale compatibility input until all sessions use `board`; sessions should never be told to dual-write it.
+Workboard should be the coordination control plane, while source systems remain authoritative. Before work, every session reads `board available` and `board show`, resolves ownership, then atomically claims. During work it automatically emits heartbeat/presence, current task, latest commit, and coarse state; on push it records the commit and observes import/validation; on preflight it records structured results; on stop it prompts for release or handoff. These automatic events must never masquerade as human approval or a completed handoff.
 
-Represent ownership as a lease on a role, not just a string: `{task, role: builder|reviewer, session_id, agent, host, acquired_at, heartbeat_at, phase, handoff_note}`. A task may have one builder and independent reviewers, but never two builders. Reviews do not take the builder lease. The two-server header should show weighted lane capacity, for example `23237: 2 editing, 1 validating · 6971: 1 editing, 2 idle`, with source age.
+Explicit session actions should remain: choosing/accepting an assignment, changing task priority/scope, recording a review verdict, acknowledging a message, and releasing/handover with a one-line state plus next command. Assignment is an offer until the target session accepts or starts work; show `offered`, `accepted`, `declined/expired`, not just `assigned`.
 
-Use this lifecycle:
+Duplicate-work prevention needs a server-independent atomic claim as the gate, then local edit hooks as guardrails. Presence is evidence of activity, not ownership. On conflict, block new edits where possible and present both sessions with the same resolver. A handoff should bundle task, current commit, completed checks, open findings, next command, and ownership transfer; only release the old owner after the new owner accepts, or label the gap explicitly.
 
-1. `board start slug --to session` reserves a new idea before files exist.
-2. Entering a known task directory offers/renews the builder lease; a conflicting edit is blocked with owner, host, age, and handoff command.
-3. Push/check/review events update the same task record immediately; server import and validation transitions reconcile later.
-4. `board handoff` carries the current blocker, exact commit, last clean check, and next command; the target accepts before ownership moves.
-5. Accepted/in-training/archived tasks release leases automatically, while a failed or abandoned session leaves an explicit recoverable handoff.
+Message etiquette: target the narrowest session/server; attach a task when relevant; write one actionable request with owner and urgency; acknowledge only after reading; reply with outcome or blocker; use broadcast only for cross-cutting incidents. The UI should discourage chat noise by separating `FYI` from `action requested` and showing unanswered requests.
 
-Each session should do the following automatically: register identity and heartbeat; infer the task from cwd/tool paths; renew its lease while genuinely active; record push SHA and check results from wrapped commands; publish presence within seconds; stop presence on session end; and release when codimango reaches Done. It should do the following explicitly: reserve a brand-new idea/slug, accept a handoff, release/park with a reason, steal an expired lease, and submit an independent review verdict. Those are intent decisions and should not be guessed.
+The shared contract must be in both README and the installed skill: at session start read inbox/assignments; before editing show/claim; after a push or preflight let hooks record objective state; after an agent review explicitly record the verdict; before exit explicitly hand off/release and acknowledge messages. Claude and Codex need equivalent adapters—presence-only support for Codex is not enough.
 
-Duplicate prevention must work before source creation and for Codex as well as Claude. Today the Claude hook blocks some editor tools, while Codex is mostly inferred after the fact. Give Codex sessions the same explicit session token/lease protocol, and treat two fresh builder presences as an actionable conflict even if claim synchronization has not completed.
+## F. ETA/next-step accuracy
 
-## F. ETA and next-step accuracy
+Available inputs include lifecycle/status timestamps, state age, validation items/details, git head/server/validated commits, changed files, commit history, preflight events, agent reviews tied to commits, human revision decisions, claims/presence, and aggregate cycle/wait statistics. These support accurate **state-derived next steps** and historical wait estimates; they do not yet support precise coding-effort estimates.
 
-### Data that exists
+Compute external waits from recent, track-specific cohorts with sample size and percentiles. Compute work effort only after capturing step start/finish or active-time events, bucketed by action/check/track/difficulty; exclude idle and concurrent-session time. Show ranges and confidence: high for a current deterministic command, medium for waits with enough recent samples, low for sparse cohorts, and unknown for novel repair effort. Never subtract wall-clock state age from a population median and call the remainder an ETA without a survival model; elapsed waits do not have that distribution.
 
-| Source | Useful facts | Limits |
-|---|---|---|
-| Codimango | Current status, validation status/details, created/entered-pool/reviewed/updated times, server/head/validation SHAs, track/category/difficulty | Mostly latest state; no durable history of every import/validation transition; latest submission timestamps cannot reconstruct first-submission cycle. |
-| Human review history | Decision kind/time and short reason; revision rounds | Refreshed a few tasks per cron run, cached without freshness in the card, and parsing depends on CLI prose. |
-| Git | Task head, commit times, changed files since validated SHA, server-SHA commit time when present | Commit time is not push/import time; an older timestamp does not prove synchronization. |
-| Ledger | Claims, renewals, touches, presence, checks, agent reviews, build actions, aliases | Presence is sampled/inferred; current Codex identity is not session-safe; no canonical task-intent or codimango transition events. |
+When unknown, show `Next: fix calibration` and `Effort: unknown`, optionally `similar fixes: median 1.8h, n=7`—not `~2h`. Separate `your work`, `automation`, and `human wait`, because only the first is schedulable by the author.
 
-### Honest computation
+## G. Visual critique of the screenshots: 10 specific fixes
 
-- Record state transitions first: local push observed, server head changed, validation started/completed, entered pool, human decision, revision push, presubmit started/completed.
-- Split **active effort** from **external wait**. Calibration repair time should use builder-active intervals from claim/touch to clean check/push; validation ETA should use server-head-to-validation-complete; reviewer wait should use pool-entry-to-decision.
-- Build cohorts by task format/track, action type, validation check, revision round, and difficulty only when `n >= 5`; otherwise back off to the broader cohort.
-- Show a range, not a point: p50–p75 for system waits and p50–p80 for repair effort, plus `n`, lookback window, and `high/medium/low` confidence.
-- For an already elapsed human wait, compute the conditional residual distribution `T - elapsed | T > elapsed`; the current `p50 - age` rule is statistically wrong and produces “any time now” precisely when uncertainty is highest.
-- Never add multiple step ETAs as though work were serial if a wait can overlap another agent’s work. Label `active work` and `waiting` separately.
-- When data is absent show `ETA unknown — no observed transitions yet`; when sample size is weak show `Usually 1–4h · low confidence · n=3`; for human review say `No promise; 50% of comparable reviews finish within …`.
+1. The table is information-dense but the task name receives too little width; freeze it as the first column and allow two-line wrapping before truncation.
+2. “Next” repeats `FIX validation` across many rows; replace it with the first actual problem (`calibration`, `oracle`, `provenance`) so scanning differentiates tasks.
+3. Owner strings such as `23237 (CLAIMS.md)` are cryptic; show `server/session`, freshness, and source in a secondary line.
+4. The Review column's grey ticks and grey human text are too faint and ambiguous; render human state as a labelled chip and agent approvals as secondary `0/2`, `1/2`, `2/2 current`.
+5. Presubmit and Sync are nearly all bare ticks; add short labels and consolidate into a compact “Readiness” cell if horizontal space becomes tight.
+6. The hover is concise, which is good, but it overlaps adjacent rows and requires a pointer precision move to copy; click-to-pin it, add Copy, and anchor it to the cell edge.
+7. The drawer correctly starts with next steps, but primary actions are external links; put Claim/Assign/Handoff/Copy next command ahead of navigation links.
+8. The drawer's narrow width makes the handoff command wrap awkwardly; make the action block full width with a copy button or default the drawer slightly wider.
+9. Stats bars lack a shared scale cue and the funnel reports `imported 144` above `built 143` as `101% of previous`; explain non-nested populations or rename the visualization so it does not imply an impossible funnel.
+10. The continuous shimmer, pulsing dot, twinkling change marker, row entrances, chip movement, and card movement compete; limit animation to a soft freshness pulse and a one-shot update highlight, with reduced-motion support.
 
-Next-step selection should remain deterministic, but use the most specific evidence: ownership conflict → current validation blocker → server/import drift → stale presubmit/agent approval → human state. A generic `FIX validation` should never survive when a parsed issue such as `calibration: step 2 too easy` exists. If sources disagree, the next step is to reconcile the disagreement, not to pick whichever timestamp looks newer.
+## H. Risks/bugs in the code (file:line)
 
-## G. Visual critique of the screenshots
+1. **High — superseded review verdicts still count.** `workboard/projection.py:107–122` builds sets from every verdict on the commit instead of the latest verdict per session; `ready → changes` still contributes approval. Two such sessions can produce `R2` and dissent simultaneously. `workboard/insights.py:128–138` repeats the same mistake in the web summary.
+2. **High — pre-scaffold claims are invisible.** `workboard/projection.py:220–221` creates views only for entities present in observations, not claim/event-only tasks; `workboard/app.py:118–120` also drops claim-ref observations for unknown tasks. This contradicts `skill/SKILL.md:18–19`, which promises a newly claimed slug will show everywhere before scaffolding. A direct claim-only projection returns no rows.
+3. **High — “delivered” only means pushed to the ledger.** `workboard/__main__.py:1122–1123` maps `last_push_ok && !pending` to `delivered`; `workboard/html_page.py:247–257` promises delivery into the session. There is no evidence that the target server fetched it or that a session saw it.
+4. **High — Codex sessions never receive injected messages.** Inbox injection is a Claude `additionalContext` hook at `workboard/hooks.py:231–251`, while Codex support only scans session logs for presence at `workboard/presence.py:108–127`. This misses the stated Claude/Codex communication goal.
+5. **High — hook delivery state races and can redeliver.** `workboard/comms.py:99–111` performs an unlocked read/modify/write through one fixed `.tmp` filename; concurrent hooks can lose updates or fail replacement. Line 108 keeps the lexicographically greatest 500 random IDs, not the 500 newest messages.
+6. **High — Team's “last sync” is not a sync time.** `workboard/comms.py:166–181` derives it from the newest ledger event recorded by a host. A healthy but quiet syncing server appears offline, and an event-producing server can appear healthy without a successful pull; the UI labels this `last sync`/`online` at `workboard/html_page.py:235–240`.
+7. **High — failed web refreshes are invisible.** `workboard/html.py:126–134` swallows every background refresh exception and leaves the old payload. The client continues fetching it and can retain a green live dot because `workboard/html_page.py:203–204,260–293` ignores ledger state and freshness age.
+8. **Medium — infra failures can prescribe a push instead of a rerun.** `workboard/insights.py:62–64` correctly downgrades codimango infrastructure failures to warnings, but `FIX validation` only turns `fail` items into steps at lines 91–95; the resulting plan can omit the actual rerun and say only “push, then wait.”
+9. **Medium — ETAs look measured but are mostly literals.** `workboard/insights.py:91–123` hard-codes repair/review/import times. Lines 117–120 estimate remaining reviewer wait as `p50 − elapsed`, which is not a valid conditional wait estimate and can claim “any time now” indefinitely.
+10. **Medium — assignee suggestions can target an offline host.** `workboard/insights.py:156–165` selects the configured host with the lowest claimed-task count, with no live-session eligibility, waiting state, specialty, or capacity; it emits a placeholder rather than an executable assignment.
+11. **Medium — interactive terminal refresh crashes if gathering throws.** Both `workboard/app_ui.py:217–225` and `workboard/tui.py:353–362` let a worker-thread exception leave `box["snap"]` unset, then index it after join. Preserve the last snapshot and expose the error instead.
+12. **Medium — the claimed per-field authority merge is observation-wide.** `workboard/projection.py:56–67` ranks an observation by its highest-authority field and then updates every field. Mixed-authority plugin observations can overwrite newer or more authoritative values despite the docstring promising per-field resolution.
+13. **Low — help text names nonexistent/missing group keys.** `workboard/app_ui.py:3–4,129` says `a/r/w/d`; actual keys at line 21 are `a/r/v/e/d`. This is exactly the sort of operator papercut the Help tab should eliminate.
+14. **Documentation/rollout gap.** `README.md:8–17` and `skill/SKILL.md:28–38` omit `ui`, `serve`, Team, `msg`, `inbox`, `ack`, and `feed`; the skill still mandates a duplicate CLAIMS.md update at lines 18–21. The current source has a Team tab, but none appears in the supplied live screenshots.
 
-1. Reduce the board header/control stack by about 40 px: the logo, week line, colour bar, tabs, group chips, owner chips, search, and health consume too much vertical space before the first task.
-2. Give **Task** more width and middle-truncate names; the current end ellipsis removes the discriminating suffix (`…reference-fidelity`, `…split-move`).
-3. Replace the eight-column tick matrix with the seven-column action set in section D; **Presubmit** and **Sync** currently force interpretation instead of supporting scanning.
-4. Remove green `✔ clean` from every validation row. Blank clean cells make the red failure rows and amber warnings immediately visible.
-5. Make human review state a pill with readable contrast. Grey prose beside grey ticks is the lowest-salience information in a column whose human status matters most.
-6. Replace green double Sync ticks with explicit server words. Screenshot 1 shows red validation failures beside green `✓✓`, a visually contradictory success signal.
-7. Move the task card’s Next Steps block above status and link buttons, and put the proposed actual session/server plus confidence on the same first screenful.
-8. Increase dim-text contrast (`#5b6070` ticks/hints are too faint on `#13151b`) and add focus outlines; colour alone should not distinguish active/off chips or review completion.
-9. Remove the permanent logo float, health pulse, and progress-bar shimmer; retain the row-change sparkle and drawer motion, with a reduced-motion mode.
-10. Fix Stats before polishing it: do not render `101% of previous`; align stacked MT/ST bars without the negative margin, mark the current week as week-to-date, and include coverage next to cycle/wait numbers.
+**Verification:** 448 tests were exercised. The complete sandbox run had 447 successes plus one localhost-bind permission error; that isolated HTML server test passed outside the socket restriction. It emitted a `ResourceWarning` because the test calls `shutdown()` but not `server_close()` (`tests/test_html.py:30–44`). Coverage is strong for rendering widths, claims, projection, and basic comms, but does not cover latest-verdict replacement, concurrent inbox delivery, Codex message injection, failed live refresh, or browser accessibility. Both supplied terminal captures contain only `./board: No such file or directory`; `./board --help` works from this checkout, so the captures were taken from the wrong directory and do not verify terminal UX.
 
-## H. Risks and bugs visible in the code
+## I. Prioritized 2-week roadmap
 
-The suite is substantial—443 tests pass—but it mostly checks structural output and current rules, not whether those rules represent reality. It also emits an unclosed-socket `ResourceWarning` from the HTML server test.
-
-| Severity | Evidence | Risk / bug |
-|---|---|---|
-| Critical | `workboard/__main__.py:93-102`, `workboard/__main__.py:422-424`, `workboard/projection.py:220-221`, `workboard/app.py:118-120` | `board claim <new-slug>` cannot work before the slug exists in a source; event-only tasks and orphan claim refs are discarded. This directly breaks the documented anti-duplication workflow for new tasks. |
-| Critical | `workboard/identity.py:50-60` | Only `CLAUDE_CODE_SESSION_ID` creates an agent identity. Every Codex session on a host is attributed to the same human shell actor, so ownership and “two independent sessions” can be wrong. |
-| High | `workboard/__main__.py:1088-1092`, `workboard/html.py:121-129`, `workboard/html_page.py:193-194`, `workboard/html_page.py:250-251` | Live serve skips ledger sync, refresh errors are swallowed, and the live dot only reflects old source-health fields. The page can stay green and stale; cron + refresh + polling explains the reported lag. |
-| High | `workboard/projection.py:275-288`, `tests/test_projection.py:160-162`, `tests/test_projection.py:186-192` | Unequal local/server SHAs become `OK` when the local commit time is older. Timestamps cannot prove commit containment or import, and the tests explicitly lock in this false result. |
-| High | `workboard/projection.py:217-218`, `workboard/events.py:257` | Ledger events are read in per-host sequence order, then re-sorted globally by `occurred_at`. This violates the design’s “order within writer by seq” rule and lets clock skew reorder claim/release/renew state. |
-| High | `workboard/html.py:20-29`, `workboard/projection.py:298-300` | The web card marks agent reviews/checks current only against git head, while projection uses git head or server SHA. With git absent/stale, web and terminal disagree. The web also picks `checks[-1]` from host/seq order rather than the latest occurrence. |
-| High | `workboard/html.py:21-24`, `workboard/insights.py:124-149` | Web review deduplication uses display alias (`who`), not session ID. Two sessions with one alias collapse; one session renamed between reviews can count twice. The new ticks can therefore still be inaccurate. |
-| High | `workboard/presence.py:92-107` | A task mentioned in any tool input in a transcript tail gets the transcript file’s latest mtime. Later unrelated session activity makes an old task look freshly active, potentially hiding free work or assigning it to the wrong session. |
-| High | `workboard/presence.py:108-127` | Codex presence reads only the first 64 KiB and only the initial cwd; it does not inspect later tool paths. Codex working from a repo root is invisible, so cross-agent overlap protection is asymmetric. |
-| Medium | `workboard/projection.py:56-67` | `_merge` claims to resolve authority per field but sorts each observation by its maximum authority and updates every field together. A mixed-authority observation can overwrite a more authoritative field. |
-| Medium | `workboard/projection.py:289-290`, `workboard/html_page.py:146-147` | `validated = valid != RUN`, so a failed validation is rendered as the second green Sync tick. “Validation finished” is semantically true, but green communicates success and contradicts the red blocker beside it. |
-| Medium | `workboard/html_page.py:174-180` | The Done `accepted` filter/count includes `in_training`, then shows `in_training` again. The requested Accepted/In training/Archived children are not disjoint. |
-| Medium | `workboard/insights.py:67-119` | Repair and wait ETAs are constants; reviewer remaining time is `p50 - state age`. There is no sample count, cohort, interval, or confidence, so the UI overstates accuracy. |
-| Medium | `workboard/insights.py:152-161`, `workboard/html.py:62-69` | Assignee selection counts tasks per parsed host prefix and picks `min(load)`. It ignores live sessions, agent capability, task cost, running checks, stale presence, and whether the suggested host can access the repo. |
-| Medium | `workboard/stats.py:37-57`, `workboard/stats.py:101-111` | “All-time accepted” counts only tasks whose *current* status is accepted/in-training. Archiving a previously accepted task can reduce the all-time total even though `status_before_archive` is available. |
-| Medium | `workboard/sync.py:135-140` | Ledger pull uses `git reset --hard`; an in-progress tracked edit in the private ledger checkout, including config, can be silently discarded. The dedicated checkout needs a no-manual-edit contract or a safer config path. |
-| Medium | `workboard/html.py:21-45`, `workboard/html.py:104-112`, `workboard/__main__.py:951-955` | Static HTML embeds task names, aliases, internal links, review notes/reasons, and validation text; `config show --json` prints paths/remotes. There is no redacted export mode or privacy warning. |
-| Medium | `workboard/legacy.py:40-56`, `workboard/__main__.py:484-495`, `workboard/completion.py:32-39` | CLAIMS.md sync only recognizes tasks already in the codimango cache and excludes archived tasks. A free-text row for a brand-new task—the moment coordination matters most—is silently ignored. |
-| Low | `workboard/html_page.py:160-165` | Validation hover maps every non-pass item without a cap and still renders “all N checks passed”; the latest hover feedback is only partially implemented. |
-| Low | `DESIGN.md:15`, `skill/SKILL.md:16-25`, `DESIGN.md:55`, `README.md:27-28` | The signed-off design says review is the only explicit action and mentions a five-minute timer, while the skill requires claim/CLAIMS/check/release/review and README says two minutes. Workflow documentation is not one coherent contract. |
-| Low | `tests/test_html.py:30-44` | The test calls `shutdown()` but not `server_close()`, producing the observed unclosed-socket warning and masking resource-lifecycle regressions. |
-
-## I. Prioritized two-week roadmap
-
-1. Add ledger-backed task-intent projection and make `board start/claim` work for an unknown slug.
-2. Give Claude, Codex, and shell sessions stable distinct identities; bind claims/reviews to session IDs.
-3. Make live serve run/publish synchronized snapshots and expose refresh errors plus per-source ages.
-4. Fix SHA drift logic, per-field authority merge, event ordering, and web/terminal current-commit parity.
-5. Replace the table with the action-first column set and remove clean-validation/presubmit noise.
-6. Reorder the card to Do now → effort/wait → actual assignee → blocker → review → history/links.
-7. Implement atomic offered/accepted handoffs and possible-overlap findings for multiple builder presences.
-8. Record codimango/import/validation transitions; show `ETA unknown` until cohorts meet the sample threshold.
-9. Correct Done subgroups, all-time accepted, and remove invalid funnel conversion percentages.
-10. Add pinned/copyable keyboard popovers, focus states, contrast fixes, and reduced-motion CSS.
-11. Rewrite README/DESIGN/skill as one workflow: Workboard writes, CLAIMS.md compatibility reads only.
-12. Dogfood on both servers for 48 hours with freshness/duplicate-work logs, then fix only observed failures before calling it v1.
+- **Day 1:** fix latest-verdict semantics, materialize claim/event-only new tasks, and correct infra-rerun steps; add regressions.
+- **Days 1–2:** define source authority/freshness and message/assignment state machines; update README and installed skill, removing CLAIMS.md dual-write.
+- **Days 2–3:** ship per-source freshness/error indicators and prevent green “live” when required inputs are stale.
+- **Days 3–5:** make inbox state atomic and visible (`queued/synced/surfaced/acked`); add equivalent Claude and Codex delivery plus task threads.
+- **Days 5–7:** add live-session capacity plus atomic assign/accept/handoff/release flows and resolver UX.
+- **Days 7–8:** replace constant ETAs with effort/wait separation, ranges, confidence, sample size, and unknown states.
+- **Days 8–9:** revise row labels/columns, pin-and-copy hovers, card actions, responsive behavior, and reduced-motion/accessibility.
+- **Days 9–10:** harden refresh/concurrency failure paths, add two-host integration/browser tests, recapture terminal/web artifacts, and dogfood for a full day.

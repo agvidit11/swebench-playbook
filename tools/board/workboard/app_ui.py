@@ -1,6 +1,6 @@
 """Interactive terminal app (`board ui`): tabs, toggle chips, search, selection with a detail panel, live refresh.
 
-Keys: 1 board · 2 stats · ? help · ↑/↓ or j/k move · enter details · a/r/w/d toggle groups · f owner filter ·
+Keys: 1 board · 2 stats · ? help · ↑/↓ or j/k move · enter details · a/r/v/e/d toggle groups · f owner filter ·
 / search · esc clear · r refresh · q quit. Rendering reuses tui.render / tui.render_stats so the look is identical.
 """
 from __future__ import annotations
@@ -214,7 +214,12 @@ def run(gather_fn, cfg, *, interval: int = 120, host_tag: str = "", out=sys.stdo
         tty.setcbreak(fd)
         while True:
             box = {}
-            t = threading.Thread(target=lambda: box.setdefault("snap", gather_fn()), daemon=True)
+            def work():
+                try:
+                    box["snap"] = gather_fn()
+                except Exception as exc:          # keep the last snapshot and show the error instead of crashing
+                    box["error"] = exc
+            t = threading.Thread(target=work, daemon=True)
             t.start()
             i = 0
             while t.is_alive():
@@ -222,7 +227,9 @@ def run(gather_fn, cfg, *, interval: int = 120, host_tag: str = "", out=sys.stdo
                 out.flush()
                 time.sleep(0.08)
                 i += 1
-            snap = box["snap"]
+            snap = box.get("snap") or snap
+            if snap is None:
+                raise RuntimeError(f"could not load the board: {box.get('error')}")
             changed = tui._changed_since(prev, snap)
             prev = {v.entity_id: {k: v.fields.get(k) for k in ("state", "valid", "next", "review", "owner")}
                     for v in snap.views}

@@ -19,7 +19,7 @@ from . import events
 
 INBOX_CACHE = "inbox-cache.json"
 DELIVERED = "inbox-delivered.json"
-FEED_TYPES = {"msg", "claim", "release", "steal", "assign", "check", "review", "presence", "note"}
+FEED_TYPES = {"msg", "claim", "release", "steal", "assign", "check", "review", "presence", "note"}   # not heartbeat
 
 
 def target_for(spec: str, aliases: dict[str, str], servers: list[str]) -> dict:
@@ -96,20 +96,30 @@ def pending_for_hook(state_dir: Path, session_id: str, host_id: str, max_items: 
         cache = json.loads((state_dir / INBOX_CACHE).read_text())
     except (OSError, ValueError):
         return []
+    import fcntl
+    lock = os.open(state_dir / (DELIVERED + ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        delivered = json.loads((state_dir / DELIVERED).read_text())
-    except (OSError, ValueError):
-        delivered = {}
-    mine = set(delivered.get(session_id, []))
-    out = [m for m in cache.get("messages", []) if addressed_to(m, session_id, host_id)
-           and m.get("from_session") != session_id and session_id not in m.get("acked_by", [])
-           and m["id"] not in mine][:max_items]
-    if out:
-        delivered[session_id] = sorted(mine | {m["id"] for m in out})[-500:]
-        tmp = state_dir / (DELIVERED + ".tmp")
-        tmp.write_text(json.dumps(delivered))
-        os.replace(tmp, state_dir / DELIVERED)
-    return out
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            delivered = json.loads((state_dir / DELIVERED).read_text())
+        except (OSError, ValueError):
+            delivered = {}
+        mine = delivered.get(session_id, [])            # [[msg_id, at], ...] newest last
+        mine_ids = {x[0] for x in mine if isinstance(x, list)}
+        out = [m for m in cache.get("messages", []) if addressed_to(m, session_id, host_id)
+               and m.get("from_session") != session_id and session_id not in m.get("acked_by", [])
+               and m["id"] not in mine_ids][:max_items]
+        if out:
+            merged = [x for x in mine if isinstance(x, list)] + [[m["id"], m["at"]] for m in out]
+            delivered[session_id] = sorted(merged, key=lambda x: x[1])[-500:]
+            fd, tmp = tempfile.mkstemp(dir=state_dir, prefix=".delivered-")
+            with os.fdopen(fd, "w") as fh:
+                json.dump(delivered, fh)
+            os.replace(tmp, state_dir / DELIVERED)
+        return out
+    finally:
+        fcntl.flock(lock, fcntl.LOCK_UN)
+        os.close(lock)
 
 
 def hook_context(msgs: list[dict]) -> str:
@@ -164,7 +174,8 @@ def servers(evs: list[dict], views, cfg, now: float | None = None) -> list[dict]
     out = []
     for h in ids:
         mine = [e for e in evs if e.get("host_id") == h]
-        last = max((datetime.fromisoformat(e["recorded_at"]).timestamp() for e in mine if e.get("recorded_at")),
+        beats = [e for e in mine if e["type"] == "heartbeat"] or mine      # heartbeat = a successful sync from that host
+        last = max((datetime.fromisoformat(e["recorded_at"]).timestamp() for e in beats if e.get("recorded_at")),
                    default=None)
         sessions = {}
         for e in mine:

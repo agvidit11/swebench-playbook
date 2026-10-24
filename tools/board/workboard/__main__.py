@@ -514,6 +514,13 @@ def cmd_sync(args, cfg):
                                                if r.get("entered_pool_at") and r.get("status") != "archived"])
     except Exception as exc:
         print(f"review history refresh skipped: {exc}", file=sys.stderr)
+    hb = s.default_state_dir() / "heartbeat-at"
+    if not hb.exists() or time.time() - hb.stat().st_mtime > 600:      # prove this host syncs, at most every 10 min
+        from . import coord as _c, events as _e
+        if _e.spool_append(s.default_state_dir(), _e.new_event("heartbeat", None, {"host": host},
+                                                               actor=dict(_c.actor_for(cfg), kind="human"),
+                                                               commit=None, source="sync")):
+            hb.touch()
     st = s.sync(cfg, state_dir=s.default_state_dir())
     app.refresh_claims_cache(cfg, s.default_state_dir())
     try:
@@ -1120,7 +1127,7 @@ def cmd_serve(args, cfg):
         if not ev_mod.spool_append(s.default_state_dir(), comms.new_message(text, target, actor, task=task)):
             raise ValueError("could not queue the message")
         st = s.sync(cfg, state_dir=s.default_state_dir(), timeout_seconds=20)
-        return {"to": target["to_label"], "delivered": bool(st.last_push_ok and not st.pending)}
+        return {"to": target["to_label"], "synced": bool(st.last_push_ok and not st.pending)}
     srv = html.serve(fresh, cfg, port=args.port, interval=args.interval, send_fn=send)
     print(f"🧭 workboard live at http://localhost:{args.port}/  (VS Code forwards the port; Ctrl-C to stop)")
     try:
@@ -1150,7 +1157,8 @@ def cmd_msg(args, cfg):
         return 2
     st = s.sync(cfg, state_dir=state, timeout_seconds=20)
     ok = st.last_push_ok and not st.pending
-    print(f"💬 sent to {target['to_label']}" + ("" if ok else " (queued locally; delivered after the next sync)"))
+    print(f"💬 sent to {target['to_label']} — in the shared ledger; the target sees it on its next sync (≤2 min) + next tool call"
+          if ok else f"💬 queued for {target['to_label']} (published on the next sync)")
     return 0 if ok else 3
 
 

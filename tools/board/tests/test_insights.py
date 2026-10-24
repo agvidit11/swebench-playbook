@@ -32,3 +32,12 @@ class InsightsTest(unittest.TestCase):
     def test_assignee(self):
         self.assertTrue(insights.assignee({"claim_health": "OWNED", "owner": "h1·x", "task": "t"}, {}).startswith("keep with"))
         self.assertIn("h2", insights.assignee({"claim_health": "FREE", "group": "ATTENTION", "task": "t"}, {"h1": 3, "h2": 1}))
+
+
+class InfraStepTest(unittest.TestCase):
+    def test_infra_failure_gives_rerun_step(self):
+        vs = insights.validation_summary([{"name": "Oracle validation", "status": "failed",
+                                           "detail": "No oracle trials produced a usable result (9 errored). infrastructure error, not a task defect"}])
+        steps = insights.next_steps({"next": "FIX validation", "vsum": vs}, {})
+        self.assertTrue(any("rerun" in s["do"] for s in steps))
+        self.assertFalse(any(s["do"].startswith("push") for s in steps))

@@ -306,3 +306,20 @@ class RenewKeepsForeignEditTest(ProjectionTest):
         self.assertEqual(self.view([cm("t")], [long]).fields["claim_health"], "LEGACY")
         short = e("note", "t", {"legacy_owner": "host-b", "updated": "2026-10-23", "expires_at": "2026-10-23T12:00:00+00:00"}, seq=1)
         self.assertEqual(self.view([cm("t")], [short]).fields["claim_health"], "FREE")
+
+
+class CodexFindingsTest(ProjectionTest):
+    def test_latest_verdict_per_session_wins(self):
+        obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        evs = [e("review", "t", {"verdict": "ready"}, commit=SHA_A, seq=1, at="2026-10-23T18:00:00+00:00"),
+               e("review", "t", {"verdict": "changes"}, commit=SHA_A, seq=2, at="2026-10-23T19:00:00+00:00"),
+               e("review", "t", {"verdict": "ready"}, session="s2", host="h2", commit=SHA_A, seq=1)]
+        v = self.view(obs, evs)
+        self.assertEqual(v.fields["review"], "R1")
+        self.assertEqual(v.fields["dissent"], 1)
+
+    def test_claimed_new_slug_is_visible(self):
+        evs = [e("claim", "brand-new-slug", seq=1)]
+        views = {v.entity_id: v for v in project([cm("t")], evs, self.cfg, NOW)}
+        self.assertIn("brand-new-slug", views)
+        self.assertEqual(views["brand-new-slug"].fields["claim_health"], "OWNED")

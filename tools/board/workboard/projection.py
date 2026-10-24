@@ -106,7 +106,10 @@ def _claims(task_events, cfg, now, aliases):
 
 def _reviews(task_events, current):
     reviews = [e for e in task_events if e["type"] == "review"]
-    at_current = [r for r in reviews if current and r["commit"] == current]
+    latest = {}
+    for r in reviews:                                   # a later verdict from the same session replaces its earlier one
+        latest[(r["actor"]["session_id"], r.get("commit"))] = r
+    at_current = [r for r in latest.values() if current and r["commit"] == current]
     ready = {r["actor"]["session_id"] for r in at_current if r["payload"].get("verdict") == "ready"}
     dissent = len({r["actor"]["session_id"] for r in at_current if r["payload"].get("verdict") == "changes"})
     if len(ready) >= 2:
@@ -217,6 +220,10 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
     for lst in per_task_events.values():
         lst.sort(key=lambda e: (ts(e["occurred_at"]) or now, e["host_id"], e["seq"]))
 
+    for tid, tev_list in per_task_events.items():          # claimed before codimango/git know it (new slug)
+        if tid not in by_task and any(e["type"] in ("claim", "presence") for e in tev_list) and \
+                any((now - (ts(e["occurred_at"]) or now)).total_seconds() < GIT_ONLY_MAX_AGE_S for e in tev_list):
+            by_task[tid] = {"workboard.claim_only": True}
     views = []
     for task, fields in by_task.items():
         cm = {k: v for k, v in fields.items() if k.startswith("codimango.")}
@@ -234,7 +241,7 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             slug = repo_cfg.remote_url.split("github.com", 1)[1].lstrip(":/").replace("22/", "", 1).removesuffix(".git")
             links["latest"] = f"https://github.com/{slug}/tree/{repo_cfg.branch}/{task}"
         raw = cm.get("codimango.status")
-        if not cm:
+        if not cm and not fields.get("workboard.claim_only"):
             ht = ts(g.get("git.task_head_time"))
             if not ht or (now - ht).total_seconds() > GIT_ONLY_MAX_AGE_S:
                 continue                                   # old git-only folder: template/sample, not a task

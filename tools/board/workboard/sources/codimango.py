@@ -138,6 +138,15 @@ class CodimangoSource:
         except OSError as exc:
             raise RuntimeError(f"cannot run {argv[0]}: {exc}")
         if proc.returncode != 0:
+            try:                                          # the CLI reports structured errors on stdout
+                j = json.loads((proc.stdout or "").strip() or "{}").get("error") or {}
+            except ValueError:
+                j = {}
+            if j.get("kind") == "authentication":
+                raise RuntimeError(f"codimango login expired — run `{j.get('fix') or 'codimango auth setup'}`")
+            if j.get("message"):
+                raise RuntimeError(f"{j.get('kind', 'error')}: {str(j['message']).splitlines()[0][:120]}"
+                                   + (f" — try `{j['fix']}`" if j.get("fix") else ""))
             err = re.sub(r"\s+", " ", (proc.stderr or "").strip())
             err = re.sub(r"(https?://\S+|malink/\S+|Need help\?.*$|=+)", "", err).strip(" .:")[-160:]
             raise RuntimeError(f"exit {proc.returncode}: {err or 'no stderr'}")

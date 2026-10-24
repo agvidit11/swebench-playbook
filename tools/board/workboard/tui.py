@@ -351,7 +351,12 @@ def watch(gather_fn, cfg, *, interval: int = 120, once: bool = False, out=sys.st
             # refreshing: small spinner animation while sources load
             import threading
             box = {}
-            t = threading.Thread(target=lambda: box.setdefault("snap", gather_fn()), daemon=True)
+            def work():
+                try:
+                    box["snap"] = gather_fn()
+                except Exception as exc:          # keep the last snapshot and show the error instead of crashing
+                    box["error"] = exc
+            t = threading.Thread(target=work, daemon=True)
             t.start()
             i = 0
             while t.is_alive():
@@ -359,7 +364,9 @@ def watch(gather_fn, cfg, *, interval: int = 120, once: bool = False, out=sys.st
                 out.flush()
                 time.sleep(0.08)
                 i += 1
-            snap = box["snap"]
+            snap = box.get("snap") or snap
+            if snap is None:
+                raise RuntimeError(f"could not load the board: {box.get('error')}")
             changed = _changed_since(prev, snap)
             prev = {v.entity_id: {k: v.fields.get(k) for k in ("state", "valid", "next", "review", "owner")}
                     for v in snap.views}

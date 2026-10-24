@@ -115,8 +115,7 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
         cres = ClaimRefSource(cfg, state_dir=state_dir).fetch()
         health["claims"] = cres.health
         findings += cres.findings
-        known = {x.entity_id for x in obs if not x.entity_id.startswith("__repo__:")}
-        claim_obs = [o for o in cres.observations if o.entity_id in known]
+        claim_obs = list(cres.observations)                # includes slugs claimed before they exist anywhere else
         obs += claim_obs
         claims_healthy = cres.health.ok
         refresh_claims_cache(cfg, state_dir, cres)

@@ -131,3 +131,15 @@ class CodimangoStrictTest(unittest.TestCase):
             res = self.src(FakeRunner(None, rc=2)).fetch()
             self.assertFalse(res.health.ok)
             self.assertEqual(res.observations, [])
+
+
+class AuthErrorTest(unittest.TestCase):
+    def test_expired_login_names_the_fix(self):
+        import tempfile
+        cfg = load_config(Path("/nonexistent"))
+        out = '{"error":{"fix":"codimango auth setup","kind":"authentication","message":"Unauthorized"}}'
+        runner = lambda argv, **kw: subprocess.CompletedProcess(argv, 9, out, "Need help?")
+        with tempfile.TemporaryDirectory() as d:
+            res = CodimangoSource(cfg, runner=runner, cache_dir=Path(d)).fetch()
+        self.assertFalse(res.health.ok)
+        self.assertIn("codimango auth setup", res.health.detail)

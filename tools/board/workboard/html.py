@@ -120,7 +120,7 @@ def write(snap, cfg, path: Path) -> Path:
 
 def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 60, host: str = "127.0.0.1", send_fn=None):
     """Serve the dashboard; data refreshes in the background every `interval` seconds."""
-    state = {"data": payload(gather_fn(), cfg), "at": time.time()}
+    state = {"data": payload(gather_fn(), cfg), "at": time.time(), "error": None}
     lock = threading.Lock()
 
     def refresher():
@@ -129,9 +129,10 @@ def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 60, host: str = "
             try:
                 d = payload(gather_fn(), cfg)
                 with lock:
-                    state["data"], state["at"] = d, time.time()
-            except Exception:
-                pass
+                    state["data"], state["at"], state["error"] = d, time.time(), None
+            except Exception as exc:              # keep the last data, but tell the page
+                with lock:
+                    state["error"] = f"{exc.__class__.__name__}: {exc}"[:200]
 
     threading.Thread(target=refresher, daemon=True).start()
 
@@ -166,7 +167,7 @@ def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 60, host: str = "
 
         def do_GET(self):
             with lock:
-                data = state["data"]
+                data = dict(state["data"], refresh_error=state["error"], refreshed_ago_s=int(time.time() - state["at"]))
             if self.path.startswith("/data.json"):
                 body, ctype = json.dumps(data, default=str).encode(), "application/json"
             elif self.path in ("/", "/index.html"):

@@ -88,10 +88,14 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
     wait_p50 = flow.get("wait_p50_h")
     if n.startswith("RESOLVE"):
         steps.append({"do": "agree who owns it; release the other claim", "eta": "~5m"})
+    infra = [i for i in vs["issues"] if i["why"].startswith("infra error")]
     if n.startswith("FIX validation"):
         for i in fails[:2]:
-            steps.append({"do": f"{i['check']}: {i['fix']}", "eta": "~2h"})
-        steps.append({"do": "push, then wait for validation", "eta": "~45m"})
+            steps.append({"do": f"{i['check']}: {i['fix']}", "eta": "effort varies"})
+        if infra:
+            steps.append({"do": f"{infra[0]['check']}: codimango infra error — codimango task rerun (free)", "eta": "~1m"})
+        steps.append({"do": "push, then wait for validation" if fails else "wait for the rerun to validate",
+                      "eta": "typically ~45m"})
     if n.startswith("FIX check"):
         steps.append({"do": "fix the presubmit failures, re-run `board check run`", "eta": "~1h"})
     if n.startswith("RERUN"):
@@ -125,7 +129,10 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
 
 def review_summary(t: dict) -> dict:
     """{agent: '✓✓'|'✓'|'', agent_on_current: bool, human: tag-ish text, bullets: [(kind, text)]}"""
-    cur = [r for r in t.get("agent_reviews") or [] if r.get("current")]
+    latest = {}
+    for r in t.get("agent_reviews") or []:              # latest verdict per session wins
+        latest[(r.get("who"), r.get("current"))] = r
+    cur = [r for r in latest.values() if r.get("current")]
     ready = {r["who"] for r in cur if r.get("verdict") == "ready"}
     changes = [r for r in cur if r.get("verdict") == "changes"]
     older_ready = {r["who"] for r in t.get("agent_reviews") or [] if r.get("verdict") == "ready" and not r.get("current")}

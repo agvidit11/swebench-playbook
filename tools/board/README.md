@@ -14,6 +14,10 @@ board check run <task>     # run your pre-submit gate (unchanged) and log the re
 board review add <task> --verdict ready --confidence 4 --note "..."
 board stats [--quality] [--from D --to D]            board rank [import <file>]
 board status               # sources, ledger, claims, hooks, cron
+board ui                   # interactive terminal app (tabs, filters, search, details)
+board serve                # live web dashboard on localhost:8765 (Board / Team / Stats)
+board msg <who> "text"     # message a session (tab-title words), a server, or all; delivered into sessions
+board inbox · board ack <id> · board feed   # your messages, mark handled, cross-server activity
 board import-claims --dry-run   # one-time: show live rows of an old CLAIMS.md ([legacy] claims_md); drop --dry-run to import
 ```
 

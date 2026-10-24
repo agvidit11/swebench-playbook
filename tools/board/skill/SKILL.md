@@ -19,7 +19,9 @@ attempts the atomic claim, so there is a short window before ownership is real �
    shows as yours on every server, so no one builds the same idea. Also add your CLAIMS.md row as usual.
 3. Presubmit: `board check run <task>`; if you ran the gate yourself, `board check record <task> --pass N --warn N
    --fail N --summary "..."`; for a batch, `board check import <dir>` (one `<task>.txt` per task).
-4. Done or handing over: `board release <task> --reason "..."`.
+4. Done or handing over: `board release <task> --reason "..."` and tell the next owner with `board msg`.
+5. Messages to you appear inside your session automatically (📬 workboard: …). Act, reply with `board msg`,
+   then `board ack <id>`.
 
 **After reviewing a task (the one manual step):**
 `board review add <task> --verdict ready|changes|comment --confidence 1-5 --note "<one line>"`
@@ -34,6 +36,9 @@ R2 = two different sessions said ready on the same commit. A new push turns revi
 | Run presubmit and log it | `board check run <task>` |
 | What changed | `board changes` |
 | Progress, flow, funnel, rank | `board stats` (`--quality`, `--from/--to`), `board rank` |
+| Message a session / server / everyone | `board msg <tab words|server|all> "text" [--task T]` |
+| Your messages (also shown to you automatically) | `board inbox` · `board ack <id|all>` |
+| What is happening on both servers | `board feed` · web Team tab (`board serve`) |
 | Health | `board status` |
 | One-time import of an old CLAIMS.md | `board import-claims --dry-run`, then without `--dry-run` |
 
