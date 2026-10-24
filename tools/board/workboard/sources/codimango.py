@@ -23,8 +23,8 @@ KEEP = {
     "id": "id", "status": "status", "validationStatus": "validation_status", "reviewedAt": "reviewed_at",
     "enteredPoolAt": "entered_pool_at", "createdAt": "created_at", "archivedAt": "archived_at",
     "commitSha": "commit_sha", "headCommitSha": "head_commit_sha", "validationCommitSha": "validation_commit_sha",
-    "trackAssignment": "track", "format": "format", "sourceRepo": "source_repo", "reviewStatus": "review_status",
-    "tbdReviewStatus": "tbr_status", "reviewerName": "reviewer", "updatedAt": "updated_at",
+    "trackAssignment": "track", "format": "format", "reviewStatus": "review_status",
+    "tbdReviewStatus": "tbr_status", "updatedAt": "updated_at",
 }
 
 
@@ -51,15 +51,39 @@ def normalise(task: dict, *, archived: bool) -> dict:
 
 
 def _parse_envelope(text: str) -> dict:
-    start = min((i for i in (text.find("{"), text.find("[")) if i >= 0), default=-1)
+    """Strict envelope check (DESIGN §4). Raises ValueError on anything unexpected."""
+    start = text.find("{")
     if start < 0:
-        raise ValueError("no JSON in output")
+        raise ValueError("no JSON object in output")
     data, _ = json.JSONDecoder().raw_decode(text[start:])
-    if isinstance(data, list):        # tolerate an older bare-list shape
-        data = {"tasks": data, "totalExact": True}
     if not isinstance(data, dict) or not isinstance(data.get("tasks"), list):
         raise ValueError("unexpected envelope (no tasks array)")
+    for flag in ("totalExact", "trainingStatusDegraded"):
+        if not isinstance(data.get(flag), bool):
+            raise ValueError(f"envelope flag {flag} missing or not a boolean")
+    for i, t in enumerate(data["tasks"]):
+        if not (isinstance(t, dict) and isinstance(t.get("name"), str) and t["name"]):
+            raise ValueError(f"task #{i} is not an object with a name")
     return data
+
+
+def _aware_ts(value) -> datetime | None:
+    try:
+        ts = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    return ts if ts.tzinfo else None
+
+
+def _valid_cache(data) -> bool:
+    return (
+        isinstance(data, dict)
+        and _aware_ts(data.get("fetched_at")) is not None
+        and isinstance(data.get("total_exact"), bool)
+        and isinstance(data.get("training_degraded"), bool)
+        and isinstance(data.get("rows"), list)
+        and all(isinstance(r, dict) and isinstance(r.get("name"), str) and r["name"] for r in data["rows"])
+    )
 
 
 class CodimangoSource:
@@ -75,18 +99,26 @@ class CodimangoSource:
         return self.cache_dir / CACHE_FILE
 
     def _read_cache(self) -> dict | None:
+        """The last complete snapshot, or None if missing or not in the expected shape."""
         try:
             data = json.loads(self._cache_path().read_text())
-            return data if isinstance(data.get("rows"), list) else None
-        except (OSError, ValueError, AttributeError):
+        except (OSError, ValueError):
             return None
+        return data if _valid_cache(data) else None
 
     def _write_cache(self, payload: dict) -> None:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=self.cache_dir, prefix=".cm-", suffix=".json")
-        with os.fdopen(fd, "w") as fh:
-            json.dump(payload, fh)
-        os.replace(tmp, self._cache_path())
+        try:
+            with os.fdopen(fd, "w") as fh:
+                json.dump(payload, fh)
+            os.replace(tmp, self._cache_path())
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
     # -- fetch -----------------------------------------------------------------------------------
     def _run(self, extra: list[str], timeout: float) -> dict:
@@ -103,28 +135,36 @@ class CodimangoSource:
         try:
             return _parse_envelope(proc.stdout or "")
         except ValueError as exc:
-            raise RuntimeError(f"bad output: {exc}")
+            raise RuntimeError(f"bad output: {exc}") from None
 
     def fetch(self, *, since=None, timeout_seconds: float | None = None, max_age_seconds: float = 0) -> FetchResult:
         timeout = timeout_seconds or self.cfg.codimango.timeout_seconds
         cached = self._read_cache()
         if cached and max_age_seconds:
-            age = (_now() - datetime.fromisoformat(cached["fetched_at"])).total_seconds()
+            age = (_now() - _aware_ts(cached["fetched_at"])).total_seconds()
             if 0 <= age <= max_age_seconds:
                 return self._result(cached, ok=True, detail="cache", findings=[])
         try:
             active = self._run([], timeout)
             archived = self._run(["--archived"], timeout)
-        except RuntimeError as exc:
+        except (RuntimeError, ValueError) as exc:
             return self._failed(cached, str(exc))
         rows = [normalise(t, archived=False) for t in active["tasks"]]
         rows += [normalise(t, archived=True) for t in archived["tasks"]]
         payload = {
             "fetched_at": _now().isoformat(timespec="seconds"),
-            "total_exact": bool(active.get("totalExact", True)) and bool(archived.get("totalExact", True)),
-            "training_degraded": bool(active.get("trainingStatusDegraded", False)),
+            "total_exact": active["totalExact"] and archived["totalExact"],
+            "training_degraded": active["trainingStatusDegraded"],
             "rows": rows,
         }
+        if not payload["total_exact"]:
+            # never let a partial list replace the last complete one
+            why = "codimango returned a partial task list"
+            if cached:
+                return self._result(cached, ok=False, detail=why, findings=[
+                    Finding("INCOMPLETE", "warn", why + f"; showing last complete list from {cached['fetched_at']}",
+                            "rerun later")])
+            return self._result(payload, ok=False, detail=why, findings=[])
         try:
             self._write_cache(payload)
         except OSError:
@@ -142,11 +182,11 @@ class CodimangoSource:
         return FetchResult([], health, findings)
 
     def _result(self, payload: dict, *, ok: bool, detail: str, findings: list) -> FetchResult:
-        at = datetime.fromisoformat(payload["fetched_at"])
-        if not payload.get("total_exact", True):
+        at = _aware_ts(payload["fetched_at"])
+        if not payload["total_exact"] and not any(f.code == "INCOMPLETE" for f in findings):
             findings.append(Finding("INCOMPLETE", "warn", "codimango returned a partial task list",
                                     "rerun later; counts may be low"))
-        if payload.get("training_degraded"):
+        if payload["training_degraded"]:
             findings.append(Finding("DEGRADED", "info", "codimango training status is degraded",
                                     "used_in_training may lag"))
         obs = []

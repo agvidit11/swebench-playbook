@@ -17,13 +17,14 @@ class FakeRunner:
         if self.timeout:
             raise subprocess.TimeoutExpired(argv, kw.get("timeout"))
         body = self.archived if "--archived" in argv else self.active
-        out = (FIX / body).read_text() if body else '{"tasks": [], "totalExact": true}'
+        out = (FIX / body).read_text() if body else '{"tasks": [], "totalExact": true, "trainingStatusDegraded": false}'
         return subprocess.CompletedProcess(argv, self.rc, out, self.stderr)
 
 
 class CodimangoTest(unittest.TestCase):
     def setUp(self):
-        self.cache = Path(tempfile.mkdtemp())
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        self.cache = Path(td.name)
         self.cfg = load_config(Path("/nonexistent"))
 
     def src(self, runner):
@@ -80,3 +81,53 @@ class CodimangoTest(unittest.TestCase):
         res = self.src(r2).fetch(max_age_seconds=300)
         self.assertEqual(r2.calls, [])
         self.assertTrue(res.health.ok)
+
+
+class CodimangoStrictTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        self.cache = Path(td.name)
+        self.cfg = load_config(Path("/nonexistent"))
+        self.fix = Path(td.name) / "fx"; self.fix.mkdir()
+
+    def runner_text(self, active_text, archived_text='{"tasks": [], "totalExact": true, "trainingStatusDegraded": false}'):
+        def run(argv, **kw):
+            return subprocess.CompletedProcess(argv, 0, archived_text if "--archived" in argv else active_text, "")
+        return run
+
+    def src(self, runner):
+        return CodimangoSource(self.cfg, runner=runner, cache_dir=self.cache)
+
+    def test_incomplete_keeps_previous_complete_cache(self):
+        two = json.dumps({"tasks": [{"name": "a", "status": "draft"}, {"name": "b", "status": "draft"}],
+                          "totalExact": True, "trainingStatusDegraded": False})
+        one = json.dumps({"tasks": [{"name": "a", "status": "draft"}], "totalExact": False, "trainingStatusDegraded": False})
+        self.src(self.runner_text(two)).fetch()
+        res = self.src(self.runner_text(one)).fetch()
+        self.assertFalse(res.health.ok)
+        self.assertEqual({o.entity_id for o in res.observations}, {"a", "b"})
+        self.assertIn("INCOMPLETE", [f.code for f in res.findings])
+        cached = json.loads((self.cache / "codimango-last-good.json").read_text())
+        self.assertEqual(len(cached["rows"]), 2)
+
+    def test_missing_flags_rejected(self):
+        res = self.src(self.runner_text('{"tasks": []}')).fetch()
+        self.assertFalse(res.health.ok)
+        self.assertIn("SYNC_FAILED", [f.code for f in res.findings])
+
+    def test_string_flags_rejected(self):
+        res = self.src(self.runner_text('{"tasks": [], "totalExact": "false", "trainingStatusDegraded": "false"}')).fetch()
+        self.assertFalse(res.health.ok)
+
+    def test_scalar_task_entry_rejected(self):
+        res = self.src(self.runner_text('{"tasks": [3], "totalExact": true, "trainingStatusDegraded": false}')).fetch()
+        self.assertFalse(res.health.ok)
+        self.assertEqual(res.observations, [])
+
+    def test_invalid_cache_treated_as_absent(self):
+        for bad in ({"rows": []}, {"fetched_at": "2026-10-23T00:00:00+00:00", "total_exact": True,
+                                    "training_degraded": False, "rows": [3]}):
+            (self.cache / "codimango-last-good.json").write_text(json.dumps(bad))
+            res = self.src(FakeRunner(None, rc=2)).fetch()
+            self.assertFalse(res.health.ok)
+            self.assertEqual(res.observations, [])

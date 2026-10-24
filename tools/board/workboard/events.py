@@ -20,6 +20,7 @@ SCHEMA_VERSION = 1
 SPOOL_NAME = "spool.jsonl"
 MAX_LINE = 16384
 MAX_QUEUE = 10000
+ACTOR_KINDS = {"claude", "codex", "muse", "human"}
 EVENT_TYPES = {
     "alias", "touch", "claim", "renew", "steal", "release", "assign", "check", "review",
     "build_action", "warning", "note",
@@ -143,7 +144,8 @@ def validate_committed(ev) -> str | None:
     if ev.get("type") not in EVENT_TYPES:
         return "type"
     actor = ev.get("actor")
-    if not (isinstance(actor, dict) and all(isinstance(actor.get(k, ""), str) for k in ("session_id", "alias", "kind"))):
+    if not (isinstance(actor, dict) and isinstance(actor.get("session_id"), str) and actor["session_id"]
+            and isinstance(actor.get("alias"), str) and actor.get("kind") in ACTOR_KINDS):
         return "actor"
     ent = ev.get("entity")
     if ent is not None and not (isinstance(ent, dict) and isinstance(ent.get("kind"), str) and isinstance(ent.get("id"), str)):
@@ -166,11 +168,12 @@ def _bounded_lines(path: Path, limit: int):
             if not line:
                 return
             lineno += 1
-            if len(line) > limit and not line.endswith(b"\n"):
-                while True:   # drain the rest of the oversize record
-                    more = fh.readline(65536)
-                    if not more or more.endswith(b"\n"):
-                        break
+            if len(line) > limit:
+                if not line.endswith(b"\n"):
+                    while True:   # drain the rest of the oversize record
+                        more = fh.readline(65536)
+                        if not more or more.endswith(b"\n"):
+                            break
                 yield lineno, None
                 continue
             yield lineno, line.rstrip(b"\n")

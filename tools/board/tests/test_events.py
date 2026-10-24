@@ -92,6 +92,26 @@ class EventsTest(unittest.TestCase):
         self.assertEqual([e["seq"] for e in evs], [1, 5])
         self.assertIn("3 ledger line(s)", findings[0].summary)
 
+    def test_empty_actor_rejected(self):
+        f = self.dir / "h.jsonl"
+        bad = ev(seq=2); bad["actor"] = {}
+        write_lines(f, [ev(seq=1), bad, ev(seq=3)])
+        evs, findings = events.read_events([f])
+        self.assertEqual([e["seq"] for e in evs], [1, 3])
+        self.assertIn("bad actor", findings[0].summary)
+
+    def test_line_exactly_over_limit_with_newline_is_oversize(self):
+        f = self.dir / "h.jsonl"
+        pad = "y" * (events.MAX_LINE - 10)
+        big = json.dumps({"x": pad})          # > MAX_LINE once newline is added? make sure
+        while len(big.encode()) + 1 != events.MAX_LINE + 1:
+            pad = pad[:-1] if len(big.encode()) + 1 > events.MAX_LINE + 1 else pad + "y"
+            big = json.dumps({"x": pad})
+        write_lines(f, [ev(seq=1), big, ev(seq=3)])
+        evs, findings = events.read_events([f])
+        self.assertEqual([e["seq"] for e in evs], [1, 3])
+        self.assertIn("oversize", findings[0].summary)
+
     def test_duplicate_event_id_deduped(self):
         f = self.dir / "h.jsonl"
         e = ev()
