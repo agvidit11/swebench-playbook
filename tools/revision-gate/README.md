@@ -72,3 +72,6 @@ absence of a new job; if a run nevertheless appears, monitor and report it.
 - **One local run, not two:** the server calibrates every pushed commit itself, so it is the second sample.
   The local run is there to catch a step that clearly left the band before spending a server cycle.
 - `--calibrate-runs N` forces N local runs when you want more confidence (for example a step sitting at 3/5).
+- `--accept-zero "<third-party gradient evidence>"` accepts a 0/5 step (RUNBOOK phase-1 band: 0/5 needs a
+  third-party gradient and legit failures); the evidence is recorded in the stamp.
+- `--calibrate-first` runs stage 7 before the others, to take the one-per-host bench slot while it is free.

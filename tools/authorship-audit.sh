@@ -99,7 +99,9 @@ BASH_WRITE_TEMPLATE = (
     r"|sed\s+-i\S*\s+(?:-\S+\s+|'[^']*'\s+|\"[^\"]*\"\s+)*\S*TASKNAME\S*"
     r"|truncate\s+(?:-\S+\s+)*\S*TASKNAME\S*"
     r"|dd\s+(?:\S+=\S+\s+)*of=\S*TASKNAME\S*"
-    r"|\bpatch\s+(?:-\S+\s+)*\S*TASKNAME\S*"
+    # `\bpatch` also matches a jq selector such as `.patch <task>/tests/config.json`,
+    # which is a read. Require the shell command verb at a command boundary.
+    r"|(?:^|[;&|]\s*)patch\s+(?:-\S+\s+)*\S*TASKNAME\S*"
     r"|git\s+(?:apply|checkout|restore)\s+(?:-\S+\s+|HEAD\s+|--\s+)*\S*TASKNAME\S*"
     r"|open\(\s*['\"][^'\"]*TASKNAME[^'\"]*['\"]\s*,\s*['\"][wa]"
 )

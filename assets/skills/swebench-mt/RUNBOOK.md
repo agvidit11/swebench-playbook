@@ -128,7 +128,7 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    **Completion Rates / Model Analysis describe the commit being pushed** — no stale "0/5 / not reached /
    not calibrated / RELEASE / WAITING / out of band" text left by a calibration loop. commonmark d711592
    shipped a stale 4/5|0/5|not-reached table; a bounce for this costs a revision round. Then
-   `revision-gate/gate.py <task>` must pass (it runs `preflight.sh --with-oracle` plus presubmit, provenance, step carry-forward, fake-pass probes, the reviewer agent and k2n x2). PROVISIONAL until `ledger/VERIFY-revision-gate.md` has 3 sign-offs; see the playbook's `tools/revision-gate/README.md`.
+   `revision-gate/gate.py <task>` must pass (it runs `preflight.sh --with-oracle` plus presubmit, provenance, step carry-forward, fake-pass probes, the reviewer agent and one k2n run when difficulty can have moved). A strict documentation-only change (`README.md` and `audit/**` only) uses `--documentation-only` instead: it proves every other task byte is identical to the exact server-validated commit, re-reads all server gate results and reviews, requires a closed review ledger when the task needs revision, and runs presubmit; any other changed path refuses that mode. PROVISIONAL until `ledger/VERIFY-revision-gate.md` has 3 sign-offs; see the playbook's `tools/revision-gate/README.md`.
 3. **After the verdict** — is the number real? `references/signal-integrity.md`
    before touching anything.
 4. **Before submit — README must match the server (Vidit 2026-10-20, MUST).** Run
@@ -185,7 +185,7 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
 
 ## Tools
 
-> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged.
+> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged. **Documentation-only exception (2026-10-17):** if the task diff from the exact green server commit touches only `README.md` and `audit/**`, run `gate.py <task> --documentation-only` instead (re-verifies server results, reviews, the closed review ledger and presubmit; no Docker/oracle/calibration) and push with `PUSH_MODE=documentation-only`. Any other changed path refuses the exception.
 
 `~/swebench/<tool>` paths below are host-local: missing ~/swebench? run ~/swebench-playbook/tools/bootstrap-swebench-home.sh (and
 `~/swebench-playbook/tools/sync-skill.sh install` to install this skill itself).
@@ -198,7 +198,15 @@ python3 ~/swebench/prov_predict.py <task>                    # provenance: must 
 grader-lint.py <task>                                        # private-state / nil-pin graders
 instruction-lint.py <task> <clone>                           # does the instruction leak the answer
 push-task.sh <task> [--dry-run]                              # scoped commit + push
+PUSH_MODE=documentation-only push-task.sh <task>             # README/audit only; reuse exact green server evidence
 ```
+
+A documentation-only Git push must never be followed by a manual Codimango
+rerun. Measured on Dogpile `c32ce74f` (2026-10-17), Nest advanced `headCommitSha`
+but retained validation at `697b4ddc` and created no new job. After every such
+push, verify the same content-aware reuse: new head, old green validation SHA,
+and no job for the documentation commit. If a new run does appear, monitor and
+report it—do not enqueue a second run or cancel it without explicit authority.
 
 Always run Muse through `mc2.sh`, which passes the prompt as a file. Never
 hand-roll `muse exec`, `metacode run` or `script -qec` with an inline prompt: an

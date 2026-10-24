@@ -22,6 +22,8 @@ Usage:
   gate.py <task> [--repo DIR] [--fast] [--only s1,s2] [--skip s1,s2] [--k2n-agent metacode]
           [--accept-uncovered "<what you checked by hand>"]   when no forge applies to a step's language
           [--calibrate-runs N]   force N local k2n runs (default: 1 run, and only if difficulty can have moved)
+          [--accept-zero "<third-party gradient evidence>"]  when a 0/5 Avocado step is server-carried
+          [--calibrate-first]  reserve the scarce host-wide bench slot before the remaining stages
   gate.py <task> --documentation-only [--repo DIR]           reuse server evidence; never run Docker/k2n
   gate.py --version                                           build id (also printed and stamped)
     --fast   stages 1-5 only (minutes). A push stamp is only issued for a full run.
@@ -423,17 +425,20 @@ def st_calibrate(ctx):
                 incomplete = True
             saturated &= n >= 5 and s["pass"] == n
             band = n >= 5 and 1 <= s["pass"] <= 3
-            cells.append((i, s, n, band))
+            # RUNBOOK phase-1 band: 0/5 is acceptable only with a third-party gradient and legit failures.
+            zero = n >= 5 and s["pass"] == 0 and bool(ctx.get("accept_zero"))
+            cells.append((i, s, n, band, zero))
         # Server rule: one non-final step may sit at 1.0 when the task declares 3+ steps (single-1.0 exemption).
         exempt = saturated and len(steps) >= 3 and step != last and exempt_used is None
         if exempt:
             exempt_used = step
         txt = []
-        for i, s, n, band in cells:
-            good = band or exempt
+        for i, s, n, band, zero in cells:
+            good = band or exempt or zero
             ok &= good or n < 5
             txt.append(f"run{i + 1} {s['pass']}/{n}" + (f" (+{s['error']} infra)" if s["error"] else "")
-                       + (" exempt" if exempt else "" if band else " OUT" if n >= 5 else " INCOMPLETE"))
+                       + (" exempt" if exempt else "" if band else " ZERO-ACCEPTED" if zero
+                          else " OUT" if n >= 5 else " INCOMPLETE"))
         lines.append(f"      step {step}: " + ", ".join(txt))
     msg = "\n".join(lines) or "      no cells"
     if not steps or incomplete:
@@ -442,7 +447,8 @@ def st_calibrate(ctx):
     if ok:
         return "PASS", head + msg + (f"\n      step {exempt_used} used the single-1.0 exemption (3+ steps, not the last)" if exempt_used else "") + \
             ("\n      one local run; the server's calibration after the push is the second sample" if len(splits) == 1 else "")
-    return "FAIL", head + msg + "\n      target: 1-3 passes of 5 on every step in every run (one non-final 5/5 allowed when the task has 3+ steps)"
+    return "FAIL", head + msg + "\n      target: 1-3 passes of 5 on every step in every run (one non-final 5/5 allowed when the task has 3+ steps;"\
+        "\n      0/5 only with --accept-zero \"<third-party gradient evidence>\")"
 
 
 STAGES = {"server-evidence": st_server_evidence, "preflight": st_preflight, "presubmit": st_presubmit, "provenance": st_provenance, "carry": st_carry,
@@ -479,10 +485,12 @@ def main():
         stages = [s for s in ORDER if s in opt("--only").split(",")]
     if opt("--skip"):
         stages = [s for s in stages if s not in opt("--skip").split(",")]
+    if "--calibrate-first" in a and "calibrate" in stages:
+        stages = ["calibrate"] + [s for s in stages if s != "calibrate"]
     logdir = f"/tmp/revision-gate/{task}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}"
     os.makedirs(logdir, exist_ok=True)
     ctx = {"repo": repo, "task": task, "dir": tdir, "logdir": logdir, "k2n_agent": opt("--k2n-agent", "metacode"),
-           "accept_uncovered": opt("--accept-uncovered"),
+           "accept_uncovered": opt("--accept-uncovered"), "accept_zero": opt("--accept-zero"),
            "calibrate_runs": int(opt("--calibrate-runs", "1")), "calibrate_runs_forced": "--calibrate-runs" in a,
            "log": lambda n: os.path.join(logdir, n + ".log")}
     before = task_hash(tdir)
@@ -507,7 +515,7 @@ def main():
     os.makedirs(STAMPS, exist_ok=True)
     stamp = {"task": task, "hash": after, "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "build": gate_version(), "accepted_uncovered": opt("--accept-uncovered"),
-             "mode": "documentation-only" if documentation_only else "full",
+             "accepted_zero": opt("--accept-zero"), "mode": "documentation-only" if documentation_only else "full",
              "results": results, "verdict": verdict, "full_run": full, "provisional": True, "logs": logdir}
     # Only a full run writes <task>.json (the push stamp); partial runs go to <task>.partial.json so a
     # quick diagnostic never revokes a valid push stamp for unchanged files.

@@ -2,14 +2,15 @@
 
 > **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
 
-> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged.
+> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged. **Documentation-only exception (2026-10-17):** if the task diff from the exact green server commit touches only `README.md` and `audit/**`, run `gate.py <task> --documentation-only` instead (re-verifies server results, reviews, the closed review ledger and presubmit; no Docker/oracle/calibration) and push with `PUSH_MODE=documentation-only`. Any other changed path refuses the exception.
 
 ```
 OWNER:   Claude
 INPUT:   HANDOFF B4 — a locally-green task, oracle 3/3
 OUTPUT:  one pushed commit containing only this task's paths
-EXIT:    `preflight.sh <task> --with-oracle` exits 0, and a scoped commit has landed
-         on origin/main
+EXIT:    full change: `preflight.sh <task> --with-oracle` exits 0;
+         documentation-only change: `gate.py <task> --documentation-only` exits 0;
+         then a scoped commit has landed on origin/main
 ```
 
 This is the last act before the server sees anything. Everything past here costs a cycle.
@@ -219,11 +220,16 @@ Use the script. It encodes every rule below:
 
 ```bash
 ~/.claude/skills/swebench-mt/push-task.sh <task> [--dry-run]
+PUSH_MODE=documentation-only ~/.claude/skills/swebench-mt/push-task.sh <task> [--dry-run]
 ```
 
 The sequence, and why each step exists:
 
-1. **preflight `--with-oracle` must exit 0.** The script refuses to push otherwise.
+1. **Full changes: preflight `--with-oracle` must exit 0.** The script refuses to push otherwise.
+   **Strict documentation-only changes:** the gate must prove the non-document tree is
+   byte-identical to the green server commit, all displayed server gates pass, review handling
+   is closed, README values match server truth, and presubmit passes. The script refuses mixed
+   diffs and skips local Docker/oracle/k2n.
 2. **`git reset -q`** — isolate the index first. The shared repo routinely holds dozens of
    unrelated uncommitted files: other agents' in-progress task dirs, another session's
    remediation, old sweeps.
@@ -430,8 +436,11 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         proof: the three blocks
 [ ]  2. Every OPEN item from B1-B4 is either closed or restated here with its owner
         proof: the list
-[ ]  3. preflight --with-oracle exits 0
+[ ]  3. Full change: preflight --with-oracle exits 0
         proof: `~/.claude/skills/swebench-mt/preflight.sh <task> --with-oracle; echo $?`
+        Documentation-only: `gate.py <task> --documentation-only` exits 0
+        proof: its output naming the reused validation SHA, the six passing server gates,
+        review/comment counts and the exact README/audit-only paths
 [ ]  4. Every ADV line read; none promoted to blocking; the ones acted on are named
         proof: the ADV lines and a one-line disposition each
 [ ]  5. TIER 0 inventory clean (§3), and the FULL diff read, not skimmed
