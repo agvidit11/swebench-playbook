@@ -268,7 +268,8 @@ def _render_list(views, health, *, now, width=120, style: Style, wide=False, sho
         members = [(v, r) for v, r in zip(visible, rows) if _group_key(v, group) == g]
         if not members:
             continue
-        out.append(style.paint(f"{g} ({len(members)})", "bold"))
+        for line in wrap(f"{g} ({len(members)})", width):
+            out.append(style.paint(line, "bold"))
         for v, r in members:
             cells = []
             for c in cols:

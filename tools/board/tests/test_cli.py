@@ -50,12 +50,12 @@ class CliTest(unittest.TestCase):
             p.parse_args(argv)
 
     def test_every_read_command_prints_banner(self):
-        for argv in (["list"], ["show", "alpha"], ["explain", "alpha"], ["available"], ["changes"]):
+        for argv in (["list"], ["show", "alpha", "--no-reviews"], ["explain", "alpha"], ["available"], ["changes"]):
             code, out = self.run_cli(argv)
             self.assertTrue(out.splitlines()[0].startswith("codimango"), (argv, out[:80]))
 
     def test_strict_nonzero_when_unhealthy(self):
-        for argv in (["list"], ["show", "alpha"], ["explain", "alpha"], ["available"], ["changes"]):
+        for argv in (["list"], ["show", "alpha", "--no-reviews"], ["explain", "alpha"], ["available"], ["changes"]):
             code, out = self.run_cli(argv + ["--strict"], healthy=False)
             self.assertEqual(code, 1, argv)
             self.assertIn("SYNC FAILED", out)
@@ -63,7 +63,7 @@ class CliTest(unittest.TestCase):
             self.assertEqual(code, 0, argv)
 
     def test_json_envelope(self):
-        for argv in (["list"], ["show", "alpha"], ["explain", "alpha"], ["available"], ["changes"]):
+        for argv in (["list"], ["show", "alpha", "--no-reviews"], ["explain", "alpha"], ["available"], ["changes"]):
             code, out = self.run_cli(argv + ["--json"], healthy=False)
             data = json.loads(out)
             for key in ("health", "sync_state", "findings", "result"):
@@ -73,6 +73,44 @@ class CliTest(unittest.TestCase):
     def test_review_fetch_failure_is_visible(self):
         code, out = self.run_cli(["show", "alpha"])
         self.assertIn("reviews unavailable", out)
+        code, _ = self.run_cli(["show", "alpha", "--strict"])
+        self.assertEqual(code, 1)
+        code, out = self.run_cli(["show", "alpha", "--json"])
+        data = json.loads(out)
+        self.assertFalse(data["health"]["reviews"]["ok"])
+        self.assertIn("REVIEWS_UNAVAILABLE", [f["code"] for f in data["findings"]])
+
+    def test_show_history_opt_in(self):
+        code, out = self.run_cli(["show", "alpha", "--json"])
+        self.assertNotIn("history", json.loads(out)["result"])
+        code, out = self.run_cli(["show", "alpha", "--json", "--history"])
+        self.assertIn("history", json.loads(out)["result"])
+
+    def test_changes_since_timestamp(self):
+        code, out = self.run_cli(["changes", "--since", "2026-10-23T09:00:00-07:00", "--json"])
+        self.assertEqual(json.loads(out)["result"], [])
+        with self.assertRaises(SystemExit):
+            self.run_cli(["changes", "--since", "2026-10-23T09:00:00"])
+
+    def test_config_json_parseable(self):
+        for action in ("show", "validate"):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                cli.main(["config", action, "--json"])
+            json.loads(out.getvalue())
+
+    def test_plugins_doctor_reports_failures(self):
+        out = io.StringIO()
+        with mock.patch.object(cli, "load_config", lambda: self._cfg_with_plugin()), contextlib.redirect_stdout(out):
+            code = cli.main(["plugins", "doctor", "--json"])
+        self.assertEqual(code, 1)
+        self.assertFalse(json.loads(out.getvalue())["ok"])
+
+    def _cfg_with_plugin(self):
+        from workboard.config import load_config
+        cfg = load_config(Path("/nonexistent"))
+        cfg.plugins.enabled = ["no_such_plugin_abc"]
+        return cfg
 
     def test_available_reason_filter(self):
         code, out = self.run_cli(["available", "--reason", "expired", "--json"])

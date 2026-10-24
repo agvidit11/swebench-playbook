@@ -61,6 +61,10 @@ class RenderTest(unittest.TestCase):
             for line in ANSI.sub("", text).splitlines():
                 self.assertLessEqual(len(line), width, f"{width}: {line!r}")
             self.assertIn("FIX validation", ANSI.sub("", text))
+            owners = [tv("x", owner="h1·" + "a very long session tab title " * 4)]
+            text = self.out(owners, width=width, wide=wide, group="owner")
+            for line in ANSI.sub("", text).splitlines():
+                self.assertLessEqual(len(line), width, f"owner {width}: {line!r}")
 
     def test_group_by_state(self):
         text = self.out([tv("a", state="DRAFT"), tv("b", state="REVIEW", group="WAITING")], group="state")

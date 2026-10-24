@@ -40,9 +40,16 @@ def _is_doc(path: str) -> bool:
     return name.endswith(".md") and any(name.startswith(d) for d in DOC_NAMES) or name in ("readme", "readme.txt")
 
 
+AUTH_RANK = {"derived": 0, "advisory": 1, "authoritative": 2}
+
+
 def _merge(observations):
+    """Deterministic: per field, higher authority wins, then the newer observation."""
     by_task, repos = {}, {}
-    for o in observations:
+    def rank(o):
+        top = max((AUTH_RANK.get(a, 0) for a in o.authority.values()), default=0)
+        return (top, o.observed_at)
+    for o in sorted(observations, key=rank):
         if o.entity_id.startswith(REPO_ENTITY_PREFIX):
             repos[o.entity_id[len(REPO_ENTITY_PREFIX):]] = dict(o.fields)
             continue
@@ -51,7 +58,7 @@ def _merge(observations):
 
 
 def _claims(task_events, cfg, now, aliases):
-    """Live claims from claim/renew/steal/assign/release audit events only (DESIGN §5: ordinary activity is
+    """Live claims from claim/renew/steal/release audit events only (DESIGN §5: ordinary activity is
     not a heartbeat). Returns (owner_alias, claim_health, live_claimants)."""
     live: dict[str, dict] = {}
     skew = timedelta(seconds=cfg.claims.clock_skew_warn_seconds)
@@ -202,25 +209,34 @@ def project(observations, evs, cfg, now) -> list[TaskView]:
         seen_time = ts(repo_times.get(server_head)) if server_head else None
         if seen_time is None and server_sha:
             seen_time = ts(repo_times.get(server_sha))
-        f["sync"] = "OK" if (head_time and seen_time) else ("UNCHECKED" if g and cm else "—")
         open_task = state not in ("ACCEPTED", "ARCHIVED")
-        if open_task and head_time and seen_time and head_time > seen_time:
-            f["sync"] = "HEAD≠SERVER"
-            findings.append(Finding("HEAD≠SERVER", "warn", "a newer commit to this task is not on the server yet",
-                                    "codimango task rerun <task> (free), then wait for validation"))
-        elif open_task and head and server_sha and head != server_sha and "git.changed_since_validated" in g:
-            changed = g["git.changed_since_validated"]
-            if changed and not all(_is_doc(x) for x in changed):
-                f["sync"] = "STALE_VALID"
-                findings.append(Finding("STALE_VALID", "warn",
-                                        f"server validated an older commit; {len(changed)} non-doc file(s) changed since",
-                                        "codimango task rerun <task>, then wait for validation"))
-            elif changed:
-                f["sync"] = "OK·doc"
+        f["sync"] = "—" if not (g and cm) else "UNCHECKED"
+        if head and server_head and head == server_head:
+            # the server has seen exactly this head; only the validated version can lag
+            if head == server_sha:
+                f["sync"] = "OK"
+            elif "git.changed_since_validated" in g:
+                changed = g["git.changed_since_validated"]
+                if open_task and changed and not all(_is_doc(x) for x in changed):
+                    f["sync"] = "STALE_VALID"
+                    findings.append(Finding("STALE_VALID", "warn",
+                                            f"server validated an older commit; {len(changed)} non-doc file(s) changed since",
+                                            "codimango task rerun <task>, then wait for validation"))
+                else:
+                    f["sync"] = "OK·doc" if changed else "OK"
+        elif head_time and seen_time:
+            if open_task and head_time > seen_time:
+                f["sync"] = "HEAD≠SERVER"
+                findings.append(Finding("HEAD≠SERVER", "warn", "a newer commit to this task is not on the server yet",
+                                        "codimango task rerun <task> (free), then wait for validation"))
+            else:
+                f["sync"] = "OK"
         vsha = cm.get("codimango.validation_commit_sha")
-        if server_sha and vsha and vsha != server_sha and f["valid"] != "RUN":
-            findings.append(Finding("VALID≠SERVER", "warn", "validation results are for an older server commit",
-                                    "wait for validation or rerun"))
+        if server_sha and vsha and vsha != server_sha:
+            running = f["valid"] == "RUN"
+            findings.append(Finding("VALID≠SERVER", "info" if running else "warn",
+                                    "validation results are for an older server commit" + (" (re-validation running)" if running else ""),
+                                    "wait for validation" if running else "codimango task rerun <task>"))
 
         current = head or server_sha
         f["review"], f["confidence"], f["confidence_stale"], f["dissent"] = _reviews(tev, current)

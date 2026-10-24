@@ -104,9 +104,11 @@ def cmd_list(args, cfg):
         print(json.dumps(_envelope(snap, [_view_json(v) for v in views]), default=str, indent=1))
     else:
         warnings = [f.summary for f in snap.findings if f.code not in ("SYNC_FAILED",)] + cfg.warnings
-        print(render._render_list(views, snap.health, now=snap.now, width=_width(args), style=_style(args, cfg),
-                                  wide=args.wide, show_all=args.all, header=week_header(snap.observations, cfg, snap.now),
-                                  sync_state=snap.sync_state, warnings=warnings, group=args.group))
+        color = "never" if args.plain else (args.color or cfg.ui.color)
+        uni = "never" if args.plain else (args.unicode or cfg.ui.unicode)
+        print(render.render_list(views, snap.health, cfg, width=_width(args), color=color, unicode=uni,
+                                 wide=args.wide, show_all=args.all, header=week_header(snap.observations, cfg, snap.now),
+                                 sync_state=snap.sync_state, warnings=warnings, group=args.group, now=snap.now))
     _save_look(snap)
     return 1 if args.strict and _unhealthy(snap) else 0
 
@@ -125,6 +127,13 @@ def cmd_show(args, cfg):
     v = _find(snap, args.task)
     tev = [e for e in snap.events if (e.get("entity") or {}).get("id") == v.entity_id]
     reviews = None if args.no_reviews else _reviews_text(cfg, v.entity_id)
+    if not args.no_reviews:
+        from .model import Finding, SourceHealth
+        ok = reviews is not None
+        snap.health["reviews"] = SourceHealth("reviews", ok, snap.now, 0, "ok" if ok else "codimango task reviews failed or timed out")
+        if not ok:
+            snap.findings.append(Finding("REVIEWS_UNAVAILABLE", "warn", "human reviews could not be fetched",
+                                         f"codimango task reviews {v.entity_id} --full"))
     human_reviews = None
     if reviews is not None:
         human_reviews = {"revision_rounds": len(re.findall(r"^\s*REVISION by", reviews, re.M)),
@@ -132,7 +141,8 @@ def cmd_show(args, cfg):
     if args.json:
         result = _view_json(v)
         result["human_reviews"] = human_reviews if reviews is not None else ("skipped" if args.no_reviews else "unavailable")
-        result["history"] = tev if args.history else tev[-15:]
+        if args.history:
+            result["history"] = tev
         if args.sources:
             result["sources"] = [{"source": o.source, "fields": o.fields} for o in snap.observations if o.entity_id == v.entity_id]
         return _emit(args, snap, result)
@@ -152,10 +162,11 @@ def cmd_show(args, cfg):
         lines.append(style.paint("  human    reviews unavailable (codimango task reviews failed or timed out)", "amber"))
     for x in v.findings:
         lines.append(style.paint(f"  ! {x.code}: {x.summary} -> {x.next_action}", "amber"))
-    if tev:
-        shown = tev if args.history else tev[-15:]
-        lines.append(f"  history ({len(shown)} of {len(tev)}{'' if args.history else '; --history for all'})")
-        for e in shown:
+    if tev and not args.history:
+        lines.append(f"  history  {len(tev)} ledger event(s); see them with --history")
+    if tev and args.history:
+        lines.append(f"  history ({len(tev)})")
+        for e in tev:
             who = e["actor"].get("alias") or e["actor"].get("session_id")
             extra = {k: e["payload"][k] for k in list(e["payload"])[:3]}
             lines.append(f"    {e['occurred_at'][:16]}  {e['type']:<8} {who}  {extra if extra else ''}")
@@ -234,9 +245,15 @@ def cmd_changes(args, cfg):
         _emit(args, snap)
     if args.since:
         m = re.fullmatch(r"(\d+)([mhd])", args.since)
-        if not m:
-            sys.exit("--since takes e.g. 30m, 2h, 3d")
-        cutoff = snap.now - timedelta(**{{"m": "minutes", "h": "hours", "d": "days"}[m.group(2)]: int(m.group(1))})
+        if m:
+            cutoff = snap.now - timedelta(**{{"m": "minutes", "h": "hours", "d": "days"}[m.group(2)]: int(m.group(1))})
+        else:
+            try:
+                cutoff = datetime.fromisoformat(args.since.replace("Z", "+00:00"))
+            except ValueError:
+                sys.exit("--since takes a duration (30m, 2h, 3d) or an ISO timestamp with timezone")
+            if cutoff.tzinfo is None:
+                sys.exit("--since timestamp needs a timezone, e.g. 2026-10-23T09:00:00-07:00")
         hits = [e for e in snap.events if datetime.fromisoformat(e["occurred_at"]) >= cutoff and e["type"] not in ("touch", "alias")]
         if args.json:
             return _emit(args, snap, hits)
@@ -322,15 +339,29 @@ def cmd_legend(args, cfg):
 
 def cmd_config(args, cfg):
     if args.action == "validate":
-        print("config ok" if not cfg.warnings else "\n".join(cfg.warnings))
+        if args.json:
+            print(json.dumps({"ok": not cfg.warnings, "path": cfg.path, "warnings": cfg.warnings}))
+        else:
+            print("config ok" if not cfg.warnings else "\n".join(cfg.warnings))
         return 0 if not cfg.warnings else 1
-    print(f"# {cfg.path}")
-    print(json.dumps(asdict(cfg), indent=1, default=str))
+    if args.json:
+        print(json.dumps(asdict(cfg), default=str))
+    else:
+        print(f"# {cfg.path}")
+        print(json.dumps(asdict(cfg), indent=1, default=str))
     return 0
 
 
 def cmd_plugins(args, cfg):
     reg = load_plugins(cfg)
+    if args.action == "doctor":
+        if args.json:
+            print(json.dumps({"ok": not reg.warnings, "enabled": cfg.plugins.enabled, "problems": reg.warnings}))
+        else:
+            print(f"{len(cfg.plugins.enabled)} plugin(s) enabled; " + ("all loaded" if not reg.warnings else "problems:"))
+            for w in reg.warnings:
+                print(f"  {w}")
+        return 1 if reg.warnings else 0
     if args.json:
         print(json.dumps({k: sorted(getattr(reg, k)) for k in ("sources", "columns", "checks", "stats")} | {"warnings": reg.warnings}))
         return 0
@@ -375,7 +406,7 @@ def build_parser():
     cf = sub.add_parser("config", parents=[common], help="show or validate config")
     cf.add_argument("action", choices=["show", "validate"], nargs="?", default="show")
     pl = sub.add_parser("plugins", parents=[common], help="list loaded plugins")
-    pl.add_argument("action", choices=["list"], nargs="?", default="list")
+    pl.add_argument("action", choices=["list", "doctor"], nargs="?", default="list")
     return p
 
 

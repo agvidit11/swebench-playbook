@@ -172,6 +172,27 @@ class ProjectionTest(unittest.TestCase):
         self.assertEqual(v.fields["sync"], "STALE_VALID")
         self.assertEqual(v.fields["next"], "RERUN server")
 
+    def test_equal_heads_never_head_ne_server_even_without_times(self):
+        obs = [cm("t", head_commit_sha=SHA_A), gt("t", head=SHA_A, head_time="2026-10-23T10:00:00+00:00",
+                                                     changed=["t/src.py"]), repo({})]
+        v = self.view(obs)
+        self.assertNotIn("HEAD≠SERVER", [f.code for f in v.findings])
+        self.assertEqual(v.fields["sync"], "STALE_VALID")
+
+    def test_unequal_heads_never_stale_valid(self):
+        obs = [cm("t", head_commit_sha=SHA_B), gt("t", head=SHA_A, head_time="2026-10-21T00:00:00+00:00",
+                                                     changed=["t/src.py"]),
+               repo({SHA_B: "2026-10-22T00:00:00+00:00"})]
+        v = self.view(obs)
+        self.assertNotIn("STALE_VALID", [f.code for f in v.findings])
+        self.assertEqual(v.fields["sync"], "OK")
+
+    def test_running_validation_on_other_commit_is_info_finding(self):
+        v = self.view([cm("t", valid="pending", validation_commit_sha=SHA_B)])
+        f = [x for x in v.findings if x.code == "VALID≠SERVER"]
+        self.assertEqual(f[0].severity, "info")
+        self.assertEqual(v.fields["next"], "WAIT validation")
+
     def test_validation_on_older_commit_finding(self):
         v = self.view([cm("t", validation_commit_sha=SHA_B)])
         self.assertIn("VALID≠SERVER", [f.code for f in v.findings])
