@@ -1,8 +1,12 @@
-import json, tempfile, threading, unittest
+import json
+import tempfile
+import threading
+import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 from workboard import claims, coord, events, sync
-from tests.helpers import bare_remote, cfg_for
+from tests.helpers import bare_remote, cfg_for, git
 
 A1 = {"session_id": "s1", "alias": "h1·lane loop", "kind": "claude", "host": "h1"}
 A2 = {"session_id": "s2", "alias": "h2·harness", "kind": "claude", "host": "h2"}
@@ -67,3 +71,134 @@ class ClaimCliTest(unittest.TestCase):
         ok, err = coord.ledger_fresh(self.c1, self.s1)
         self.assertFalse(ok)
         self.assertTrue(err)
+
+
+class ClaimHardeningTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.tmp = Path(td.name)
+        self.remote = bare_remote(self.tmp)
+        self.c1, self.c2 = cfg_for(self.tmp, "h1", self.remote), cfg_for(self.tmp, "h2", self.remote)
+        self.c1.user.id = self.c2.user.id = "vidit"
+        self.s1, self.s2 = self.tmp / "st1", self.tmp / "st2"
+        self.s1.mkdir()
+        self.s2.mkdir()
+        for cfg, st in ((self.c1, self.s1), (self.c2, self.s2)):
+            claims.probe(cfg, state_dir=st)
+
+    def test_busy_sync_fails_closed(self):
+        sync.sync(self.c1, host_id="h1", state_dir=self.s1)     # leaves last_pull_ok=True on disk
+        with mock.patch.object(sync, "sync", return_value=sync.SyncState(last_pull_ok=True, last_push_ok=True, busy=True)):
+            ok, err = coord.ledger_fresh(self.c1, self.s1)
+        self.assertFalse(ok)
+        self.assertIn("another sync", err)
+
+    def test_pull_ok_push_failed_fails_closed(self):
+        with mock.patch.object(sync, "sync", return_value=sync.SyncState(last_pull_ok=True, last_push_ok=False,
+                                                                         error="push failed: rejected")):
+            ok, err = coord.ledger_fresh(self.c1, self.s1)
+        self.assertFalse(ok)
+
+    def test_steal_without_evidence_refused(self):
+        coord.claim(self.c1, "t", state_dir=self.s1, actor=A1)
+        res = coord.claim(self.c2, "t", state_dir=self.s2, actor=A2, steal=True)
+        self.assertEqual(res.status, "REFUSED")
+        for src, clk in ((False, True), (True, False)):
+            res = coord.claim(self.c2, "t", state_dir=self.s2, actor=A2, steal=True, source_healthy=src, clock_healthy=clk)
+            self.assertEqual(res.status, "REFUSED")
+        self.assertFalse((self.s2 / claims.GRACE_FILE).exists())   # no grace timer started
+
+    def test_cross_host_assignment_adopted_and_renewed(self):
+        coord.claim(self.c1, "t", state_dir=self.s1, actor=A1, to_actor=A2)
+        with mock.patch.object(coord, "_now", return_value=datetime.now(timezone.utc) + timedelta(minutes=30)):
+            notes = coord.auto_claims(self.c2, self.s2, [("t", A2)])
+        cur = claims.read(self.c2, "t", state_dir=self.s2)
+        self.assertEqual(cur.owner["session_id"], "s2")
+        with coord.local_claims(self.s2) as local:
+            self.assertEqual(local["t"]["oid"], cur.oid)          # adopted then renewed to the new tip
+        self.assertEqual(notes, [])
+
+    def test_concurrent_local_updates_not_lost(self):
+        def put(i):
+            with coord.local_claims(self.s1) as local:
+                local[f"t{i}"] = {"oid": "x", "session_id": "s", "renewed": "2026-10-23T00:00:00+00:00"}
+        ts = [threading.Thread(target=put, args=(i,)) for i in range(20)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+        with coord.local_claims(self.s1) as local:
+            self.assertEqual(len(local), 20)
+
+    def test_person_can_release_own_agent_claim(self):
+        agent = dict(A1, person="vidit")
+        coord.claim(self.c1, "t", state_dir=self.s1, actor=agent)
+        human = {"session_id": "human:vidit@h1", "alias": "h1·vidit (shell)", "kind": "human", "host": "h1", "person": "vidit"}
+        res = coord.release(self.c1, "t", "handing over", state_dir=self.s1, actor=human)
+        self.assertEqual(res.status, "RELEASED", res.detail)
+        rel = [json.loads(l) for l in (self.s1 / events.SPOOL_NAME).read_text().splitlines() if '"release"' in l][-1]
+        self.assertEqual(rel["actor"]["kind"], "human")
+        self.assertEqual(rel["payload"]["released_owner"]["session_id"], "s1")
+
+    def test_other_person_cannot_release(self):
+        coord.claim(self.c1, "t", state_dir=self.s1, actor=dict(A1, person="someone-else"))
+        human = {"session_id": "human:vidit@h1", "alias": "h1·vidit", "kind": "human", "host": "h1", "person": "vidit"}
+        self.assertEqual(coord.release(self.c1, "t", "x", state_dir=self.s1, actor=human).status, "REFUSED")
+
+    def test_probe_cleanup_after_uncertain_create(self):
+        orig = claims._push
+        calls = {"n": 0}
+
+        def flaky(cfg, repo, args, timeout):
+            res = orig(cfg, repo, args, timeout)
+            calls["n"] += 1
+            if calls["n"] == 1:
+                res.returncode = 128       # create landed, reported failure
+            return res
+
+        fresh = self.tmp / "st-p"
+        with mock.patch.object(claims, "_push", flaky):
+            claims.probe(self.c1, state_dir=fresh)
+        refs = git(self.remote, "for-each-ref", "--format=%(refname)").stdout
+        self.assertNotIn("probe-", refs)
+
+
+class ClaimRefSourceTest(unittest.TestCase):
+    def cfg(self):
+        from workboard.config import load_config
+        c = load_config(Path("/nonexistent"))
+        c.ledger.remote = "x"
+        return c
+
+    def store(self, rows):
+        return mock.Mock(snapshot=mock.Mock(return_value=(True, "refs/claims", rows)))
+
+    def good(self, task, **over):
+        p = {"entity_id": task, "session_id": "s1", "alias": "h1·x",
+             "renewed_at": datetime.now(timezone.utc).isoformat()}
+        p.update(over)
+        return (claims.ref_for(task), "a" * 40, p)
+
+    def test_healthy_snapshot(self):
+        from workboard.sources.claimrefs import ClaimRefSource
+        res = ClaimRefSource(self.cfg(), store=self.store([self.good("t")])).fetch()
+        self.assertTrue(res.health.ok)
+        self.assertEqual(res.observations[0].entity_id, "t")
+
+    def test_malformed_or_mismatched_or_future_is_unhealthy(self):
+        from workboard.sources.claimrefs import ClaimRefSource
+        future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        bad_rows = [[self.good("t"), (claims.ref_for("u"), "b" * 40, None)],
+                    [(claims.ref_for("other"), "c" * 40, self.good("t")[2])],
+                    [self.good("t", renewed_at=future)],
+                    [self.good("t", renewed_at="yesterday")]]
+        for rows in bad_rows:
+            res = ClaimRefSource(self.cfg(), store=self.store(rows)).fetch()
+            self.assertFalse(res.health.ok, rows)
+            self.assertEqual(res.observations, [])
+
+    def test_overflow_is_unhealthy(self):
+        from workboard.sources.claimrefs import ClaimRefSource
+        cfg = self.cfg()
+        cfg.claims.max_live_claims = 1
+        res = ClaimRefSource(cfg, store=self.store([self.good("a"), self.good("b")])).fetch()
+        self.assertFalse(res.health.ok)

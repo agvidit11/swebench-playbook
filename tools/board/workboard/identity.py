@@ -47,11 +47,14 @@ def tab_title(session_id: str) -> str:
     return (custom or ai)[:80]
 
 
-def current_actor(host_id: str, env=None) -> dict:
+def current_actor(host_id: str, env=None, person: str = "") -> dict:
+    """The acting session. `person` is the configured user id, stored in claims so that person can later
+    release claims their own agent sessions hold."""
     env = os.environ if env is None else env
     sid = env.get("CLAUDE_CODE_SESSION_ID", "")
     if sid:
         title = tab_title(sid) or f"session {sid[:8]}"
-        return {"session_id": sid, "alias": f"{host_id}·{title}", "kind": "claude", "host": host_id}
+        return {"session_id": sid, "alias": f"{host_id}·{title}", "kind": "claude", "host": host_id, "person": person}
     user = env.get("USER") or getpass.getuser()
-    return {"session_id": f"human:{user}@{host_id}", "alias": f"{host_id}·{user} (shell)", "kind": "human", "host": host_id}
+    return {"session_id": f"human:{user}@{host_id}", "alias": f"{host_id}·{user} (shell)", "kind": "human",
+            "host": host_id, "person": person}

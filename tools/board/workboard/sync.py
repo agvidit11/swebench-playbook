@@ -31,6 +31,7 @@ class SyncState:
     error: str = ""
     at: str | None = None
     busy: bool = False
+    notes: list = None
 
 
 class Deadline:
@@ -63,7 +64,8 @@ def safe_host(host_id: str) -> str:
 
 def load_state(state_dir: Path) -> SyncState:
     try:
-        return SyncState(**json.loads((Path(state_dir) / STATE_FILE).read_text()))
+        data = json.loads((Path(state_dir) / STATE_FILE).read_text())
+        return SyncState(**{k: v for k, v in data.items() if k in SyncState.__dataclass_fields__})
     except (OSError, ValueError, TypeError):
         return SyncState()
 
@@ -245,7 +247,7 @@ def _sync_locked(cfg, host_id, state_dir, dl: Deadline, retries) -> SyncState:
             if touched and getattr(cfg.claims, "mode", "atomic") == "atomic" and AUTO_CLAIM[0]:
                 try:
                     from .coord import auto_claims
-                    auto_claims(cfg, state_dir, touched)
+                    st.notes = auto_claims(cfg, state_dir, touched)
                 except Exception as exc:          # claims must never break event delivery
                     st.error = f"auto-claim: {exc}"
             st.last_push_ok = True

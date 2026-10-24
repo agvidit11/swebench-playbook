@@ -126,3 +126,77 @@ class CliTest(unittest.TestCase):
         self.run_cli(["list"])
         code, out = self.run_cli(["changes"])
         self.assertIn("nothing changed", out)
+
+
+class ClaimCommandTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        p = mock.patch.dict(os.environ, {"WORKBOARD_CACHE": td.name, "WORKBOARD_STATE": td.name,
+                                         "WORKBOARD_CONFIG": "/nonexistent", "NO_COLOR": "1"})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def snap_with_sessions(self):
+        s = snap()
+        from workboard import events as ev
+        for sid, alias, kind in (("s1", "h1·lane orchestrator loop", "claude"), ("s2", "h2·harness loop", "claude"),
+                                 ("s3", "h2·NWR history", "claude")):
+            e = ev.stamp(ev.new_event("alias", None, {"alias": alias},
+                                      actor={"session_id": sid, "alias": alias, "kind": kind, "host": alias[:2]},
+                                      commit=None, source="hook"), alias[:2], 1)
+            s.events.append(e)
+        return s
+
+    def drive(self, argv, fresh=(True, ""), claim_status="ACQUIRED"):
+        from workboard import coord, claims
+        out, err = io.StringIO(), io.StringIO()
+        captured = {}
+
+        def fake_claim(cfg, task, **kw):
+            captured.update(kw, task=task)
+            return claims.ClaimResult(claim_status, "a" * 40, "", {"alias": "h1·me"})
+
+        with mock.patch.object(cli, "_gather", lambda a, c: self.snap_with_sessions()), \
+             mock.patch.object(coord, "ledger_fresh", return_value=fresh), \
+             mock.patch.object(coord, "claim", fake_claim), \
+             mock.patch("workboard.sync.sync"), \
+             contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            try:
+                code = cli.main(argv)
+            except SystemExit as exc:
+                code = exc.code
+        if isinstance(code, str):           # SystemExit("message"): Python prints it to stderr and exits 1
+            err.write(code)
+            code = 1
+        return code, out.getvalue() + err.getvalue(), captured
+
+    def test_claim_by_task_fragment(self):
+        code, out, cap = self.drive(["claim", "alpha"])
+        self.assertEqual(code, 0)
+        self.assertEqual(cap["task"], "alpha-task")
+        self.assertIn("claimed alpha-task", out)
+
+    def test_claim_to_unique_alias_keeps_kind_and_host(self):
+        code, out, cap = self.drive(["claim", "alpha", "--to", "harness"])
+        self.assertEqual(code, 0)
+        self.assertEqual(cap["to_actor"]["session_id"], "s2")
+        self.assertEqual((cap["to_actor"]["kind"], cap["to_actor"]["host"]), ("claude", "h2"))
+
+    def test_claim_to_missing_or_ambiguous_alias(self):
+        code, out, _ = self.drive(["claim", "alpha", "--to", "nobody"])
+        self.assertNotEqual(code, 0)
+        self.assertIn("no known session", out)
+        code, out, _ = self.drive(["claim", "alpha", "--to", "loop"])
+        self.assertIn("ambiguous", out)
+
+    def test_claim_lost_exit_1(self):
+        code, out, _ = self.drive(["claim", "alpha"], claim_status="LOST")
+        self.assertEqual(code, 1)
+        self.assertIn("already owned", out)
+
+    def test_claim_and_release_refuse_when_ledger_stale(self):
+        for argv in (["claim", "alpha"], ["release", "alpha-task", "--reason", "x"]):
+            code, out, _ = self.drive(argv, fresh=(False, "push failed"))
+            self.assertEqual(code, 2, argv)
+            self.assertIn("refusing", out)

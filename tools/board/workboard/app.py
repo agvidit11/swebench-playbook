@@ -72,6 +72,20 @@ def _enrich_changed(cfg, cm_obs, git_obs, now) -> list:
     return out
 
 
+def refresh_claims_cache(cfg, state_dir, cres=None) -> None:
+    """Write the claim cache the pre-tool hook reads (only from a healthy claim-ref fetch)."""
+    from .hooks import save_claims_cache
+    if not (cfg.ledger.remote and cfg.claims.mode == "atomic"):
+        return
+    cres = cres or ClaimRefSource(cfg, state_dir=state_dir).fetch()
+    if not cres.health.ok:
+        return
+    save_claims_cache(state_dir, {
+        "fetched_at": cres.health.observed_at.isoformat(),
+        "claims": {o.entity_id: {"session_id": o.fields.get("claims.session_id"), "alias": o.fields.get("claims.alias"),
+                                 "renewed_at": o.fields.get("claims.renewed_at")} for o in cres.observations}})
+
+
 def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: float = 8) -> Snapshot:
     now = datetime.now(timezone.utc)
     cdir = cache_dir()
@@ -104,6 +118,7 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
         claim_obs = [o for o in cres.observations if o.entity_id in {x.entity_id for x in cm.observations}]
         obs += claim_obs
         claims_healthy = cres.health.ok
+        refresh_claims_cache(cfg, state_dir, cres)
     evs, ev_findings = events.read_events(ledger_event_files(cfg))
     known = {e["event_id"] for e in evs}
     evs += [e for e in pending_spool_events(state_dir, sync_mod.safe_host(sync_mod.host_id_for(cfg)))

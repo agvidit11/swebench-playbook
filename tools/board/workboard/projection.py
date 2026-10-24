@@ -181,7 +181,9 @@ def _ref_claim(g_claims: dict, cfg, now):
     """Owner from the authoritative claim ref fields (claims.*)."""
     renewed = ts(g_claims.get("claims.renewed_at"))
     alias = g_claims.get("claims.alias", "")
-    if renewed and now - renewed > timedelta(hours=cfg.claims.expire_after_hours):
+    if renewed is None:
+        return alias, "EXPIRED", g_claims.get("claims.session_id"), None
+    if now - renewed > timedelta(hours=cfg.claims.expire_after_hours):
         return alias, "EXPIRED", g_claims.get("claims.session_id"), renewed
     return alias, "OWNED", g_claims.get("claims.session_id"), renewed
 

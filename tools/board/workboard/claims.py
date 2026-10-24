@@ -161,7 +161,7 @@ def _new_payload(entity_id, actor, now, base: dict | None = None, **extra) -> di
     p = dict(base or {})
     p.update(entity_id=entity_id, nonce=str(uuid.uuid4()), renewed_at=now.isoformat(timespec="seconds"),
              session_id=actor.get("session_id", ""), alias=actor.get("alias", ""), host=actor.get("host", ""),
-             kind=actor.get("kind", "claude"))
+             kind=actor.get("kind", "claude"), person=actor.get("person", ""))
     p.setdefault("claim_id", str(uuid.uuid4()))
     p.setdefault("acquired_at", p["renewed_at"])
     p.update(extra)
@@ -190,25 +190,29 @@ def probe(cfg, *, state_dir=None) -> ProbeResult:
     errors = []
     for prefix in (DEFAULT_PREFIX, FALLBACK_PREFIX):
         ref = f"{prefix}/probe-{uuid.uuid4().hex[:12]}"
-        tip = None
+        candidates = []          # every oid that might be the remote tip; cleaned up in finally
+        ok = False
         try:
             oid = _commit(repo, _new_payload("probe", actor, _now()), None)
+            candidates.append(oid)
             if _push(cfg, repo, [f"{oid}:{ref}"], TIMEOUT).returncode != 0 or _remote_oid(cfg, repo, ref) != oid:
                 raise RuntimeError("create/read failed")
-            tip = oid
             oid2 = _commit(repo, _new_payload("probe", actor, _now()), oid)
+            candidates.append(oid2)
             if (_push(cfg, repo, [f"--force-with-lease={ref}:{oid}", f"{oid2}:{ref}"], TIMEOUT).returncode != 0
                     or _remote_oid(cfg, repo, ref) != oid2):
                 raise RuntimeError("renew failed")
-            tip = oid2
             if (_push(cfg, repo, [f"--force-with-lease={ref}:{oid2}", f":{ref}"], TIMEOUT).returncode != 0
                     or _remote_oid(cfg, repo, ref) is not None):
                 raise RuntimeError("delete failed")
-            tip = None
+            ok = True
         except (RuntimeError, Offline) as exc:
             errors.append(f"{prefix}: {exc}")
-            if tip:
-                _push(cfg, repo, [f"--force-with-lease={ref}:{tip}", f":{ref}"], TIMEOUT)
+        finally:
+            if not ok:
+                for cand in reversed(candidates):     # exact-oid leased delete: harmless if never created
+                    _push(cfg, repo, [f"--force-with-lease={ref}:{cand}", f":{ref}"], TIMEOUT)
+        if not ok:
             continue
         rec = {"prefix": prefix, "remote": _fingerprint(cfg.ledger.remote), "at": _now().isoformat()}
         (_state(state_dir) / PROBE_FILE).write_text(json.dumps(rec))
@@ -304,14 +308,23 @@ def heartbeat(cfg, entity_id, actor, *, expected_oid, state_dir=None, now=None) 
     return _resolve(cfg, repo, ref, oid, gitutil.err(p))
 
 
-def release(cfg, entity_id, actor, *, expected_oid, state_dir=None) -> ClaimResult:
+def release(cfg, entity_id, actor, *, expected_oid, state_dir=None, override_person: str | None = None) -> ClaimResult:
+    """Owner release; or, with override_person, a person releasing a claim their own agent session holds
+    (payload.person must equal override_person). Both are CAS on the exact expected_oid."""
     try:
         repo, ref = _ctx(cfg, entity_id, state_dir)
     except Disabled as exc:
         return ClaimResult("REFUSED", None, str(exc))
-    _, refusal = _owned(cfg, repo, ref, entity_id, actor, expected_oid)
-    if refusal:
-        return refusal
+    if override_person:
+        base = _payload(cfg, repo, ref, expected_oid)
+        if not _valid_payload(base, entity_id):
+            return ClaimResult("REFUSED", expected_oid, "claim payload missing, malformed or for another task", base)
+        if not base.get("person") or base.get("person") != override_person:
+            return ClaimResult("REFUSED", expected_oid, f"owned by {base.get('alias')} (not your session)", base)
+    else:
+        _, refusal = _owned(cfg, repo, ref, entity_id, actor, expected_oid)
+        if refusal:
+            return refusal
     p = _push(cfg, repo, [f"--force-with-lease={ref}:{expected_oid}", f":{ref}"], TIMEOUT)
     if p.returncode == 0:
         return ClaimResult("RELEASED", None, "deleted")
@@ -392,3 +405,39 @@ def steal(cfg, entity_id, actor, *, source_healthy: bool, clock_healthy: bool, s
     if p.returncode == 0:
         return ClaimResult("ACQUIRED", oid, "stolen after expiry", _payload(cfg, repo, ref, oid))
     return _resolve(cfg, repo, ref, oid, gitutil.err(p))
+
+
+class ClaimStore:
+    """Read-only access to every live claim (used by the claim-ref source)."""
+
+    def __init__(self, cfg, state_dir=None):
+        self.cfg, self.state_dir = cfg, state_dir
+
+    def snapshot(self, timeout=20):
+        """(ok, detail, [(ref, oid, payload|None)]) for all live claims under the probed prefix."""
+        pr = ensure_probe(self.cfg, self.state_dir)
+        if not pr.ok:
+            return False, f"claims disabled: {pr.detail}", []
+        repo = _repo(self.state_dir)
+        p = _git(repo, "fetch", "-q", "--prune", self.cfg.ledger.remote, f"+{pr.prefix}/*:refs/live-claims/*",
+                 timeout=timeout)
+        if p.returncode != 0:
+            return False, gitutil.err(p), []
+        listing = _git(repo, "for-each-ref", "--format=%(objectname) %(refname)", "refs/live-claims/")
+        if listing.returncode != 0:
+            return False, f"listing failed: {gitutil.err(listing)}", []
+        out = []
+        for line in listing.stdout.splitlines():
+            if not line.strip():
+                continue
+            oid, local_ref = line.split(" ", 1)
+            name = local_ref.rsplit("/", 1)[-1]
+            if name.startswith("probe-"):
+                continue
+            shown = _git(repo, "show", f"{oid}:claim.json")
+            try:
+                payload = json.loads(shown.stdout) if shown.returncode == 0 else None
+            except ValueError:
+                payload = None
+            out.append((f"{pr.prefix}/{name}", oid, payload))
+        return True, pr.prefix, out

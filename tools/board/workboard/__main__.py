@@ -332,16 +332,22 @@ def cmd_status(args, cfg):
 
 
 def _resolve_session(snap, fragment):
-    from . import events as ev
-    aliases = ev.latest_aliases(snap.events)
-    hits = {sid: a for sid, a in aliases.items() if fragment.lower() in a.lower()}
+    """Session whose latest alias contains fragment; keeps the actor's recorded kind/host/person."""
+    latest = {}
+    for e in snap.events:
+        sid = e["actor"].get("session_id")
+        if sid:
+            alias = e["payload"].get("alias") if e["type"] == "alias" and isinstance(e["payload"].get("alias"), str) else None
+            prev = latest.get(sid, dict(e["actor"]))
+            latest[sid] = dict(e["actor"], alias=alias or prev.get("alias") or e["actor"].get("alias", ""))
+    hits = {sid: a for sid, a in latest.items() if fragment.lower() in a.get("alias", "").lower()}
     if len(hits) == 1:
-        sid, alias = next(iter(hits.items()))
-        host = alias.split("·", 1)[0]
-        return {"session_id": sid, "alias": alias, "kind": "claude", "host": host}
+        sid, actor = next(iter(hits.items()))
+        return {"session_id": sid, "alias": actor.get("alias", ""), "kind": actor.get("kind", "claude"),
+                "host": actor.get("host") or actor.get("alias", "").split("·", 1)[0], "person": actor.get("person", "")}
     if not hits:
-        sys.exit(f"no known session matches {fragment!r} (sessions appear once they have run with the hooks)")
-    sys.exit(f"ambiguous session {fragment!r}: " + ", ".join(sorted(hits.values())[:6]))
+        raise SystemExit(f"no known session matches {fragment!r} (sessions appear once they have run with the hooks)")
+    raise SystemExit(f"ambiguous session {fragment!r}: " + ", ".join(sorted(a.get("alias", "") for a in hits.values())[:6]))
 
 
 def cmd_claim(args, cfg):
@@ -354,7 +360,11 @@ def cmd_claim(args, cfg):
     snap = _gather(args, cfg)
     task = _find(snap, args.task).entity_id
     to_actor = _resolve_session(snap, args.to) if args.to else None
-    res = coord.claim(cfg, task, state_dir=state, to_actor=to_actor, steal=args.steal)
+    source_ok = bool(snap.health.get("claims") and snap.health["claims"].ok)
+    view = _find(snap, task)
+    clock_ok = not any(f.code == "CLOCK_SKEW" for f in view.findings + list(snap.findings))
+    res = coord.claim(cfg, task, state_dir=state, to_actor=to_actor, steal=args.steal,
+                      source_healthy=source_ok if args.steal else None, clock_healthy=clock_ok if args.steal else None)
     s.sync(cfg, state_dir=state)
     if args.json:
         print(json.dumps(asdict(res)))
@@ -381,6 +391,53 @@ def cmd_release(args, cfg):
     else:
         print(f"{res.status}: {args.task} {res.detail}")
     return 0 if res.status == "RELEASED" else 1
+
+
+def cmd_hook(args, cfg):
+    """Entry point for Claude Code hooks: reads hook JSON on stdin; prints nothing on stdout."""
+    try:
+        from . import hooks, sync as s
+        raw = sys.stdin.read()
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            data = None
+        res = hooks.handle(args.kind, data, cfg=cfg, state_dir=s.default_state_dir(), host_id=s.safe_host(s.host_id_for(cfg)))
+        if res.stderr:
+            print(res.stderr, file=sys.stderr)
+        return res.code
+    except Exception:
+        return 0
+
+
+def cmd_sync(args, cfg):
+    from . import app, sync as s
+    st = s.sync(cfg, state_dir=s.default_state_dir())
+    app.refresh_claims_cache(cfg, s.default_state_dir())
+    if not args.quiet:
+        print(json.dumps(asdict(st)) if args.json else
+              f"ledger: pull {'ok' if st.last_pull_ok else 'FAILED'}, push {'ok' if st.last_push_ok else 'not ok'}, "
+              f"{st.pending} pending {('— ' + st.error) if st.error else ''}")
+    return 0 if st.last_pull_ok else 1
+
+
+def cmd_install_hooks(args, cfg):
+    from . import hooks
+    settings = Path(args.settings).expanduser()
+    board = str(Path(__file__).resolve().parent.parent / "board")
+    if args.uninstall:
+        hooks.uninstall(settings)
+        print(f"removed workboard hooks from {settings} (backup kept next to it)")
+        return 0
+    text = hooks.install(settings, board, dry_run=args.dry_run)
+    if args.dry_run:
+        print(text)
+        return 0
+    print(f"installed workboard hooks into {settings} (backup kept next to it; only hook entries changed)")
+    line = f"*/2 * * * * {board} sync --quiet >/dev/null 2>&1"
+    print("To keep claim data fresh (needed for edit-blocking), add this cron line (crontab -e):")
+    print(f"  {line}")
+    return 0
 
 
 def cmd_legend(args, cfg):
@@ -459,6 +516,14 @@ def build_parser():
     cl.add_argument("task")
     cl.add_argument("--to", help="assign to the session whose tab title contains this text")
     cl.add_argument("--steal", action="store_true", help="take over an expired claim")
+    hk = sub.add_parser("hook", help="(internal) Claude Code hook entry point")
+    hk.add_argument("kind", choices=["session-start", "pre-tool", "post-tool"])
+    sy = sub.add_parser("sync", parents=[common], help="push queued events and refresh claim data")
+    sy.add_argument("--quiet", action="store_true")
+    ih = sub.add_parser("install-hooks", help="add workboard hooks to Claude Code settings (hooks only)")
+    ih.add_argument("--settings", default="~/.claude/settings.json")
+    ih.add_argument("--dry-run", action="store_true")
+    ih.add_argument("--uninstall", action="store_true")
     rl = sub.add_parser("release", parents=[common], help="give a task up")
     rl.add_argument("task")
     rl.add_argument("--reason", required=True)
@@ -471,13 +536,22 @@ def build_parser():
 
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
-            "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release}
+            "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release, "hook": cmd_hook,
+            "sync": cmd_sync, "install-hooks": cmd_install_hooks}
 
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0].startswith("-") and argv[0] not in ("-h", "--help", "--version"):
         argv = ["list", *argv]
+    if argv[:1] == ["hook"]:
+        try:
+            args = build_parser().parse_args(argv)
+            cfg = load_config()
+        except BaseException:
+            return 0                                   # hooks fail open, even on bad args/config
+        _CFG[0] = cfg
+        return cmd_hook(args, cfg)
     args = build_parser().parse_args(argv)
     try:
         cfg = load_config()
