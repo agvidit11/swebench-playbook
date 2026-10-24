@@ -503,6 +503,7 @@ class SetupCommandTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("links somewhere else", err)
         self.assertEqual(os.readlink(self.home / ".local" / "bin" / "board"), "/usr/bin/true")
+        self.assertEqual(os.readlink(self.home / ".claude" / "skills" / "workboard" / "SKILL.md"), "/usr/bin/true")
 
     def test_setup_accepts_relative_link_to_our_board(self):
         dest = self.home / ".local" / "bin" / "board"
