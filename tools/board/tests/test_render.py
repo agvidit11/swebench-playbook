@@ -22,7 +22,7 @@ HEALTH_OK = {"codimango": SourceHealth("codimango", True, NOW, 900, "live"), "gi
 class RenderTest(unittest.TestCase):
     def out(self, views, width=120, color=False, unicode=True, health=HEALTH_OK, wide=False, **kw):
         style = render.Style(color=color, unicode=unicode)
-        return render.render_list(views, health, now=NOW, width=width, style=style, wide=wide, **kw)
+        return render._render_list(views, health, now=NOW, width=width, style=style, wide=wide, **kw)
 
     def test_groups_in_order_and_done_collapsed(self):
         views = [tv("a", "WAITING", "WAIT reviewer"), tv("b", "ATTENTION", "FIX validation", valid="FAIL"),
@@ -48,6 +48,29 @@ class RenderTest(unittest.TestCase):
             self.assertLessEqual(len(line), 80, line)
         self.assertIn("FIX validation", text)
         self.assertIn("NEXT", text)
+
+    def test_every_line_fits_width(self):
+        failed = dict(HEALTH_OK, codimango=SourceHealth("codimango", False, NOW, 900, "timeout after 60s " * 6))
+        views = [tv("a-very-long-task-name-that-goes-on-and-on-forever", next="FIX validation", review="R~",
+                    conf_stale=True, sync="HEAD≠SERVER", owner="", claim_health="FREE"),
+                 tv("b", claim_health="EXPIRED", owner="h2·x", valid="RUN"), tv("c", claim_health="CONFLICT", valid="FAIL")]
+        header = "W43: 13 accepted  ·  last week at this point 10  ·  4-week median 8.5  (accepted incl. used_in_training, by acceptance date)"
+        for width, wide in ((80, False), (120, False), (200, True)):
+            text = self.out(views, width=width, wide=wide, health=failed, header=header,
+                            warnings=["a fairly long warning message that keeps going " * 3], color=True)
+            for line in ANSI.sub("", text).splitlines():
+                self.assertLessEqual(len(line), width, f"{width}: {line!r}")
+            self.assertIn("FIX validation", ANSI.sub("", text))
+
+    def test_group_by_state(self):
+        text = self.out([tv("a", state="DRAFT"), tv("b", state="REVIEW", group="WAITING")], group="state")
+        self.assertIn("DRAFT (1)", text)
+        self.assertIn("REVIEW (1)", text)
+
+    def test_public_render_list_signature(self):
+        text = render.render_list([tv("a")], HEALTH_OK, None, width=100, color="never", unicode="never")
+        self.assertIn("TASK", text)
+        self.assertIsNone(ANSI.search(text))
 
     def test_task_name_middle_truncated(self):
         name = "a-very-long-task-name-that-goes-on-and-on-forever-and-ever"
@@ -83,7 +106,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("~P20", text)
 
     def test_owner_free_and_expired(self):
-        text = self.out([tv("a", owner="", claim_health="FREE"), tv("b", owner="h2·x", claim_health="EXPIRED")])
+        text = self.out([tv("a", owner="", claim_health="FREE"), tv("b", owner="h2·x", claim_health="EXPIRED")], width=140)
         self.assertIn("FREE", text)
         self.assertIn("EXPIRED", text)
 

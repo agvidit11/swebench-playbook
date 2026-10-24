@@ -96,7 +96,9 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
         sync_state = sync_mod.sync(cfg, state_dir=state_dir, timeout_seconds=sync_timeout) if do_sync \
             else sync_mod.load_state(state_dir)
     evs, ev_findings = events.read_events(ledger_event_files(cfg))
-    evs += pending_spool_events(state_dir, sync_mod.safe_host(sync_mod.host_id_for(cfg)))
+    known = {e["event_id"] for e in evs}
+    evs += [e for e in pending_spool_events(state_dir, sync_mod.safe_host(sync_mod.host_id_for(cfg)))
+            if e["event_id"] not in known]
     findings += ev_findings
     views = project(obs, evs, cfg, now)
     return Snapshot(views, obs, evs, health, findings, sync_state, now)

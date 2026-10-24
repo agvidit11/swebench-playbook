@@ -1,0 +1,90 @@
+import contextlib, io, json, os, tempfile, unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest import mock
+from workboard import __main__ as cli, app
+from workboard.model import Finding, SourceHealth, TaskView
+from workboard.sync import SyncState
+
+NOW = datetime(2026, 10, 23, 20, 0, tzinfo=timezone.utc)
+
+
+def view(name, **f):
+    base = {"group": "READY", "next": "RUN check", "state": "DRAFT", "state_age_s": 3600, "age_level": "ok",
+            "owner": "", "claim_health": "FREE", "valid": "PASS", "review": "R0", "confidence": None,
+            "confidence_stale": False, "sync": "OK", "check": "NONE", "check_stale": False, "pushes": "1+0",
+            "pushes_before_submit": 1, "pushes_after_submit": 0, "round": None, "track": "", "dissent": 0}
+    base.update(f)
+    return TaskView(name, base, [])
+
+
+def snap(healthy=True):
+    h = SourceHealth("codimango", healthy, NOW, 900, "live" if healthy else "timeout after 60s")
+    views = [view("alpha-task"), view("beta-task", claim_health="EXPIRED", owner="h2·x"),
+             view("gamma-task", group="DONE", state="ACCEPTED", next="—")]
+    return app.Snapshot(views, [], [], {"codimango": h},
+                        [] if healthy else [Finding("SYNC_FAILED", "warn", "codimango fetch failed", "fix")],
+                        SyncState(last_pull_ok=True, last_push_ok=True), NOW)
+
+
+class CliTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        self.env = mock.patch.dict(os.environ, {"WORKBOARD_CACHE": td.name, "WORKBOARD_CONFIG": "/nonexistent",
+                                                 "NO_COLOR": "1"})
+        self.env.start(); self.addCleanup(self.env.stop)
+
+    def run_cli(self, argv, healthy=True):
+        out = io.StringIO()
+        with mock.patch.object(cli, "_gather", lambda args, cfg: snap(healthy)), \
+             mock.patch.object(cli, "_reviews_text", lambda cfg, t: None), \
+             contextlib.redirect_stdout(out):
+            code = cli.main(argv)
+        return code, out.getvalue()
+
+    def test_parser_accepts_documented_grammar(self):
+        p = cli.build_parser()
+        for argv in (["list", "--group", "state"], ["show", "x", "--history", "--sources"],
+                     ["available", "--reason", "expired"], ["plugins", "list"], ["changes", "--since", "2h"],
+                     ["list", "--wide", "--all", "--strict", "--json"]):
+            p.parse_args(argv)
+
+    def test_every_read_command_prints_banner(self):
+        for argv in (["list"], ["show", "alpha"], ["explain", "alpha"], ["available"], ["changes"]):
+            code, out = self.run_cli(argv)
+            self.assertTrue(out.splitlines()[0].startswith("codimango"), (argv, out[:80]))
+
+    def test_strict_nonzero_when_unhealthy(self):
+        for argv in (["list"], ["show", "alpha"], ["explain", "alpha"], ["available"], ["changes"]):
+            code, out = self.run_cli(argv + ["--strict"], healthy=False)
+            self.assertEqual(code, 1, argv)
+            self.assertIn("SYNC FAILED", out)
+            code, _ = self.run_cli(argv + ["--strict"], healthy=True)
+            self.assertEqual(code, 0, argv)
+
+    def test_json_envelope(self):
+        for argv in (["list"], ["show", "alpha"], ["explain", "alpha"], ["available"], ["changes"]):
+            code, out = self.run_cli(argv + ["--json"], healthy=False)
+            data = json.loads(out)
+            for key in ("health", "sync_state", "findings", "result"):
+                self.assertIn(key, data, argv)
+            self.assertFalse(data["health"]["codimango"]["ok"])
+
+    def test_review_fetch_failure_is_visible(self):
+        code, out = self.run_cli(["show", "alpha"])
+        self.assertIn("reviews unavailable", out)
+
+    def test_available_reason_filter(self):
+        code, out = self.run_cli(["available", "--reason", "expired", "--json"])
+        names = [r["task"] for r in json.loads(out)["result"]]
+        self.assertEqual(names, ["beta-task"])
+
+    def test_default_command_is_list(self):
+        code, out = self.run_cli(["--plain"])
+        self.assertIn("TASK", out)
+        self.assertIn("Done: 1", out)
+
+    def test_changes_after_look(self):
+        self.run_cli(["list"])
+        code, out = self.run_cli(["changes"])
+        self.assertIn("nothing changed", out)

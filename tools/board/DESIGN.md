@@ -25,7 +25,8 @@ Everything that can be recorded automatically is. The only explicit agent action
 Normalisation keeps disagreements as **findings** instead of overwriting. Findings have a code, severity
 (info / warn / block) and a next action. Built-in drift findings: `HEAD≠SERVER` (git task head vs
 codimango commit), `VALID≠SERVER` (validationCommitSha vs commitSha), `INCOMPLETE` (`totalExact=false`),
-`DEGRADED` (`trainingStatusDegraded`), `NONOWNER_COMMIT`, `CLOCK_SKEW`, `MALFORMED_EVENTS`, `SYNC_FAILED`,
+`DEGRADED` (`trainingStatusDegraded`), `STALE_VALID` (server saw the task's newest commit but validated an older one
+and non-doc files changed since), `NONOWNER_COMMIT`, `CLOCK_SKEW`, `MALFORMED_EVENTS`, `SYNC_FAILED`,
 `CACHE_STALE`.
 
 ## 3. Data health is always visible

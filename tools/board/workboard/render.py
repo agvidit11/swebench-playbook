@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import os
+import re
+import textwrap
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -43,6 +45,16 @@ class Style:
 
     def g(self, uni: str, ascii_: str) -> str:
         return uni if self.unicode else ascii_
+
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def wrap(text: str, width: int, indent: str = "  ") -> list[str]:
+    """Wrap plain prose at word boundaries; continuation lines are indented. Never truncates."""
+    if len(text) <= width:
+        return [text]
+    return textwrap.wrap(text, width=width, subsequent_indent=indent, break_long_words=True, break_on_hyphens=False)
 
 
 def fmt_age(seconds) -> str:
@@ -135,51 +147,63 @@ def _layout(cols, rows, width):
         cols.remove(droppable[0])
 
 
-def banner(health: dict, style: Style, sync_state=None, now: datetime | None = None) -> str:
+def banner(health: dict, style: Style, sync_state=None, now: datetime | None = None, width: int = 120) -> str:
     parts, failed = [], []
     ok_mark, bad_mark = style.g("✓", "ok"), style.g("!", "FAIL")
     for name, h in health.items():
         age = fmt_age(int((now - h.observed_at).total_seconds())) if (now and h.observed_at) else "?"
-        if h.ok:
-            parts.append(f"{name} {ok_mark} {age}")
-        else:
+        parts.append((f"{name} {ok_mark} {age}", None) if h.ok else (f"{name} {bad_mark} {age}", "red"))
+        if not h.ok:
             failed.append(f"{name}: {h.detail}")
-            parts.append(style.paint(f"{name} {bad_mark} {age}", "red"))
     if sync_state is not None:
-        if sync_state.last_push_ok or (sync_state.last_pull_ok and not sync_state.pending):
-            parts.append(f"ledger {ok_mark}")
+        if sync_state.last_pull_ok and (sync_state.last_push_ok or not sync_state.pending):
+            parts.append((f"ledger {ok_mark}", None))
         else:
-            parts.append(style.paint(f"ledger {bad_mark} {sync_state.pending} pending", "red"))
+            parts.append((f"ledger {bad_mark} {sync_state.pending} pending", "red"))
             if sync_state.error:
                 failed.append(f"ledger: {sync_state.error}")
-    line = " · ".join(parts)
+    lines = []
     if failed:
-        line = style.paint("SYNC FAILED", "red") + " — " + "; ".join(failed)[:160] + "\n" + line
-    return line
+        for i, l in enumerate(wrap("SYNC FAILED — " + "; ".join(failed), width)):
+            lines.append(style.paint(l, "red") if i == 0 else l)
+    # status parts: wrap on the separator
+    cur, cur_len = "", 0
+    for text, colour in parts:
+        sep = " · " if cur else ""
+        if cur and cur_len + len(sep) + len(text) > width:
+            lines.append(cur)
+            cur, cur_len, sep = "", 0, ""
+        cur += sep + style.paint(text, colour)
+        cur_len += len(sep) + len(text)
+    if cur:
+        lines.append(cur)
+    return "\n".join(lines)
 
 
-def legend(symbols: set[str], style: Style, everything: bool = False) -> str:
+def legend(symbols: set[str], style: Style, everything: bool = False, width: int = 120) -> str:
     stale = style.g("↻", "~")
     items = [
         ("PASS", "PASS passing"), ("RUN", "RUN validating"), ("FAIL", "FAIL failing"), ("UNK", "UNK unknown"),
-        ("R0", "R0 no review"), ("R1", "R1 one session"), ("R2", "R2 two sessions"), ("R~", "R~ review on older commit"),
+        ("R0", "R0 no agent-session review"), ("R1", "R1 one agent session approved"),
+        ("R2", "R2 two agent sessions approved"), ("R~", "R~ agent review on an older commit"),
         ("C", "C4 confidence 4/5"), ("STALE", f"{stale} result from an older commit"),
         ("FREE", "FREE nobody owns it"), ("EXPIRED", "EXPIRED owner idle 24h+"), ("CONFLICT", "CONFLICT two owners"),
         ("HEAD≠SERVER", "HEAD≠SERVER newer push not on server"), ("STALE_VALID", "STALE_VALID validated an older commit"),
-        ("OK·doc", "OK·doc only docs changed since validation"), ("PUSHES", "2+1 commits before+after submit"),
+        ("OK·doc", "OK·doc only docs changed since validation"), ("UNCHECKED", "UNCHECKED drift not checked"),
+        ("PUSHES", "2+1 commits before+after submit"),
     ]
     shown = [text for key, text in items if everything or key in symbols]
     if not shown:
         return ""
     lines, cur = [], "Legend:"
     for t in shown:
-        if len(cur) + len(t) + 3 > 110:
+        if len(cur) + 2 + len(t) > width:
             lines.append(cur)
             cur = "       "
         cur += "  " + t
     lines.append(cur)
     if style.color:
-        lines.append("        colour only repeats the word: green good · amber waiting · red blocking · dim stale")
+        lines += wrap("colour only repeats the word: green good · amber waiting · red blocking · dim stale", width, "        ")
     return "\n".join(lines)
 
 
@@ -199,13 +223,30 @@ def _symbols(views, cols) -> set[str]:
     return s
 
 
-def render_list(views, health, *, now, width=120, style: Style, wide=False, show_all=False, header="",
-                sync_state=None, warnings=()) -> str:
-    out = [banner(health, style, sync_state, now)]
+def render_list(views, health, cfg=None, *, width=120, color="auto", unicode="auto", wide=False, show_all=False,
+                header="", sync_state=None, warnings=(), group="attention", now: datetime | None = None) -> str:
+    """Public entry point: detects style from color/unicode (+ NO_COLOR, TERM, TTY) and renders the board."""
+    from datetime import timezone
+    style = Style.detect(color, unicode)
+    return _render_list(views, health, now=now or datetime.now(timezone.utc), width=width, style=style, wide=wide,
+                        show_all=show_all, header=header, sync_state=sync_state, warnings=warnings, group=group)
+
+
+def _group_key(v, mode):
+    if mode == "state":
+        return v.fields.get("state", "?")
+    if mode == "owner":
+        return v.fields.get("owner") or v.fields.get("claim_health", "FREE")
+    return v.fields.get("group")
+
+
+def _render_list(views, health, *, now, width=120, style: Style, wide=False, show_all=False, header="",
+                 sync_state=None, warnings=(), group="attention") -> str:
+    out = [banner(health, style, sync_state, now, width)]
     if header:
-        out.append(header)
+        out += wrap(header, width)
     for w in warnings:
-        out.append(style.paint(f"warning: {w}", "amber"))
+        out += [style.paint(l, "amber") for l in wrap(f"warning: {w}", width)]
     active = [v for v in views if v.fields.get("group") != "DONE"]
     done = [v for v in views if v.fields.get("group") == "DONE"]
     if not active and not (show_all and done):
@@ -219,9 +260,12 @@ def render_list(views, health, *, now, width=120, style: Style, wide=False, show
     cols, widths = _layout(cols, rows, width)
     head = "  " + "  ".join(HEAD[c].ljust(widths[c]) for c in cols)
     out.append(style.paint(head.rstrip(), "bold"))
-    groups = list(GROUPS) + (["DONE"] if show_all else [])
+    if group == "attention":
+        groups = list(GROUPS) + (["DONE"] if show_all else [])
+    else:
+        groups = sorted({_group_key(v, group) for v in visible}, key=str)
     for g in groups:
-        members = [(v, r) for v, r in zip(visible, rows) if v.fields.get("group") == g]
+        members = [(v, r) for v, r in zip(visible, rows) if _group_key(v, group) == g]
         if not members:
             continue
         out.append(style.paint(f"{g} ({len(members)})", "bold"))
@@ -234,7 +278,7 @@ def render_list(views, health, *, now, width=120, style: Style, wide=False, show
             out.append(("  " + "  ".join(cells)).rstrip())
     if done and not show_all:
         out.append(f"Done: {len(done)} (use --all)")
-    leg = legend(_symbols(visible, cols), style)
+    leg = legend(_symbols(visible, cols), style, width=width)
     if leg:
         out.append(leg)
     return "\n".join(out)

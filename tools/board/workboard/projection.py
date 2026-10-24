@@ -60,7 +60,7 @@ def _claims(task_events, cfg, now, aliases):
         at = ts(e["occurred_at"])
         if at is None or at - now > skew:
             continue                       # future-dated: reported as CLOCK_SKEW, never trusted for liveness
-        if e["type"] in ("claim", "renew", "steal", "assign"):
+        if e["type"] in ("claim", "renew", "steal"):
             target = e["payload"].get("to_session") or sid
             if e["type"] == "steal":
                 live.clear()
@@ -144,6 +144,10 @@ def _next(f, findings):
         return "ATTENTION", "FIX validation"
     if codes & {"HEAD≠SERVER", "STALE_VALID"}:
         return "ATTENTION", "RERUN server"
+    if "NONOWNER_COMMIT" in codes:
+        return "ATTENTION", "RESOLVE ownership"
+    if "CLOCK_SKEW" in codes:
+        return "ATTENTION", "CHECK clock"
     if "VALID≠SERVER" in codes:
         return ("WAITING", "WAIT validation") if valid == "RUN" else ("ATTENTION", "RERUN server")
     if valid == "RUN":

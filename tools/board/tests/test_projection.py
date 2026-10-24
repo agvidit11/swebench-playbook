@@ -132,6 +132,19 @@ class ProjectionTest(unittest.TestCase):
                        e("review", "t", {"verdict": "ready"}, session="s9", host="h2", seq=1, commit=SHA_B,
                          at="2026-10-23T19:00:00+00:00")]
         self.assertNotIn("NONOWNER_COMMIT", [f.code for f in self.view([cm("t")], review_only).findings])
+        v = self.view([cm("t")], evs)
+        self.assertEqual((v.fields["group"], v.fields["next"]), ("ATTENTION", "RESOLVE ownership"))
+
+    def test_clock_skew_routes_to_attention(self):
+        v = self.view([cm("t")], [e("touch", "t", seq=1, at="2026-10-25T00:00:00+00:00")])
+        self.assertEqual((v.fields["group"], v.fields["next"]), ("ATTENTION", "CHECK clock"))
+
+    def test_assign_alone_is_not_liveness(self):
+        evs = [e("assign", "t", {"to_session": "s2", "to_alias": "h2·x"}, seq=1)]
+        self.assertEqual(self.view([cm("t")], evs).fields["claim_health"], "FREE")
+        after_expired = [e("claim", "t", seq=1, at="2026-10-21T00:00:00+00:00"),
+                         e("assign", "t", {"to_session": "s1"}, seq=2, at="2026-10-23T19:00:00+00:00")]
+        self.assertEqual(self.view([cm("t")], after_expired).fields["claim_health"], "EXPIRED")
 
     def test_head_newer_than_server_is_finding(self):
         obs = [cm("t"), gt("t", head_time="2026-10-23T10:00:00+00:00"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
