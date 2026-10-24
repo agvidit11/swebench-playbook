@@ -25,6 +25,8 @@ KEEP = {
     "commitSha": "commit_sha", "headCommitSha": "head_commit_sha", "validationCommitSha": "validation_commit_sha",
     "trackAssignment": "track", "format": "format", "reviewStatus": "review_status",
     "tbdReviewStatus": "tbr_status", "updatedAt": "updated_at", "githubUrl": "github_url",
+    "oraclePassCount": "oracle_pass", "oracleTotalCount": "oracle_total", "avocadoPassCount": "avocado_pass",
+    "avocadoTotalCount": "avocado_total", "codexPassCount": "codex_pass", "codexTotalCount": "codex_total",
 }
 
 
@@ -36,7 +38,8 @@ def _snake_validation(details) -> list:
     out = []
     for d in details or []:
         if isinstance(d, dict):
-            out.append({"name": str(d.get("name", ""))[:80], "status": str(d.get("status", ""))[:20]})
+            out.append({"name": str(d.get("label") or d.get("name") or "")[:80], "status": str(d.get("status", ""))[:20],
+                        "detail": str(d.get("detail") or "")[:300]})
     return out
 
 

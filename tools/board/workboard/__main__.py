@@ -504,6 +504,14 @@ def cmd_sync(args, cfg):
                 stamp.touch()
     except Exception as exc:                       # cache warming is best-effort
         print(f"cache refresh skipped: {exc}", file=sys.stderr)
+    try:
+        from . import reviews
+        from .sources.codimango import CodimangoSource as _CS
+        rows = (_CS(cfg, cache_dir=app.cache_dir())._read_cache() or {}).get("rows", [])
+        reviews.refresh(cfg, app.cache_dir(), [(r["name"], r.get("updated_at") or "") for r in rows
+                                               if r.get("entered_pool_at") and r.get("status") != "archived"])
+    except Exception as exc:
+        print(f"review history refresh skipped: {exc}", file=sys.stderr)
     st = s.sync(cfg, state_dir=s.default_state_dir())
     app.refresh_claims_cache(cfg, s.default_state_dir())
     if not args.quiet:
