@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 import typing
 from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
 
 CONFIG_VERSION = 1
-DEFAULT_PATH = Path(os.environ.get("WORKBOARD_CONFIG", "~/.config/workboard/config.toml")).expanduser()
+def default_path() -> Path:
+    """Read at call time so WORKBOARD_CONFIG set later (tests, wrappers) is honoured."""
+    return Path(os.environ.get("WORKBOARD_CONFIG", "~/.config/workboard/config.toml")).expanduser()
 
 
 @dataclass
@@ -168,7 +171,7 @@ def _fill(obj, data: dict, prefix: str, warnings: list) -> None:
 
 
 def load_config(path: Path | None = None) -> Config:
-    path = Path(path) if path else DEFAULT_PATH
+    path = Path(path) if path else default_path()
     cfg = Config(path=str(path))
     if not path.exists():
         cfg.warnings.append(f"config not found at {path}; using defaults (copy config.example.toml)")
@@ -179,4 +182,9 @@ def load_config(path: Path | None = None) -> Config:
     if version != CONFIG_VERSION:
         raise ValueError(f"config_version {version} not supported (expected {CONFIG_VERSION})")
     _fill(cfg, data, "", cfg.warnings)
+    try:
+        if re.compile(cfg.checks.summary_regex).groups < 3:
+            raise ValueError("checks.summary_regex needs 3 groups: fail, warn, pass")
+    except re.error as exc:
+        raise ValueError(f"checks.summary_regex is not a valid regex: {exc}") from None
     return cfg

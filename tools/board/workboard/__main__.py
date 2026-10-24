@@ -454,7 +454,8 @@ def cmd_review(args, cfg):
     if args.action == "list":
         snap = _gather(args, cfg)
         task = _find(snap, args.task).entity_id
-        revs = [e for e in snap.events if e["type"] == "review" and (e.get("entity") or {}).get("id") == task]
+        revs = sorted((e for e in snap.events if e["type"] == "review" and (e.get("entity") or {}).get("id") == task),
+                      key=lambda e: (e["occurred_at"], e["host_id"], e["seq"]))
         if args.json:
             return _emit(args, snap, revs)
         lines = [f"{len(revs)} agent-session review(s) of {task}:"]
@@ -466,10 +467,22 @@ def cmd_review(args, cfg):
     if not args.verdict:
         print("review add needs --verdict ready|changes|comment", file=sys.stderr)
         return 2
+    from . import coord
+    fresh, why = coord.ledger_fresh(cfg, state)
+    if not fresh:
+        print(f"refusing to add review: ledger did not sync ({why})", file=sys.stderr)
+        return 2
     ok, detail = checks.add_review(cfg, args.task, args.verdict, args.confidence, args.note or "", state_dir=state)
-    s.sync(cfg, state_dir=state, timeout_seconds=10)
-    print(f"review recorded on {detail[:8]}" if ok else f"review refused: {detail}", file=sys.stdout if ok else sys.stderr)
-    return 0 if ok else 2
+    if not ok:
+        print(f"review refused: {detail}", file=sys.stderr)
+        return 2
+    st = s.sync(cfg, state_dir=state, timeout_seconds=10)
+    if not (st.last_pull_ok and st.last_push_ok and not st.pending):
+        print(f"review on {detail[:8]} is queued locally but NOT yet in the ledger ({st.error or 'push pending'}); "
+              "run `workboard sync`", file=sys.stderr)
+        return 1
+    print(f"review recorded on {detail[:8]}")
+    return 0
 
 
 def cmd_legend(args, cfg):

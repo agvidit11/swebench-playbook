@@ -260,3 +260,36 @@ class StealEvidenceCommandTest(ClaimCommandTest):
             cli.main(["claim", "alpha", "--steal"])
         self.assertTrue(captured["source_healthy"])
         self.assertFalse(captured["clock_healthy"])
+
+
+class ReviewAddCommandTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        p = mock.patch.dict(os.environ, {"WORKBOARD_STATE": td.name, "WORKBOARD_CACHE": td.name,
+                                         "WORKBOARD_CONFIG": "/nonexistent"})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def code(self, fresh, after):
+        from workboard import checks, coord
+        with mock.patch.object(coord, "ledger_fresh", return_value=fresh), \
+             mock.patch.object(checks, "add_review", return_value=(True, "e" * 40)), \
+             mock.patch("workboard.sync.sync", return_value=after), \
+             contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+            return cli.main(["review", "add", "alpha-task", "--verdict", "ready", "--confidence", "4"]), err.getvalue()
+
+    def test_busy_or_failed_pull_refused(self):
+        for why in ("another sync is running", "pull failed: x"):
+            code, err = self.code((False, why), SyncState(last_pull_ok=True, last_push_ok=True))
+            self.assertEqual(code, 2)
+            self.assertIn("refusing", err)
+
+    def test_push_left_pending_reports_queued(self):
+        code, err = self.code((True, ""), SyncState(last_pull_ok=True, last_push_ok=False, pending=1, error="push failed"))
+        self.assertEqual(code, 1)
+        self.assertIn("queued locally", err)
+
+    def test_success(self):
+        code, err = self.code((True, ""), SyncState(last_pull_ok=True, last_push_ok=True, pending=0))
+        self.assertEqual(code, 0)
