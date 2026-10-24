@@ -20,7 +20,7 @@ from .projection import ts
 ACCEPTED = {"accepted", "used_in_training"}
 DEFINITIONS = ("accepted = current status accepted or used_in_training, dated by reviewedAt; "
                "submitted = has enteredPoolAt (dated by it); worked on = createdAt; MT = multi-turn track, "
-               "ST = single-turn; imported = known to codimango; cycle time = first submission -> acceptance; "
+               "ST = single-turn; imported = known to codimango; first-submission cycle time = unavailable (codimango keeps only the latest pool entry); latest-round cycle = latest submission -> acceptance; "
                "reviewer wait = submission -> latest human decision (codimango keeps only the latest); "
                "weeks Monday-start in {tz}; timestamps after now are ignored")
 
@@ -180,7 +180,10 @@ def cycle_and_wait(observations, now, start=None, end=None) -> dict:
             decided += 1
             if pool and rev and rev >= pool:
                 wait.append((rev - pool).total_seconds())
-    return {"cycle_p50_h": _pct(cycle, .5), "cycle_p75_h": _pct(cycle, .75), "cycle_coverage": f"{len(cycle)}/{accepted}",
+    return {"first_submission_cycle": {"available": False, "reason": "codimango keeps only the latest pool entry",
+                                       "coverage": f"0/{accepted}"},
+            "latest_round_cycle_p50_h": _pct(cycle, .5), "latest_round_cycle_p75_h": _pct(cycle, .75),
+            "latest_round_cycle_coverage": f"{len(cycle)}/{accepted}",
             "wait_p50_h": _pct(wait, .5), "wait_p75_h": _pct(wait, .75), "wait_coverage": f"{len(wait)}/{decided}"}
 
 

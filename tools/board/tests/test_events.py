@@ -112,6 +112,21 @@ class EventsTest(unittest.TestCase):
         self.assertEqual([e["seq"] for e in evs], [1, 3])
         self.assertIn("oversize", findings[0].summary)
 
+    def test_partial_spool_tail_does_not_swallow_next_event(self):
+        (self.dir / events.SPOOL_NAME).write_bytes(b'{"schema_version":1,"event_id":"half')
+        e = events.new_event("touch", "t1", {}, actor=ACTOR, commit=None, source="t")
+        self.assertTrue(events.spool_append(self.dir, e))
+        lines = (self.dir / events.SPOOL_NAME).read_text().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(json.loads(lines[1])["event_id"], e["event_id"])
+
+    def test_complete_json_without_final_newline_is_torn(self):
+        f = self.dir / "h.jsonl"
+        f.write_text(json.dumps(ev(seq=1)) + "\n" + json.dumps(ev(seq=2)))
+        evs, findings = events.read_events([f])
+        self.assertEqual([x["seq"] for x in evs], [1])
+        self.assertIn("unterminated", findings[0].summary)
+
     def test_duplicate_event_id_deduped(self):
         f = self.dir / "h.jsonl"
         e = ev()

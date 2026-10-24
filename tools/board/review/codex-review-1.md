@@ -56,7 +56,7 @@ Defer causal productivity rankings, transcript backfill, messaging, and elaborat
 
 ## 9. Add portable configuration and stable extension boundaries now
 
-- **Problem — [Open-source architect]:** Vidit, server names, home paths, repo URLs, FBIDs/opaque importer IDs, lane names, reviewer names, internal URLs, and private client paths are currently embedded in the design or existing integrations. Adding config after implementation will bake these assumptions into storage and UI.
+- **Problem — [Open-source architect]:** the author, server names, home paths, repo URLs, FBIDs/opaque importer IDs, lane names, reviewer names, internal URLs, and private client paths are currently embedded in the design or existing integrations. Adding config after implementation will bake these assumptions into storage and UI.
 - **Concrete proposal:** Use TOML because Python 3.11+ reads it with stdlib `tomllib`. Separate a local, uncommitted user config from a shareable team config. Normalize external records into public internal types, and let trusted plugins contribute data sources, columns, checks, and stats without becoming authorities implicitly. Provide `board init`, schema validation, config versioning, and a no-network sample profile. Keep internal adapters/plugins in a separate package or config overlay.
 - **Effort:** M
 
@@ -106,7 +106,7 @@ Defer causal productivity rankings, transcript backfill, messaging, and elaborat
 ## Architect for later open-sourcing
 
 - **[Open-source architect]** The product name and data model should not assume AAI, SWE-bench, Claude, or Codimango. Keep those as a default profile and plugins; the core concepts are item, observation, claim, check, review, state, and report.
-- **[Open-source architect]** Separate private values: `Vidit`, `agvidit`, `6971`, `23237`, `/home/agvidit/...`, private repo URLs, opaque user/FBID fields, lane/reviewer names, internal URLs, and the presubmit private-client path. Do not commit a generated personal config.
+- **[Open-source architect]** Separate private values: `the author`, `<user>`, `host-a`, `host-b`, `~/...`, private repo URLs, opaque user/FBID fields, lane/reviewer names, internal URLs, and the presubmit private-client path. Do not commit a generated personal config.
 - **[Open-source architect]** Give each normalized field an authority and namespace. A plugin may publish `codimango.validation_status`; it must not silently replace `core.state`.
 - **[Open-source architect]** Plugins execute arbitrary Python, so load only explicitly enabled modules and describe them as trusted code. A future third-party ecosystem should prefer a subprocess JSON protocol for isolation.
 - **[Open-source architect]** First run should detect capabilities, then ask: identity/display name, timezone/week start, servers, task repositories, primary next actions, desired width/columns, aging thresholds, and report audience. Preview the generated config before writing it.
@@ -205,7 +205,7 @@ profile = "swebench-codimango"
 
 [user]
 id = "vidit"                    # stable local ID, not an FBID
-display_name = "Vidit"
+display_name = "the author"
 timezone = "America/Los_Angeles"
 week_start = "monday"
 
@@ -228,26 +228,26 @@ max_stale_seconds = 900
 [[servers]]
 id = "build-a"
 display_name = "Build A"
-host_alias = "devvm6971"
+host_alias = "host-a"
 event_file = "ledger/events/build-a.jsonl"
 
 [[servers]]
 id = "build-b"
 display_name = "Build B"
-host_alias = "devvm23237"
+host_alias = "host-b"
 event_file = "ledger/events/build-b.jsonl"
 
 [[repositories]]
 id = "tasks"
-path = "/home/agvidit/swe-bench-pro-agvidit"
+path = "~/<task-repo>"
 remote = "origin"
 branch = "main"
 task_path_pattern = "{task}"
 
 [[team.members]]
 id = "vidit"
-display_name = "Vidit"
-aliases = ["agvidit"]
+display_name = "the author"
+aliases = ["<user>"]
 
 [claims]
 mode = "advisory"               # advisory | atomic-plugin

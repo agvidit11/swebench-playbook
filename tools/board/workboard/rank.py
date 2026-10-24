@@ -3,7 +3,8 @@
 `workboard rank` runs `meta daiquery.query execute --id=<rank.daiquery_id> --output=json` from your shell and
 caches rows with their snapshot date. Agent sessions are often denied that table; then it prints the one
 manual step, and `workboard rank import <file>` loads a pasted CSV/markdown result. Any query returning a
-canonical (scope, window, metric, value, rank, of) table, or the wide rank-query.sql shape, is normalized.
+canonical (scope, window, metric, value, rank, of) table, or the wide shape (scope, win, acc, acc_rank "r/n",
+sub, sub_rank, work, work_rank), is normalized.
 """
 from __future__ import annotations
 
@@ -33,15 +34,27 @@ CANON = ("scope", "window", "metric", "value", "rank", "of")
 WIDE = {"acc": "accepted", "sub": "submitted", "work": "worked_on"}
 
 
-def valid_rows(rows) -> bool:
-    """Normalized rank rows: every row has the canonical keys with sane types."""
-    if not (isinstance(rows, list) and rows):
+METRICS = set(WIDE.values())
+
+
+def _row_ok(r) -> bool:
+    if not (isinstance(r, dict) and all(k in r for k in CANON)):
         return False
-    for r in rows:
-        if not (isinstance(r, dict) and all(k in r for k in CANON) and isinstance(r["scope"], str)
-                and isinstance(r["window"], str) and isinstance(r["metric"], str)):
+    if not (isinstance(r["scope"], str) and r["scope"] and isinstance(r["window"], str) and r["window"]):
+        return False
+    if r["metric"] not in METRICS:
+        return False
+    for k in ("value", "rank", "of"):
+        if r[k] is not None and not (isinstance(r[k], int) and not isinstance(r[k], bool) and r[k] >= 0):
             return False
-    return True
+    if (r["rank"] is None) != (r["of"] is None):
+        return False
+    return r["rank"] is None or 1 <= r["rank"] <= max(r["of"], 1) or r["value"] == 0
+
+
+def valid_rows(rows) -> bool:
+    """Normalized rank rows: canonical keys, allowed metric, ints or null, consistent rank/of."""
+    return isinstance(rows, list) and bool(rows) and all(_row_ok(r) for r in rows)
 
 
 def _num(v):
@@ -52,14 +65,18 @@ def _num(v):
 
 
 def normalize(rows) -> list[dict]:
-    """Accept canonical long rows, or the wide rank-query.sql shape (scope, win, acc, acc_rank "r/n", ...).
+    """Accept canonical long rows, or the wide shape (scope, win, acc, acc_rank "r/n", ...).
     Raises ValueError if a row has neither shape."""
     if not (isinstance(rows, list) and rows and all(isinstance(r, dict) for r in rows)):
         raise ValueError("expected a non-empty list of rows")
     out = []
     for i, r in enumerate(rows):
         if all(k in r for k in CANON):
-            out.append({k: r[k] for k in CANON})
+            row = {"scope": r["scope"], "window": r["window"], "metric": r["metric"],
+                   "value": _num(r["value"]), "rank": _num(r["rank"]), "of": _num(r["of"])}
+            if not _row_ok(row):
+                raise ValueError(f"row {i}: invalid canonical row")
+            out.append(row)
             continue
         scope, window = r.get("scope"), r.get("win") or r.get("window")
         if not (isinstance(scope, str) and isinstance(window, str)):
@@ -71,8 +88,11 @@ def normalize(rows) -> list[dict]:
             found = True
             rank_text = str(r.get(f"{short}_rank") or "")
             rk, _, of = rank_text.partition("/")
-            out.append({"scope": scope, "window": window, "metric": metric, "value": _num(r.get(short)),
-                        "rank": _num(rk), "of": _num(of)})
+            row = {"scope": scope, "window": window, "metric": metric, "value": _num(r.get(short)),
+                   "rank": _num(rk), "of": _num(of)}
+            if not _row_ok(row):
+                raise ValueError(f"row {i}: invalid {metric} values")
+            out.append(row)
         if not found:
             raise ValueError(f"row {i}: no acc/sub/work or metric/value columns")
     return out
@@ -109,7 +129,7 @@ def parse_table(text: str) -> list[dict]:
 
 def refresh(cfg, cache_dir: Path, *, runner=subprocess.run) -> tuple[dict | None, str]:
     if not cfg.rank.daiquery_id:
-        return None, "set [rank] daiquery_id in your config (save rank-query.sql in DaiQuery and use its id)"
+        return None, "set [rank] daiquery_id in your config (the id of your saved DaiQuery rank query)"
     argv = [cfg.rank.command, "daiquery.query", "execute", f"--id={cfg.rank.daiquery_id}", "--output=json", "--limit=500"]
     try:
         p = runner(argv, capture_output=True, text=True, timeout=300)

@@ -126,12 +126,16 @@ class ProjectionTest(unittest.TestCase):
 
     def test_nonowner_commit_finding(self):
         evs = [e("claim", "t", seq=1, at="2026-10-23T18:00:00+00:00"),
-               e("touch", "t", session="s9", alias="h2·other", host="h2", seq=1, commit=SHA_B, at="2026-10-23T19:00:00+00:00")]
-        self.assertIn("NONOWNER_COMMIT", [f.code for f in self.view([cm("t")], evs).findings])
+               e("touch", "t", {"tool": "Edit"}, session="s9", alias="h2·other", host="h2", seq=1,
+                 at="2026-10-23T19:00:00+00:00")]
+        self.assertIn("NONOWNER_EDIT", [f.code for f in self.view([cm("t")], evs).findings])
         review_only = [e("claim", "t", seq=1, at="2026-10-23T18:00:00+00:00"),
                        e("review", "t", {"verdict": "ready"}, session="s9", host="h2", seq=1, commit=SHA_B,
                          at="2026-10-23T19:00:00+00:00")]
-        self.assertNotIn("NONOWNER_COMMIT", [f.code for f in self.view([cm("t")], review_only).findings])
+        self.assertNotIn("NONOWNER_EDIT", [f.code for f in self.view([cm("t")], review_only).findings])
+        bash_touch = [e("claim", "t", seq=1, at="2026-10-23T18:00:00+00:00"),
+                      e("touch", "t", {"tool": "Bash"}, session="s9", host="h2", seq=1, at="2026-10-23T19:00:00+00:00")]
+        self.assertNotIn("NONOWNER_EDIT", [f.code for f in self.view([cm("t")], bash_touch).findings])
         v = self.view([cm("t")], evs)
         self.assertEqual((v.fields["group"], v.fields["next"]), ("ATTENTION", "RESOLVE ownership"))
 
@@ -260,10 +264,23 @@ class ProjectionTest(unittest.TestCase):
 
 class LegacyOwnerTest(ProjectionTest):
     def test_legacy_note_shows_until_real_claim(self):
-        note = e("note", "t", {"legacy_owner": "devvm23237", "status": "ACTIVE", "updated": "2026-10-22"}, seq=1)
+        note = e("note", "t", {"legacy_owner": "host-b", "status": "ACTIVE", "updated": "2026-10-22"}, seq=1)
         v = self.view([cm("t")], [note])
-        self.assertEqual((v.fields["claim_health"], v.fields["owner"]), ("LEGACY", "devvm23237 (CLAIMS.md)"))
+        self.assertEqual((v.fields["claim_health"], v.fields["owner"]), ("LEGACY", "host-b (CLAIMS.md)"))
         claimed = [note, e("claim", "t", seq=2)]
         self.assertEqual(self.view([cm("t")], claimed).fields["claim_health"], "OWNED")
-        old = e("note", "t", {"legacy_owner": "devvm23237", "status": "ACTIVE", "updated": "2026-10-01"}, seq=1)
+        old = e("note", "t", {"legacy_owner": "host-b", "status": "ACTIVE", "updated": "2026-10-01"}, seq=1)
         self.assertEqual(self.view([cm("t")], [old]).fields["claim_health"], "FREE")
+
+
+class Step13ProjectionTest(ProjectionTest):
+    def test_own_agent_release_frees_advisory_owner(self):
+        evs = [e("claim", "t", seq=1),
+               e("release", "t", {"released_owner": {"session_id": "s1"}}, session="human:p@h1", seq=2)]
+        self.assertEqual(self.view([cm("t")], evs).fields["claim_health"], "FREE")
+
+    def test_git_only_task_shows_ref_owner(self):
+        claim = Observation("claims", "t", NOW, {"claims.session_id": "s1", "claims.alias": "h1·x",
+                                                 "claims.renewed_at": "2026-10-23T19:00:00+00:00"})
+        views = {v.entity_id: v for v in project([gt("t"), claim], [], self.cfg, NOW, claims_healthy=True)}
+        self.assertEqual((views["t"].fields["claim_health"], views["t"].fields["owner"]), ("OWNED", "h1·x"))

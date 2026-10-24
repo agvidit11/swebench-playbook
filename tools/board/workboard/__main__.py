@@ -316,8 +316,8 @@ def status_checks(cfg) -> list[dict]:
     out.append({"name": "Claude hooks installed", "ok": need <= installed,
                 "detail": detail or ("missing: " + ", ".join(sorted(need - installed)) if need - installed else "all three")})
     cron = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout if shutil.which("crontab") else ""
-    good = [l for l in cron.splitlines() if not l.lstrip().startswith("#")
-            and re.match(r"^\*/2\s+\*\s+\*\s+\*\s+\*\s+\S*board sync\b", l.strip())]
+    expected = cron_line(board_path())
+    good = [l for l in cron.splitlines() if l.strip() == expected]
     out.append({"name": "background sync (cron */2 board sync)", "ok": bool(good),
                 "detail": "" if good else ("found a board sync line with another schedule" if "board sync" in cron else "not installed")})
     return out
@@ -390,11 +390,16 @@ def cmd_claim(args, cfg):
     clock_ok = not any(f.code == "CLOCK_SKEW" for f in view.findings + list(snap.findings))
     res = coord.claim(cfg, task, state_dir=state, to_actor=to_actor, steal=args.steal,
                       source_healthy=source_ok if args.steal else None, clock_healthy=clock_ok if args.steal else None)
-    s.sync(cfg, state_dir=state)
+    st = s.sync(cfg, state_dir=state)
+    audit_ok = "audit event could not be queued" not in res.detail and st.last_push_ok and not st.pending
     if args.json:
-        print(json.dumps(asdict(res)))
+        print(json.dumps(dict(asdict(res), audit_recorded=audit_ok)))
     elif res.status == "ACQUIRED":
         print(f"claimed {task} for {(to_actor or res.owner).get('alias')}")
+        if not audit_ok:
+            print("warning: the claim is held, but its audit event is not in the ledger yet "
+                  f"({st.error or 'queued locally'}); run `workboard sync`", file=sys.stderr)
+            return 3
     elif res.status == "LOST":
         print(f"{task} is already owned by {res.owner.get('alias')} (since {res.owner.get('acquired_at')})")
     else:
@@ -410,11 +415,15 @@ def cmd_release(args, cfg):
         print(f"refusing to release: ledger did not sync ({err})", file=sys.stderr)
         return 2
     res = coord.release(cfg, args.task, args.reason, state_dir=state)
-    s.sync(cfg, state_dir=state)
+    st = s.sync(cfg, state_dir=state)
+    audit_ok = st.last_push_ok and not st.pending
     if args.json:
-        print(json.dumps(asdict(res)))
+        print(json.dumps(dict(asdict(res), audit_recorded=audit_ok)))
     else:
         print(f"{res.status}: {args.task} {res.detail}")
+    if res.status == "RELEASED" and not audit_ok:
+        print("warning: released, but the audit event is not in the ledger yet; run `workboard sync`", file=sys.stderr)
+        return 3
     return 0 if res.status == "RELEASED" else 1
 
 
@@ -449,7 +458,7 @@ def cmd_sync(args, cfg):
 def cmd_install_hooks(args, cfg):
     from . import hooks
     settings = Path(args.settings).expanduser()
-    board = str(Path(__file__).resolve().parent.parent / "board")
+    board = board_path()
     if args.uninstall:
         hooks.uninstall(settings)
         print(f"removed workboard hooks from {settings} (backup kept next to it)")
@@ -459,7 +468,7 @@ def cmd_install_hooks(args, cfg):
         print(text)
         return 0
     print(f"installed workboard hooks into {settings} (backup kept next to it; only hook entries changed)")
-    line = f"*/2 * * * * {board} sync --quiet >/dev/null 2>&1"
+    line = cron_line(board)
     print("To keep claim data fresh (needed for edit-blocking), add this cron line (crontab -e):")
     print(f"  {line}")
     return 0
@@ -550,7 +559,7 @@ def stats_data(snap, cfg, *, weeks, start=None, end=None, shown_to=None, quality
                        "end_exclusive": end.isoformat() if end else None},
             "weekly": [dict(r, week=r["week"].isoformat())
                        for r in st.weekly(snap.observations, cfg, snap.now, weeks, start, end)],
-            "week": st.week_numbers(snap.observations, cfg, snap.now),
+            "current_week": dict(st.week_numbers(snap.observations, cfg, snap.now), scope="current week, not ranged"),
             "range_totals": st.range_totals(snap.observations, snap.now, start, end) if (start or end) else None,
             "funnel": dict(st.funnel(snap.observations), scope="all-time snapshot"),
             "flow": st.cycle_and_wait(snap.observations, snap.now, start, end),
@@ -590,8 +599,9 @@ def render_stats(snap, cfg, *, weeks, width, uni, quality=None, rank_data=None, 
     flow = st.cycle_and_wait(snap.observations, snap.now, start, end)
     fmt = lambda v: "unavailable" if v is None else f"{v}h"
     out += ["", "Flow" + (" (decisions in range)" if ranged else ""),
-            f"  cycle time (latest submit -> accepted) p50 {fmt(flow['cycle_p50_h'])} · p75 {fmt(flow['cycle_p75_h'])} "
-            f"(coverage {flow['cycle_coverage']})",
+            f"  first-submission cycle time: unavailable ({flow['first_submission_cycle']['reason']})",
+            f"  latest-round cycle (latest submit -> accepted) p50 {fmt(flow['latest_round_cycle_p50_h'])} · "
+            f"p75 {fmt(flow['latest_round_cycle_p75_h'])} (coverage {flow['latest_round_cycle_coverage']})",
             f"  reviewer wait (latest submit -> latest decision) p50 {fmt(flow['wait_p50_h'])} · "
             f"p75 {fmt(flow['wait_p75_h'])} (coverage {flow['wait_coverage']})"]
     f = st.funnel(snap.observations)
@@ -696,7 +706,12 @@ def cmd_rank(args, cfg):
 def cmd_import_claims(args, cfg):
     from . import coord, legacy, sync as s
     from .app import gather
-    path = Path(args.path).expanduser()
+    if not 1 <= args.days <= 90:
+        raise SystemExit("--days must be between 1 and 90")
+    source = args.path or cfg.legacy.claims_md
+    if not source:
+        raise SystemExit("pass --path <CLAIMS.md> or set [legacy] claims_md in your config")
+    path = Path(source).expanduser()
     rows = legacy.parse_claims_md(path.read_text())
     snap = gather(cfg, do_sync=False)
     known = {v.entity_id for v in snap.views if v.fields.get("group") != "DONE"}
@@ -707,52 +722,104 @@ def cmd_import_claims(args, cfg):
         print(f"{len(live)} live row(s) would be imported (dry run)")
         return 0
     state = s.default_state_dir()
+    fresh, why = coord.ledger_fresh(cfg, state)
+    if not fresh:
+        print(f"refusing to import: ledger did not sync ({why})", file=sys.stderr)
+        return 2
     actor = coord.actor_for(cfg)
     n = sum(coord.record(state, "note", r["task"], actor, {"legacy_owner": r["machine"], "status": r["status"],
                                                            "updated": r["updated"], "text": r["note"]}) for r in live)
-    s.sync(cfg, state_dir=state)
-    print(f"imported {n} legacy owner(s); they show as LEGACY until a real claim exists or 7 days pass")
+    st = s.sync(cfg, state_dir=state)
+    if n < len(live) or not (st.last_push_ok and not st.pending):
+        print(f"imported {n}/{len(live)}, but not all are in the ledger yet ({st.error or 'queued'}); run `workboard sync`",
+              file=sys.stderr)
+        return 1
+    print(f"imported {n} legacy owner(s); they show as LEGACY until a real claim exists or {args.days} days pass")
     return 0
 
 
+def board_path() -> str:
+    return str(Path(__file__).resolve().parent.parent / "board")
+
+
+def cron_line(board: str) -> str:
+    return f"*/2 * * * * {board} sync --quiet >/dev/null 2>&1"
+
+
 def cmd_setup(args, cfg):
-    """Set up this server: config from the private ledger repo, hooks, cron sync, claim probe, first sync."""
+    """Set up this machine: config (from the private ledger if missing), `board` on PATH, the skill, hooks,
+    a 2-minute cron sync, a claim-ref probe and a first sync. Fails if any required step fails."""
     import shutil as sh
     from . import claims, config as cfgmod, gitutil, hooks, sync as s
+    problems = []
     target = cfgmod.default_path()
     if not target.exists():
         if not args.ledger:
             print("no config yet: pass --ledger <private ledger git url> (it holds config/workboard.toml)", file=sys.stderr)
             return 2
-        tmp = Path(tempfile.mkdtemp(prefix="wb-setup-"))
-        p = gitutil.run(tmp, "clone", "-q", "--depth", "1", args.ledger, "ledger", timeout=120)
-        src = tmp / "ledger" / "config" / "workboard.toml"
-        if p.returncode != 0 or not src.exists():
-            print(f"could not get config/workboard.toml from the ledger: {gitutil.err(p)}", file=sys.stderr)
-            return 2
-        target.parent.mkdir(parents=True, exist_ok=True)
-        sh.copy(src, target)
-        os.chmod(target, 0o600)
-        sh.rmtree(tmp, ignore_errors=True)
+        with tempfile.TemporaryDirectory(prefix="wb-setup-") as tmp:
+            p = gitutil.run(tmp, "clone", "-q", "--depth", "1", args.ledger, "ledger", timeout=120)
+            src = Path(tmp) / "ledger" / "config" / "workboard.toml"
+            if p.returncode != 0 or not src.exists():
+                print(f"could not get config/workboard.toml from the ledger: {gitutil.err(p)}", file=sys.stderr)
+                return 2
+            target.parent.mkdir(parents=True, exist_ok=True)
+            sh.copy(src, target)
+            os.chmod(target, 0o600)
         print(f"config installed at {target}")
-    cfg = cfgmod.load_config()
-    board = str(Path(__file__).resolve().parent.parent / "board")
-    hooks.install(Path("~/.claude/settings.json").expanduser(), board)
-    print("hooks installed (backup kept next to ~/.claude/settings.json)")
+    try:
+        cfg = cfgmod.load_config()
+    except ValueError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 2
+    board = board_path()
+    bindir = Path("~/.local/bin").expanduser()
+    bindir.mkdir(parents=True, exist_ok=True)
+    link = bindir / "board"
+    if link.is_symlink() or not link.exists():
+        if link.is_symlink():
+            link.unlink()
+        link.symlink_to(board)
+        print(f"`board` linked at {link} (make sure ~/.local/bin is on PATH)")
+    skill_dir = Path("~/.claude/skills/workboard").expanduser()
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_link = skill_dir / "SKILL.md"
+    if skill_link.is_symlink() or not skill_link.exists():
+        if skill_link.is_symlink():
+            skill_link.unlink()
+        skill_link.symlink_to(Path(board).parent / "skill" / "SKILL.md")
+        print(f"skill installed at {skill_link}")
+    try:
+        hooks.install(Path("~/.claude/settings.json").expanduser(), board)
+        print("hooks installed (backup kept next to ~/.claude/settings.json)")
+    except (OSError, ValueError) as exc:
+        problems.append(f"hooks: {exc}")
     if sh.which("crontab"):
         cur = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout
-        lines = [l for l in cur.splitlines() if "tools/board/board sync" not in l]
-        lines.append(f"*/2 * * * * {board} sync --quiet >/dev/null 2>&1")
-        subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n", text=True, check=False)
-        print("cron: board sync every 2 minutes")
+        lines = [l for l in cur.splitlines() if not re.search(r"\bboard sync\b", l)]
+        lines.append(cron_line(board))
+        r = subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n", text=True, capture_output=True)
+        if r.returncode != 0:
+            problems.append(f"cron: {r.stderr.strip() or 'crontab failed'}")
+        else:
+            print("cron: board sync every 2 minutes")
+    else:
+        problems.append("cron: crontab not available (claim data for edit-blocking will go stale)")
     state = s.default_state_dir()
     pr = claims.probe(cfg, state_dir=state)
     print(f"claim refs: {'ok (' + pr.prefix + ')' if pr.ok else 'DISABLED: ' + pr.detail}")
+    if not pr.ok:
+        problems.append("claim refs probe failed")
     st = s.sync(cfg, state_dir=state)
     print(f"ledger: pull {'ok' if st.last_pull_ok else 'FAILED'}, push {'ok' if st.last_push_ok else 'not ok'}"
           f"{(' — ' + st.error) if st.error else ''}")
-    print(f"done. Try: {board}")
-    return 0 if pr.ok and st.last_pull_ok else 1
+    if not (st.last_pull_ok and (st.last_push_ok or not st.pending)):
+        problems.append("first ledger sync did not complete")
+    if problems:
+        print("setup incomplete:\n  " + "\n  ".join(problems), file=sys.stderr)
+        return 1
+    print("done. Try: board")
+    return 0
 
 
 def cmd_legend(args, cfg):
@@ -849,7 +916,7 @@ def build_parser():
     rv.add_argument("--confidence", type=int, choices=range(1, 6), metavar="1-5")
     rv.add_argument("--note", default="")
     ic = sub.add_parser("import-claims", help="one-time: import live CLAIMS.md rows as advisory legacy owners")
-    ic.add_argument("--path", default="~/swebench-playbook/ledger/CLAIMS.md")
+    ic.add_argument("--path", help="CLAIMS.md to import (default: [legacy] claims_md in config)")
     ic.add_argument("--days", type=int, default=7)
     ic.add_argument("--dry-run", action="store_true")
     su = sub.add_parser("setup", help="set up this server (config from ledger, hooks, cron, probe, first sync)")

@@ -1,11 +1,11 @@
 # workboard v1 Implementation Plan
 
-> **For agentic workers:** Execution method (Vidit): Claude implements each task in this session; Codex
+> **For agentic workers:** Execution method (the author): Claude implements each task in this session; Codex
 > (high effort) reviews the task's diff + test run as a pair-programming expert (terminal UI/UX, software
 > design, manager readability, open-source architecture) and its corrections are applied before the next task.
 > Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** A stdlib-only Python terminal tool, `workboard` (alias `board`), that shows Vidit's codimango work
+**Goal:** A stdlib-only Python terminal tool, `workboard` (alias `board`), that shows the author's codimango work
 across two servers action-first, with atomic claims, session reviews, health/drift alerts, stats, rank and reports.
 
 **Architecture:** Sources (codimango adapter, git, ledger, optional sqlrank) produce namespaced
@@ -18,12 +18,12 @@ codimango CLI, `meta daiquery.query execute` (optional).
 
 **Spec:** `tools/board/DESIGN.md` (v2.2, signed off in `tools/board/review/codex-review-{1,2,3}.md`).
 
-## Scope cuts (Vidit, 2026-10-23)
+## Scope cuts (the author, 2026-10-23)
 
 - Task 12 (reports) CUT. Task 13: wizard + stat suggestions DEFERRED to publishing; keep CLAIMS import, skill, rollout.
 - Two layouts only: compact (TASK · NEXT · STATE/AGE · OWNER · VALID · REVIEW · SYNC, fits ~120) and `--wide`
   (+ ROUND · PUSHES · CHECK · TRACK). `doctor` folded into `status`. Atomic claims and plugin skeleton KEPT.
-- Ledger repo: `git@github.com:agvidit11/workboard-ledger.git` (private), set in personal config only.
+- Ledger repo: `git@github.com:<you>/<ledger>.git` (private), set in personal config only.
 
 ## Global Constraints
 
@@ -135,7 +135,7 @@ board                        tiny shell shim: exec python3 -m workboard "$@"
 **Interfaces — Produces:** `render_list(views, health, cfg, *, width, color, unicode) -> str`; commands `list, show, explain, available, status, doctor, legend, changes [--since]` (last-look time stored in `~/.cache/workboard/last-look`), `config show|validate`, `plugins list|doctor` with `--json --plain --color --unicode --wide --mine --all --strict`.
 
 - [ ] Tests: `test_80_cols_columns`, `test_120_and_wide_columns`, `test_pipe_no_ansi_stable`, `test_next_never_truncated_middle_truncates_task`, `test_legend_only_present_symbols`, `test_banner_sync_failed`, `test_strict_exit_nonzero_on_unhealthy`, `test_no_color_env`, `test_changes_since_last_look`.
-- [ ] FAIL → implement → PASS → run live on devvm6971 (`./board`) and paste output into the Codex review → apply → commit.
+- [ ] FAIL → implement → PASS → run live on host-a (`./board`) and paste output into the Codex review → apply → commit.
 
 ### Task 7: Claim refs — probe, acquire, heartbeat, steal, release
 
@@ -160,7 +160,7 @@ board                        tiny shell shim: exec python3 -m workboard "$@"
 **Interfaces — Produces:** `python3 -m workboard hook <session-start|pre-tool|post-tool>` reading hook JSON on stdin; `install-hooks [--dry-run]` merges entries into `~/.claude/settings.json` (backup first, idempotent, hooks only).
 
 - [ ] Tests: `test_hook_under_100ms`, `test_hook_bad_transcript_exit0` (Review Focus 4), `test_pre_tool_blocks_only_with_healthy_foreign_claim`, `test_alias_from_customTitle_then_aiTitle`, `test_install_idempotent_and_backup`.
-- [ ] FAIL → implement → PASS → Codex review → install on devvm6971 → commit.
+- [ ] FAIL → implement → PASS → Codex review → install on host-a → commit.
 
 ### Task 10: check run + reviews
 
@@ -188,4 +188,4 @@ board                        tiny shell shim: exec python3 -m workboard "$@"
 **Files:** `workboard/wizard.py`, `tests/test_wizard.py`, `skill/SKILL.md`, `README.md`.
 
 - [ ] Tests: `test_wizard_noninteractive_flags`, `test_preview_before_write`, `test_suggestion_needs_min_sample`, `test_claims_md_import_live_rows_only`.
-- [ ] FAIL → implement → PASS → Codex whole-branch review → fix → install skill on devvm6971; produce one-line install for devvm23237; commit.
+- [ ] FAIL → implement → PASS → Codex whole-branch review → fix → install skill on host-a; produce one-line install for host-b; commit.

@@ -244,3 +244,24 @@ class InstallHardeningTest(unittest.TestCase):
         self.assertIn("'/opt/my board' hook pre-tool", s.read_text())
         hooks.install(s, "/opt/my board")
         self.assertEqual(s.read_text().count("hook pre-tool"), 1)      # quoted form recognised as ours
+
+
+class HookToProjectionTest(HookTest):
+    def test_foreign_edit_end_to_end(self):
+        from datetime import datetime, timezone
+        from workboard.projection import project
+        from workboard.model import Observation
+        from workboard import events as ev
+        self.run_hook("post-tool", dict(self.payload("PostToolUse", file_path=str(self.repo / "alpha-task" / "x")),
+                                        session_id="intruder"))
+        touch = [x for x in self.spool() if x["type"] == "touch"][0]
+        stamped = ev.stamp(touch, "h1", 2)
+        owner = ev.stamp(ev.new_event("claim", "alpha-task", {}, actor={"session_id": "owner", "alias": "h2·o",
+                                                                       "kind": "claude"}, commit=None, source="t"), "h2", 1)
+        owner["occurred_at"] = "2000-01-01T00:00:00+00:00"
+        now = datetime.now(timezone.utc)
+        self.cfg.claims.expire_after_hours = 10 ** 6
+        obs = [Observation("codimango", "alpha-task", now, {"codimango.status": "draft",
+                                                            "codimango.validation_status": "passing"})]
+        v = project(obs, [owner, stamped], self.cfg, now)[0]
+        self.assertIn("NONOWNER_EDIT", [f.code for f in v.findings])

@@ -97,6 +97,11 @@ class Reports:
 
 
 @dataclass
+class Legacy:
+    claims_md: str = ""        # path to a free-text claims ledger for `workboard import-claims`
+
+
+@dataclass
 class Plugins:
     api_version: int = 1
     enabled: list[str] = field(default_factory=list)
@@ -117,6 +122,7 @@ class Config:
     checks: Checks = field(default_factory=Checks)
     rank: Rank = field(default_factory=Rank)
     reports: Reports = field(default_factory=Reports)
+    legacy: Legacy = field(default_factory=Legacy)
     plugins: Plugins = field(default_factory=Plugins)
     path: str = ""                     # internal: where this config was loaded from
     warnings: list[str] = field(default_factory=list)

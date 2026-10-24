@@ -129,6 +129,8 @@ class CliTest(unittest.TestCase):
 
 
 class ClaimCommandTest(unittest.TestCase):
+    after_sync = SyncState(last_pull_ok=True, last_push_ok=True, pending=0)
+
     def setUp(self):
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
@@ -160,7 +162,7 @@ class ClaimCommandTest(unittest.TestCase):
         with mock.patch.object(cli, "_gather", lambda a, c: self.snap_with_sessions()), \
              mock.patch.object(coord, "ledger_fresh", return_value=fresh), \
              mock.patch.object(coord, "claim", fake_claim), \
-             mock.patch("workboard.sync.sync"), \
+             mock.patch("workboard.sync.sync", return_value=self.after_sync), \
              contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             try:
                 code = cli.main(argv)
@@ -194,6 +196,12 @@ class ClaimCommandTest(unittest.TestCase):
         code, out, _ = self.drive(["claim", "alpha"], claim_status="LOST")
         self.assertEqual(code, 1)
         self.assertIn("already owned", out)
+
+    def test_claim_held_but_audit_unpushed_exit_3(self):
+        self.after_sync = SyncState(last_pull_ok=True, last_push_ok=False, pending=1, error="push failed")
+        code, out, _ = self.drive(["claim", "alpha"])
+        self.assertEqual(code, 3)
+        self.assertIn("audit event is not in the ledger", out)
 
     def test_claim_and_release_refuse_when_ledger_stale(self):
         for argv in (["claim", "alpha"], ["release", "alpha-task", "--reason", "x"]):
@@ -378,6 +386,10 @@ class StatusChecksTest(unittest.TestCase):
             from workboard.config import load_config
             return {c["name"]: c for c in cli.status_checks(load_config(Path("/nonexistent")))}
 
+    def test_other_board_binary_not_accepted(self):
+        c = self.checks("*/2 * * * * /tmp/not-the-workboard sync --quiet >/dev/null 2>&1\n", "{}")
+        self.assertFalse(c["background sync (cron */2 board sync)"]["ok"])
+
     def test_malformed_settings_and_wrong_cadence(self):
         c = self.checks("*/30 * * * * /x/board sync --quiet\n", "{not json")
         self.assertFalse(c["Claude hooks installed"]["ok"])
@@ -389,7 +401,7 @@ class StatusChecksTest(unittest.TestCase):
         s = self.home / ".claude" / "settings.json"
         s.write_text("{}")
         hooks.install(s, "/x/board")
-        c = self.checks("*/2 * * * * /x/board sync --quiet >/dev/null 2>&1\n", s.read_text())
+        c = self.checks(cli.cron_line(cli.board_path()) + "\n", s.read_text())
         self.assertTrue(c["Claude hooks installed"]["ok"])
         self.assertTrue(c["background sync (cron */2 board sync)"]["ok"])
 
@@ -401,3 +413,54 @@ class StatusChecksTest(unittest.TestCase):
         data = json.loads(out.getvalue())
         self.assertIn("checks", data["result"])
         self.assertEqual(code, 1)                 # hooks missing -> strict fails
+
+
+class ImportClaimsCommandTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.dir = Path(td.name)
+        p = mock.patch.dict(os.environ, {"WORKBOARD_CACHE": td.name, "WORKBOARD_STATE": td.name,
+                                         "WORKBOARD_CONFIG": "/nonexistent"})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_needs_path_and_valid_days(self):
+        with self.assertRaises(SystemExit):
+            cli.main(["import-claims"])
+        with self.assertRaises(SystemExit):
+            cli.main(["import-claims", "--path", "x", "--days", "0"])
+
+    def test_refuses_when_ledger_stale(self):
+        f = self.dir / "CLAIMS.md"
+        f.write_text("| m | alpha-task | r | s | B | ACTIVE | 2026-10-23 | n |\n")
+        from workboard import coord
+        with mock.patch("workboard.app.gather", return_value=snap()), \
+             mock.patch.object(coord, "ledger_fresh", return_value=(False, "push failed")), \
+             contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(cli.main(["import-claims", "--path", str(f)]), 2)
+
+
+class SetupCommandTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.home = Path(td.name)
+        cfgfile = self.home / "config.toml"
+        cfgfile.write_text("config_version = 1\n")
+        p = mock.patch.dict(os.environ, {"HOME": str(self.home), "WORKBOARD_CONFIG": str(cfgfile),
+                                         "WORKBOARD_STATE": td.name, "WORKBOARD_CACHE": td.name})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_failed_probe_and_cron_make_setup_fail(self):
+        from workboard import claims
+        with mock.patch.object(claims, "probe", return_value=claims.ProbeResult(False, "", "denied")), \
+             mock.patch("workboard.sync.sync", return_value=SyncState(last_pull_ok=True, last_push_ok=True)), \
+             mock.patch("workboard.__main__.subprocess.run", return_value=mock.Mock(returncode=1, stdout="", stderr="no crontab")), \
+             contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+            code = cli.main(["setup"])
+        self.assertEqual(code, 1)
+        self.assertIn("claim refs probe failed", err.getvalue())
+        self.assertTrue((self.home / ".local" / "bin" / "board").is_symlink())
+        self.assertTrue((self.home / ".claude" / "skills" / "workboard" / "SKILL.md").is_symlink())

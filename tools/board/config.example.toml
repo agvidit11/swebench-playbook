@@ -44,5 +44,8 @@ daiquery_id = ""     # saved DaiQuery id for `workboard rank` (optional)
 [reports]
 include_contribution = false   # per-session/model stats in exports (private, non-causal)
 
+[legacy]
+claims_md = ""      # optional: path to an old CLAIMS.md for a one-time `workboard import-claims`
+
 [plugins]
 enabled = []

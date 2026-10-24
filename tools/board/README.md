@@ -14,6 +14,7 @@ board check run <task>     # run your pre-submit gate (unchanged) and log the re
 board review add <task> --verdict ready --confidence 4 --note "..."
 board stats [--quality] [--from D --to D]            board rank [import <file>]
 board status               # sources, ledger, claims, hooks, cron
+board import-claims --dry-run   # one-time: show live rows of an old CLAIMS.md ([legacy] claims_md); drop --dry-run to import
 ```
 
 ## How it works
@@ -22,23 +23,26 @@ board status               # sources, ledger, claims, hooks, cron
   **ledger** repo (append-only per-host event files: claims, reviews, checks, session names).
 - **Claims** are create-only git refs (`refs/claims/<hash>`) on the ledger remote: exactly one session wins;
   renew/steal/release are compare-and-swap on the exact commit. Expired after 24h without renewal.
-- **Hooks** (Claude Code) record activity, name sessions after their tab title, auto-claim free tasks and block
-  edits to a task another live session owns. They never touch the network and always fail open.
+- **Hooks** (Claude Code) record activity, name sessions after their tab title and block edits to a task another
+  live session owns. They never touch the network and always fail open; the 2-minute background `board sync`
+  then attempts the atomic claim for touched free tasks (so ownership lags activity by up to one sync).
 - Nothing ever writes to codimango or to task files.
 
 ## Setup
 
-First machine: copy `config.example.toml` to `~/.config/workboard/config.toml`, fill it in, create a private
-ledger repo, then `board setup`. Store the config in the ledger as `config/workboard.toml`.
+First machine: create a private ledger repo with one commit, copy `config.example.toml` to
+`~/.config/workboard/config.toml` and fill it in, then run `./board setup` from this directory. Commit the
+config into the ledger as `config/workboard.toml` so other machines can fetch it.
 
-Every other machine (one line):
+Every other machine (from a checkout of this repo):
 
 ```
-cd ~/swebench-playbook && git pull && tools/board/board setup --ledger ssh://git@github.com:22/<you>/<ledger>.git
+git pull && tools/board/board setup --ledger <private ledger git url>
 ```
 
-`setup` fetches the config from the private ledger, installs the hooks (backup kept), adds a 2-minute
-`board sync` cron line, probes claim refs and does the first sync. Undo: `board install-hooks --uninstall`
-and remove the cron line.
+`setup` fetches the config from the private ledger (if missing), links `board` into `~/.local/bin`, installs the
+`workboard` skill into `~/.claude/skills/`, adds the hooks (backup kept) and a 2-minute `board sync` cron line,
+probes claim refs and does the first sync; it exits non-zero if any of these fail.
+Undo: `board install-hooks --uninstall` and remove the cron line.
 
 Tests: `python3 -m unittest discover -s tests` (stdlib only, Python ≥ 3.11).

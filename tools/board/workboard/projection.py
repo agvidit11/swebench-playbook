@@ -11,6 +11,7 @@ from . import events as ev_mod
 from .model import Finding, TaskView
 
 REPO_ENTITY_PREFIX = "__repo__:"
+EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 
 STATE = {
     "draft": "DRAFT", "needs_reviewers_assigned": "QUEUE", "being_reviewed": "REVIEW",
@@ -76,6 +77,9 @@ def _claims(task_events, cfg, now, aliases):
                             "host": e["host_id"], "session": target, "at": max(at, prev.get("at") or at)}
         elif e["type"] == "release":
             live.pop(sid, None)
+            released = e["payload"].get("released_owner")
+            if isinstance(released, dict) and isinstance(released.get("session_id"), str):
+                live.pop(released["session_id"], None)
     expire = timedelta(hours=cfg.claims.expire_after_hours)
     fresh = {s: c for s, c in live.items() if now - c["at"] <= expire}
     if not live:
@@ -151,7 +155,7 @@ def _next(f, findings):
         return "ATTENTION", "FIX validation"
     if codes & {"HEAD≠SERVER", "STALE_VALID"}:
         return "ATTENTION", "RERUN server"
-    if "NONOWNER_COMMIT" in codes:
+    if "NONOWNER_EDIT" in codes:
         return "ATTENTION", "RESOLVE ownership"
     if "CLOCK_SKEW" in codes:
         return "ATTENTION", "CHECK clock"
@@ -288,11 +292,11 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                                     "check the clock on that host (timedatectl)"))
         if claim_health == "OWNED" and claimants:
             owner_sid, since = claimants[0]["session"], claimants[0]["at"]
-            foreign = [e for e in tev if e["type"] == "touch" and e.get("commit") and e["actor"]["session_id"] != owner_sid
-                       and (ts(e["occurred_at"]) or now) >= since]
+            foreign = [e for e in tev if e["type"] == "touch" and e["payload"].get("tool") in EDIT_TOOLS
+                       and e["actor"]["session_id"] != owner_sid and (ts(e["occurred_at"]) or now) >= since]
             if foreign:
                 who = foreign[-1]["actor"].get("alias") or foreign[-1]["actor"]["session_id"]
-                findings.append(Finding("NONOWNER_COMMIT", "warn", f"{who} committed to this task while {owner} owns it",
+                findings.append(Finding("NONOWNER_EDIT", "warn", f"{who} edited this task while {owner} owns it",
                                         "agree who owns it; release or reassign"))
 
         pool = ts(cm.get("codimango.entered_pool_at"))

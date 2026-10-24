@@ -26,13 +26,13 @@ Normalisation keeps disagreements as **findings** instead of overwriting. Findin
 (info / warn / block) and a next action. Built-in drift findings: `HEAD≠SERVER` (git task head vs
 codimango commit), `VALID≠SERVER` (validationCommitSha vs commitSha), `INCOMPLETE` (`totalExact=false`),
 `DEGRADED` (`trainingStatusDegraded`), `STALE_VALID` (server saw the task's newest commit but validated an older one
-and non-doc files changed since), `NONOWNER_COMMIT`, `CLOCK_SKEW`, `MALFORMED_EVENTS`, `SYNC_FAILED`,
+and non-doc files changed since), `NONOWNER_EDIT` (another session's edit-tool touch while a claim is live), `CLOCK_SKEW`, `MALFORMED_EVENTS`, `SYNC_FAILED`,
 `CACHE_STALE`.
 
 ## 3. Data health is always visible
 
 Every render starts with a one-line health banner, e.g.
-`codimango ✓ 1m · ledger ✓ 0m (6971 ✓ 23237 ✓ 4m) · hooks ✓` or
+`codimango ✓ 1m · ledger ✓ 0m (host-a ✓ host-b ✓ 4m) · hooks ✓` or
 `SYNC FAILED — codimango shown from cache 43m ago (timeout)`.
 Default `workboard` shows last-known-good cache with the banner and exits 0; `--strict` exits non-zero on
 any health problem (for scripts). Claim/release/review commands fail closed when the ledger can't sync.
@@ -96,7 +96,7 @@ Installed per host by `workboard install-hooks` (adds hook entries to `~/.claude
 - PostToolUse on Edit/Write/Bash touching a configured task path: append `touch` (rate-limited to 1 per task
   per 10 min = heartbeat); if the task is unclaimed, enqueue an auto-claim (done by sync).
 - PreToolUse on Edit/Write into a task path: **block only if** a healthy, fresh claim ref names a different
-  live session. The block message: `owned by 23237·<title> — run: workboard show <task>`.
+  live session. The block message: `owned by host-b·<title> — run: workboard show <task>`.
 - SessionStart / title change: alias event.
 - Bash that launches `codex exec` / `muse exec` against a task: telemetry event `build_action` (model,
   credited to the launching session). Telemetry, not truth.
@@ -107,7 +107,7 @@ Installed per host by `workboard install-hooks` (adds hook entries to `~/.claude
   exit code, then records `{commit, pass, warn, fail}`. Recording failure is a warning.
 - Review = `workboard review add <task> --verdict ready|changes|comment --confidence 1-5 --note "…"`,
   bound to the full commit. **R2 = two different sessions with verdict `ready` on the current commit**
-  (Vidit's rule: distinct agent sessions count separately). Dissent stays visible. Reviews on an older
+  (the author's rule: distinct agent sessions count separately). Dissent stays visible. Reviews on an older
   commit render as `R~`.
 
 ## 8. Commands
@@ -160,7 +160,7 @@ ASCII mode replaces glyphs with words. Light/dark themes; colour is never the on
 
 ## 10. Stats and reports
 
-Definitions are printed with every stat. **Accepted = status accepted or used_in_training (Vidit's
+Definitions are printed with every stat. **Accepted = status accepted or used_in_training (the author's
 rule), dated by reviewedAt, PT weeks.**
 - **Flow:** accepted / submitted / worked-on per week (MT/ST), vs 4-week median; WIP by stage; arrivals vs
   completions; cycle time p50/p75 (first submit → accepted); reviewer wait; aging work.
@@ -173,7 +173,7 @@ rule), dated by reviewedAt, PT weeks.**
   `reports.include_contribution = true`.
 - **Rank (optional source, plugin `sqlrank`):** where you rank on your track, team and org (accepted /
   submitted / worked-on for this quarter, last 30 days, this half, and weekly), from a saved DaiQuery
-  query built from `~/swebench/rank-query.sql` (all windows relative to run time, so no weekly edits).
+  query of your own (all windows relative to run time, so no weekly edits).
   `workboard rank` runs `meta daiquery.query execute --id=<config rank.daiquery_id> --output=json`
   from your own shell, caches the result with its snapshot date, and shows it in `stats` and the weekly
   report with freshness. If the query can't run (e.g. agent sessions are denied that table), it prints the
@@ -189,7 +189,7 @@ rule), dated by reviewedAt, PT weeks.**
 
 - `~/.config/workboard/config.toml` (personal, never committed) + optional team config without identities.
   stdlib `tomllib`. `config_version`, migrations, unknown keys warn.
-- Profile `swebench-codimango` (default for Vidit): codimango source, presubmit check, Claude hooks.
+- Profile `swebench-codimango` (the default deployment): codimango source, presubmit check, Claude hooks.
 - Plugin API v1 (trusted, explicitly enabled modules): `DataSource.fetch → FetchResult{observations,
   health}`, `ColumnPlugin.render → Cell`, `CheckPlugin.evaluate → [Finding]`, `StatPlugin.compute`.
   Fields are namespaced (`codimango.validation_status`); plugins cannot override `core.*` authority, print,

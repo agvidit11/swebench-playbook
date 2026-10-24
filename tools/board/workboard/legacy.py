@@ -35,6 +35,6 @@ def live_rows(rows, known_tasks: set[str], now: datetime, days: int = 7) -> list
             upd = datetime.fromisoformat(r["updated"][:10]).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
-        if r["status"] in LIVE and now - upd <= timedelta(days=days):
+        if r["status"] in LIVE and timedelta(0) <= now - upd <= timedelta(days=days):
             out.append(r)
     return out

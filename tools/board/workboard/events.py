@@ -139,6 +139,9 @@ def spool_append(spool_dir: Path, event: dict, *, max_line: int = MAX_LINE, max_
                 if max_queue and _queued_records(fd) >= max_queue:
                     return False
                 start = os.fstat(fd).st_size
+                if start and os.pread(fd, 1, start - 1) != b"\n":
+                    _write_all(fd, b"\n", _write)          # crash-truncated tail: close it so it stays one bad line
+                    start = os.fstat(fd).st_size
                 try:
                     _write_all(fd, data, _write)
                 except Exception:
@@ -209,6 +212,9 @@ def _bounded_lines(path: Path, limit: int):
             if not line:
                 return
             lineno += 1
+            if not line.endswith(b"\n") and len(line) <= limit:
+                yield lineno, b"\x00unterminated"          # a final line without newline is a torn write
+                return
             if len(line) > limit:
                 if not line.endswith(b"\n"):
                     while True:   # drain the rest of the oversize record
@@ -230,6 +236,9 @@ def read_events(paths: list[Path]) -> tuple[list[dict], list[Finding]]:
             for lineno, line in _bounded_lines(path, MAX_LINE):
                 if line is None:
                     bad.append(f"{path.name}:{lineno} oversize")
+                    continue
+                if line == b"\x00unterminated":
+                    bad.append(f"{path.name}:{lineno} unterminated (torn write)")
                     continue
                 if not line.strip():
                     continue

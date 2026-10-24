@@ -106,10 +106,11 @@ class StatsTest(unittest.TestCase):
                cm("c", "needs_revision", "2026-10-02T00:00:00Z", pool="2026-10-01T00:00:00Z"),
                cm("d", "accepted", "2026-10-02T00:00:00Z")]
         f = stats.cycle_and_wait(obs, NOW)
-        self.assertEqual((f["cycle_p50_h"], f["cycle_coverage"]), (72.0, "2/3"))
+        self.assertEqual((f["latest_round_cycle_p50_h"], f["latest_round_cycle_coverage"]), (72.0, "2/3"))
         self.assertEqual(f["wait_coverage"], "3/4")
+        self.assertFalse(f["first_submission_cycle"]["available"])
         empty = stats.cycle_and_wait([], NOW)
-        self.assertIsNone(empty["cycle_p50_h"])
+        self.assertIsNone(empty["latest_round_cycle_p50_h"])
 
     def test_ascii_chart_fallback(self):
         self.assertEqual(stats.bar(5, 10, 10, unicode=False), "#####")
@@ -193,7 +194,7 @@ class WindowAndRankShapeTest(StatsTest):
         obs = [cm("a", "accepted", "2026-10-03T00:00:00Z", pool="2026-10-01T00:00:00Z"),
                cm("b", "accepted", "2026-10-20T00:00:00Z", pool="2026-10-19T12:00:00Z")]
         f = stats.cycle_and_wait(obs, NOW, start=datetime(2026, 10, 15, tzinfo=tz))
-        self.assertEqual((f["cycle_coverage"], f["cycle_p50_h"]), ("1/1", 12.0))
+        self.assertEqual((f["latest_round_cycle_coverage"], f["latest_round_cycle_p50_h"]), ("1/1", 12.0))
 
     def test_tasks_per_repo_unavailable(self):
         cfg = load_config(Path("/nonexistent"))
@@ -206,6 +207,15 @@ class WindowAndRankShapeTest(StatsTest):
                                 "sub_rank": "2/260"}])
         self.assertIn({"scope": "SWE MT", "window": "Q4", "metric": "accepted", "value": 27, "rank": 2, "of": 209}, rows)
         self.assertTrue(rank.valid_rows(rows))
+
+    def test_rank_canonical_rows_validated(self):
+        ok = rank.parse_table("scope,window,metric,value,rank,of\nOrg,H2,accepted,43,286,4999\n")
+        self.assertEqual(rank.normalize(ok)[0]["value"], 43)               # CSV strings coerced
+        for bad in ("scope,window,metric,value,rank,of\nOrg,H2,karma,1,1,2\n",       # unknown metric
+                    "scope,window,metric,value,rank,of\nOrg,H2,accepted,1,5,\n",     # rank without of
+                    "scope,window,metric,value,rank,of\n,H2,accepted,1,1,2\n"):      # empty scope
+            with self.assertRaises(ValueError):
+                rank.normalize(rank.parse_table(bad))
 
     def test_rank_canonical_and_bad_rows(self):
         canon = rank.parse_table("scope,window,metric,value,rank,of\nOrg,H2,accepted,43,286,4999\n")
