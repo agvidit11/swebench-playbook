@@ -413,7 +413,7 @@ Before touching ANY task, read `ledger/TASK-LOG/<task>.md` (protocol in `ledger/
 | devvm23237 | commons-collections-composite-map-reconcile (MT3) | apache/commons-collections | CompositeMap layer reconcile (Java) | B | BUILT — instructions copied (generic Muse), pre-push checks | 2026-10-23 | lane-pb |
 | devvm23237 | typeprof-workspace-reconciliation (MT3) | ruby/typeprof | workspace file reconcile (Ruby) | B | BUILT — instructions copied (generic Muse), pre-push checks | 2026-10-23 | lane-pb |
 | devvm23237 | php-cs-fixer-atomic-token-edits (MT3) | PHP-CS-Fixer/PHP-CS-Fixer | atomic token edits (PHP) | B | BUILT — instructions copied (generic Muse), pre-push checks | 2026-10-23 | lane-pb |
-| devvm23237 | maplibre-geojson-diff-reconciliation (MT3) | maplibre/maplibre-gl-js | GeoJSONSource diff updates (TS) | B | PARKED (step 3 no gradient) | 2026-10-23 | lane-pb |
+| devvm23237 | maplibre-geojson-diff-reconciliation (MT3) | maplibre/maplibre-gl-js | GeoJSONSource diff updates (TS) | B | FIXING (fix2-maplibre: loosen s2, tighten s3) | 2026-10-23 | lane-pb |
 | devvm23237 | pixijs-manifest-replacement (MT3) | pixijs/pixijs | asset manifest replacement (TS) | B | BUILT — instructions copied (generic Muse), pre-push checks | 2026-10-23 | lane-pb |
 | devvm23237 | yaml-language-server-failed-schema-retry (MT3) | redhat-developer/yaml-language-server | failed schema retry (TS) | B | BUILT — instructions copied (generic Muse), pre-push checks | 2026-10-23 | lane-pb |
 | devvm23237 | rbi-merge-visibility-reconciliation (MT3) | Shopify/rbi | merge visibility (Ruby) | B | PARKED (step 3 saturated 5/5, no fair test-only edge) | 2026-10-23 | lane-pb |
