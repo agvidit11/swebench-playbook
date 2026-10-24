@@ -32,6 +32,25 @@ class GitSourceTest(unittest.TestCase):
         self.assertEqual(len(obs["alpha-task"].fields["git.task_head"]), 40)
         self.assertNotIn("README", obs)                     # top-level files are not tasks
 
+    def test_old_only_task_still_listed(self):
+        work = self.tmp / "work"
+        d = work / "ancient-task"; d.mkdir()
+        (d / "f").write_text("x")
+        git(work, "add", ".")
+        env_date = "2020-01-01T00:00:00+00:00"
+        import os, subprocess
+        subprocess.run(["git", "commit", "-q", "-m", "old"], cwd=work, check=True,
+                       env={**os.environ, "GIT_COMMITTER_DATE": env_date, "GIT_AUTHOR_DATE": env_date})
+        git(work, "push", "-q", "origin", "main")
+        res = GitSource(self.cfg).fetch()
+        self.assertIn("ancient-task", {o.entity_id for o in res.observations})
+
+    def test_repo_time_map_present(self):
+        res = GitSource(self.cfg).fetch()
+        repo = [o for o in res.observations if o.entity_id == "__repo__:tasks"]
+        self.assertEqual(len(repo), 1)
+        self.assertGreaterEqual(len(repo[0].fields["git.commit_time_by_sha"]), 4)
+
     def test_fetch_failure_uses_local_and_flags(self):
         self.cfg.repositories[0].remote_url = str(self.tmp / "missing.git")
         res = GitSource(self.cfg).fetch()

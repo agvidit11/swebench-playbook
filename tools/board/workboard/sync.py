@@ -2,14 +2,17 @@
 
 Spool lines are acknowledged (removed) only after the push succeeds; on any failure the local ledger is
 reset to the remote and the spool kept, so retries can duplicate (deduped by event_id) but never lose.
+The whole run shares one deadline (default 20 s); every git call gets only the remaining budget.
 """
 from __future__ import annotations
 
 import fcntl
 import json
 import os
+import re
 import socket
 import tempfile
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -17,6 +20,7 @@ from . import events, gitutil
 
 STATE_FILE = "sync-state.json"
 LOCK_FILE = "sync.lock"
+_SAFE_HOST = re.compile(r"[^A-Za-z0-9_.-]")
 
 
 @dataclass
@@ -29,8 +33,19 @@ class SyncState:
     busy: bool = False
 
 
+class Deadline:
+    def __init__(self, seconds: float):
+        self.end = time.monotonic() + seconds
+
+    def left(self) -> float:
+        return max(0.0, self.end - time.monotonic())
+
+    def expired(self) -> bool:
+        return self.left() <= 0.5
+
+
 def default_state_dir() -> Path:
-    return Path(os.environ.get("WORKBOARD_STATE", "~/.local/state/workboard")).expanduser()
+    return Path(os.environ.get("WORKBOARD_STATE", "~/.cache/workboard")).expanduser()
 
 
 def host_id_for(cfg) -> str:
@@ -41,6 +56,11 @@ def host_id_for(cfg) -> str:
     return short
 
 
+def safe_host(host_id: str) -> str:
+    cleaned = _SAFE_HOST.sub("_", host_id).strip(".") or "host"
+    return cleaned[:64]
+
+
 def load_state(state_dir: Path) -> SyncState:
     try:
         return SyncState(**json.loads((Path(state_dir) / STATE_FILE).read_text()))
@@ -49,42 +69,45 @@ def load_state(state_dir: Path) -> SyncState:
 
 
 def _save_state(state_dir: Path, st: SyncState) -> None:
-    state_dir.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=state_dir, prefix=".state-")
     with os.fdopen(fd, "w") as fh:
         json.dump(asdict(st), fh)
     os.replace(tmp, state_dir / STATE_FILE)
 
 
-def _spool_lines(state_dir: Path) -> list[bytes]:
-    path = state_dir / events.SPOOL_NAME
+def _read_spool_locked(state_dir: Path) -> bytes:
     try:
-        with open(path, "rb") as fh:
-            fcntl.flock(fh, fcntl.LOCK_SH)
-            data = fh.read()
+        return (state_dir / events.SPOOL_NAME).read_bytes()
     except FileNotFoundError:
-        return []
-    return [l for l in data.split(b"\n") if l.strip()] if data.endswith(b"\n") else \
-        [l for l in data.split(b"\n")[:-1] if l.strip()]          # ignore an unterminated tail
+        return b""
+
+
+def _complete_lines(data: bytes) -> list[bytes]:
+    parts = data.split(b"\n")
+    if not data.endswith(b"\n"):
+        parts = parts[:-1]               # an unterminated tail is not a record yet
+    return [l for l in parts if l.strip()]
+
+
+def _spool_lines(state_dir: Path) -> list[bytes]:
+    with events.spool_lock(state_dir):
+        return _complete_lines(_read_spool_locked(state_dir))
 
 
 def _ack_spool(state_dir: Path, n: int) -> None:
-    """Drop the first n complete lines, keeping anything appended meanwhile. Holds the spool lock."""
-    path = state_dir / events.SPOOL_NAME
-    fd = os.open(path, os.O_RDWR)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        with os.fdopen(os.dup(fd), "rb") as fh:
-            data = fh.read()
-        lines = data.split(b"\n")
-        rest = b"\n".join(lines[n:])
-        fd2, tmp = tempfile.mkstemp(dir=state_dir, prefix=".spool-")
-        with os.fdopen(fd2, "wb") as out:
-            out.write(rest)
-        os.replace(tmp, path)
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
+    """Drop the first n complete records, keeping anything appended meanwhile. Holds the spool lock."""
+    with events.spool_lock(state_dir):
+        data = _read_spool_locked(state_dir)
+        kept, seen = [], 0
+        for line in data.split(b"\n"):
+            if line.strip() and seen < n:
+                seen += 1
+                continue
+            kept.append(line)
+        fd, tmp = tempfile.mkstemp(dir=state_dir, prefix=".spool-")
+        with os.fdopen(fd, "wb") as out:
+            out.write(b"\n".join(kept).lstrip(b"\n"))
+        os.replace(tmp, state_dir / events.SPOOL_NAME)
 
 
 def _last_seq(path: Path) -> int:
@@ -92,23 +115,27 @@ def _last_seq(path: Path) -> int:
     return max((e["seq"] for e in evs), default=0)
 
 
-def _ensure_clone(cfg, timeout: float) -> tuple[Path, str]:
+def _ensure_clone(cfg, dl: Deadline) -> tuple[Path, str]:
     led = Path(cfg.ledger.path).expanduser()
     if not (led / ".git").exists():
         led.parent.mkdir(parents=True, exist_ok=True)
-        p = gitutil.run(led.parent, "clone", "-q", "-b", cfg.ledger.branch, cfg.ledger.remote, str(led), timeout=timeout)
+        p = gitutil.run(led.parent, "clone", "-q", "-b", cfg.ledger.branch, cfg.ledger.remote, str(led), timeout=dl.left())
         if p.returncode != 0:
             return led, f"clone failed: {gitutil.err(p)}"
-        gitutil.run(led, "config", "user.email", "workboard@localhost")
-        gitutil.run(led, "config", "user.name", "workboard")
+        gitutil.run(led, "config", "user.email", "workboard@localhost", timeout=dl.left())
+        gitutil.run(led, "config", "user.name", "workboard", timeout=dl.left())
+    # always follow the configured remote, so a config change never keeps writing an old ledger
+    p = gitutil.run(led, "remote", "set-url", "origin", cfg.ledger.remote, timeout=dl.left())
+    if p.returncode != 0:
+        return led, f"remote set-url failed: {gitutil.err(p)}"
     return led, ""
 
 
-def _pull(led: Path, branch: str, timeout: float) -> str:
-    p = gitutil.run(led, "fetch", "-q", "origin", branch, timeout=timeout)
+def _pull(led: Path, branch: str, dl: Deadline) -> str:
+    p = gitutil.run(led, "fetch", "-q", "origin", branch, timeout=dl.left())
     if p.returncode != 0:
         return f"pull failed: {gitutil.err(p)}"
-    p = gitutil.run(led, "reset", "-q", "--hard", f"origin/{branch}")
+    p = gitutil.run(led, "reset", "-q", "--hard", f"origin/{branch}", timeout=dl.left())
     return "" if p.returncode == 0 else f"reset failed: {gitutil.err(p)}"
 
 
@@ -116,11 +143,11 @@ def _push(led: Path, branch: str, timeout: float):
     return gitutil.run(led, "push", "-q", "origin", f"HEAD:{branch}", timeout=timeout)
 
 
-def sync(cfg, *, host_id: str | None = None, state_dir: Path | None = None, timeout_seconds: float = 30,
+def sync(cfg, *, host_id: str | None = None, state_dir: Path | None = None, timeout_seconds: float = 20,
          retries: int = 3) -> SyncState:
     state_dir = Path(state_dir or default_state_dir())
     state_dir.mkdir(parents=True, exist_ok=True)
-    host_id = host_id or host_id_for(cfg)
+    host_id = safe_host(host_id or host_id_for(cfg))
     lock = open(state_dir / LOCK_FILE, "w")
     try:
         try:
@@ -129,61 +156,81 @@ def sync(cfg, *, host_id: str | None = None, state_dir: Path | None = None, time
             st = load_state(state_dir)
             st.busy = True
             return st
-        st = _sync_locked(cfg, host_id, state_dir, timeout_seconds, retries)
+        st = _sync_locked(cfg, host_id, state_dir, Deadline(timeout_seconds), retries)
         _save_state(state_dir, st)
         return st
     finally:
         lock.close()
 
 
-def _sync_locked(cfg, host_id, state_dir, timeout, retries) -> SyncState:
+def _stamp_lines(lines: list[bytes], host_id: str, seq: int) -> list[str]:
+    out = []
+    for raw in lines:
+        try:
+            ev = json.loads(raw)
+        except ValueError:
+            ev = None
+        if not isinstance(ev, dict):
+            # keep a trace instead of silently dropping an unreadable record
+            ev = events.new_event("warning", None, {"bad_spool_line": raw[:200].decode("utf-8", "replace")},
+                                  actor={"session_id": "workboard", "alias": "workboard", "kind": "human"},
+                                  commit=None, source="sync")
+        seq += 1
+        out.append(json.dumps(events.stamp(ev, host_id, seq), separators=(",", ":"), ensure_ascii=False))
+    return out
+
+
+def _sync_locked(cfg, host_id, state_dir, dl: Deadline, retries) -> SyncState:
     st = SyncState(at=events.utcnow())
+    st.pending = len(_spool_lines(state_dir))
     if not cfg.ledger.remote:
         st.error = "no ledger.remote configured"
-        st.pending = len(_spool_lines(state_dir))
         return st
-    led, err = _ensure_clone(cfg, timeout)
-    if err:
-        st.error, st.pending = err, len(_spool_lines(state_dir))
-        return st
-    branch = cfg.ledger.branch
-    err = _pull(led, branch, timeout)
-    st.last_pull_ok = not err
-    lines = _spool_lines(state_dir)
-    st.pending = len(lines)
+    led, err = _ensure_clone(cfg, dl)
     if err:
         st.error = err
         return st
+    branch = cfg.ledger.branch
+    err = _pull(led, branch, dl)
+    st.last_pull_ok = not err
+    if err:
+        st.error = err
+        return st
+    lines = _spool_lines(state_dir)
+    st.pending = len(lines)
     if not lines:
         st.last_push_ok = True
         return st
     rel = Path("events") / f"{host_id}.jsonl"
+    backoff = 0.5
     for attempt in range(retries):
+        if dl.expired():
+            st.error = st.error or "sync deadline reached"
+            break
         path = led / rel
         path.parent.mkdir(exist_ok=True)
-        seq = _last_seq(path)
-        out = []
-        for raw in lines:
-            try:
-                ev = json.loads(raw)
-            except ValueError:
-                continue                          # unparseable spool line: dropped (cannot be repaired)
-            seq += 1
-            out.append(json.dumps(events.stamp(ev, host_id, seq), separators=(",", ":"), ensure_ascii=False))
         with open(path, "a", encoding="utf-8") as fh:
-            fh.write("".join(l + "\n" for l in out))
-        gitutil.run(led, "add", str(rel))
-        c = gitutil.run(led, "commit", "-q", "-m", f"events: {host_id} +{len(out)}")
+            fh.write("".join(l + "\n" for l in _stamp_lines(lines, host_id, _last_seq(path))))
+        a = gitutil.run(led, "add", str(rel), timeout=dl.left())
+        if a.returncode != 0:
+            st.error = f"git add failed: {gitutil.err(a)}"
+            _pull(led, branch, dl)
+            return st
+        c = gitutil.run(led, "commit", "-q", "-m", f"events: {host_id} +{len(lines)}", timeout=dl.left())
         if c.returncode != 0:
             st.error = f"commit failed: {gitutil.err(c)}"
-            _pull(led, branch, timeout)
+            _pull(led, branch, dl)
             return st
-        p = _push(led, branch, timeout)
+        p = _push(led, branch, dl.left())
         if p.returncode == 0:
             _ack_spool(state_dir, len(lines))
-            st.last_push_ok, st.pending, st.error = True, len(_spool_lines(state_dir)), ""
+            st.last_push_ok, st.error = True, ""
+            st.pending = len(_spool_lines(state_dir))
             return st
         st.error = f"push failed: {gitutil.err(p)}"
-        if _pull(led, branch, timeout):            # drop our local commit; spool still holds the lines
+        if _pull(led, branch, dl):          # drop our local commit; the spool still holds the lines
             break
+        time.sleep(min(backoff, dl.left()))
+        backoff *= 2
+    st.pending = len(_spool_lines(state_dir))
     return st

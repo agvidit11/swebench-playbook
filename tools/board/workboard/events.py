@@ -18,6 +18,7 @@ from .model import Finding
 
 SCHEMA_VERSION = 1
 SPOOL_NAME = "spool.jsonl"
+SPOOL_LOCK = "spool.lock"     # never replaced; every spool reader/writer takes it before opening the spool
 MAX_LINE = 16384
 MAX_QUEUE = 10000
 ACTOR_KINDS = {"claude", "codex", "muse", "human"}
@@ -79,38 +80,52 @@ def _queued_records(fd: int) -> int:
     return count + (1 if tail else 0)
 
 
+class spool_lock:
+    """Exclusive lock on the spool's dedicated lock file (stable across the spool's atomic replacement)."""
+
+    def __init__(self, spool_dir: Path):
+        self.path = Path(spool_dir) / SPOOL_LOCK
+
+    def __enter__(self):
+        self.fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
+        fcntl.flock(self.fd, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            fcntl.flock(self.fd, fcntl.LOCK_UN)
+        finally:
+            os.close(self.fd)
+
+
 def spool_append(spool_dir: Path, event: dict, *, max_line: int = MAX_LINE, max_queue: int = MAX_QUEUE,
                  _write=os.write) -> bool:
-    """Append one complete event line under flock. Never raises; False means the event was not recorded."""
+    """Append one complete event line. Never raises; False means the event was not recorded."""
     try:
         data = (json.dumps(event, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
         if len(data) > max_line:
             return False
+        spool_dir = Path(spool_dir)
         spool_dir.mkdir(parents=True, exist_ok=True)
-        fd = os.open(spool_dir / SPOOL_NAME, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o600)
-    except Exception:
-        return False
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        if max_queue and _queued_records(fd) >= max_queue:
-            return False
-        start = os.fstat(fd).st_size
-        try:
-            _write_all(fd, data, _write)
-        except Exception:
+        with spool_lock(spool_dir):
+            fd = os.open(spool_dir / SPOOL_NAME, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o600)
             try:
-                os.ftruncate(fd, start)   # never leave a partial line behind
-            except OSError:
-                pass
-            return False
-        return True
+                if max_queue and _queued_records(fd) >= max_queue:
+                    return False
+                start = os.fstat(fd).st_size
+                try:
+                    _write_all(fd, data, _write)
+                except Exception:
+                    try:
+                        os.ftruncate(fd, start)   # never leave a partial line behind
+                    except OSError:
+                        pass
+                    return False
+                return True
+            finally:
+                os.close(fd)
     except Exception:
         return False
-    finally:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-        finally:
-            os.close(fd)
 
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")

@@ -1,4 +1,4 @@
-import json, tempfile, threading, unittest
+import json, subprocess, tempfile, threading, unittest
 from pathlib import Path
 from workboard import events, sync
 from tests.helpers import bare_remote, cfg_for, git
@@ -48,22 +48,48 @@ class SyncTest(unittest.TestCase):
         self.assertEqual(st.pending, 2)
         self.assertEqual(len((state / events.SPOOL_NAME).read_text().splitlines()), 2)
 
-    def test_retry_after_failure_no_loss_no_dup(self):
+    def test_config_remote_change_followed(self):
         cfg, state = self.host("h1")
-        spool_some(state, 2)
-        good = cfg.ledger.remote
-        sync.sync(cfg, host_id="h1", state_dir=state)          # creates the clone
-        spool_some(state, 2, "u")
-        cfg.ledger.remote = str(self.tmp / "nope.git")
-        git(cfg.ledger.path, "remote", "set-url", "origin", cfg.ledger.remote)
-        sync.sync(cfg, host_id="h1", state_dir=state)          # fails, keeps spool
-        cfg.ledger.remote = good
-        git(cfg.ledger.path, "remote", "set-url", "origin", good)
+        spool_some(state, 1)
+        sync.sync(cfg, host_id="h1", state_dir=state)
+        new_remote = bare_remote(self.tmp, "ledger2.git")
+        cfg.ledger.remote = str(new_remote)          # only the config changes
+        spool_some(state, 1, "u")
         st = sync.sync(cfg, host_id="h1", state_dir=state)
         self.assertTrue(st.last_push_ok, st.error)
-        evs, _ = events.read_events([Path(cfg.ledger.path) / "events" / "h1.jsonl"])
-        self.assertEqual(len(evs), 4)
-        self.assertEqual([e["seq"] for e in evs], [1, 2, 3, 4])
+        old_log = git(self.remote, "log", "--oneline", "main").stdout.splitlines()
+        self.assertEqual(len(old_log), 2)            # seed + first sync only; old remote untouched after
+        self.assertIn("events:", git(new_remote, "log", "-1", "--format=%s", "main").stdout)
+
+    def test_uncertain_push_retry_dedupes(self):
+        cfg, state = self.host("h1")
+        spool_some(state, 3)
+        orig = sync._push
+        calls = {"n": 0}
+
+        def lying_push(led, branch, timeout):
+            res = orig(led, branch, timeout)
+            calls["n"] += 1
+            if calls["n"] == 1:                       # reached the remote, reported as failed
+                return subprocess.CompletedProcess(res.args, 1, "", "connection reset")
+            return res
+
+        sync._push = lying_push
+        try:
+            st = sync.sync(cfg, host_id="h1", state_dir=state)
+        finally:
+            sync._push = orig
+        self.assertTrue(st.last_push_ok, st.error)
+        evs, findings = events.read_events([Path(cfg.ledger.path) / "events" / "h1.jsonl"])
+        self.assertEqual(len(evs), 3)                 # duplicates collapsed by event_id
+        self.assertEqual(findings, [])
+
+    def test_deadline_exhausted_keeps_spool(self):
+        cfg, state = self.host("h1")
+        spool_some(state, 2)
+        st = sync.sync(cfg, host_id="h1", state_dir=state, timeout_seconds=0.01)
+        self.assertFalse(st.last_push_ok)
+        self.assertEqual(len(sync._spool_lines(state)), 2)
 
     def test_two_hosts_interleave_without_conflict(self):
         c1, s1 = self.host("h1"); c2, s2 = self.host("h2")
@@ -80,12 +106,63 @@ class SyncTest(unittest.TestCase):
     def test_two_workers_one_runs(self):
         cfg, state = self.host("h1")
         spool_some(state, 5)
+        inside, release = threading.Event(), threading.Event()
+        entered = []
+        orig = sync._sync_locked
+
+        def gated(*a, **kw):
+            entered.append(1)
+            inside.set()
+            release.wait(10)
+            return orig(*a, **kw)
+
+        sync._sync_locked = gated
         results = []
-        ts = [threading.Thread(target=lambda: results.append(sync.sync(cfg, host_id="h1", state_dir=state))) for _ in range(3)]
-        [t.start() for t in ts]; [t.join() for t in ts]
+        try:
+            first = threading.Thread(target=lambda: results.append(sync.sync(cfg, host_id="h1", state_dir=state)))
+            first.start()
+            self.assertTrue(inside.wait(10))
+            others = [sync.sync(cfg, host_id="h1", state_dir=state) for _ in range(2)]
+            release.set()
+            first.join()
+        finally:
+            sync._sync_locked = orig
+        self.assertEqual(len(entered), 1)
+        self.assertTrue(all(o.busy for o in others))
         evs, _ = events.read_events([Path(cfg.ledger.path) / "events" / "h1.jsonl"])
-        self.assertEqual(len(evs), 5)                           # moved exactly once
-        self.assertTrue(any(r.busy for r in results) or len(results) == 3)
+        self.assertEqual(len(evs), 5)
+
+    def test_append_during_ack_not_lost(self):
+        """Producer arrives while the ack holds the lock and replaces the spool: its event must survive."""
+        cfg, state = self.host("h1")
+        spool_some(state, 2)
+        orig_replace = sync.os.replace
+        started = threading.Event()
+        done = []
+
+        def slow_replace(src, dst):
+            if str(dst).endswith(events.SPOOL_NAME) and not started.is_set():
+                started.set()
+                t = threading.Thread(target=lambda: done.append(events.spool_append(state, events.new_event(
+                    "touch", "late", {}, actor=ACTOR, commit=None, source="test"))))
+                t.start()
+                t.join(0.3)                           # producer is now blocked on the lock
+                self.assertEqual(done, [])
+                orig_replace(src, dst)
+                self._t = t
+                return
+            return orig_replace(src, dst)
+
+        sync.os.replace = slow_replace
+        try:
+            sync.sync(cfg, host_id="h1", state_dir=state)
+        finally:
+            sync.os.replace = orig_replace
+        self._t.join(5)
+        self.assertEqual(done, [True])
+        lines = sync._spool_lines(state)
+        self.assertEqual(len(lines), 1)
+        self.assertIn(b'"late"', lines[0])
 
     def test_state_file_written(self):
         cfg, state = self.host("h1")

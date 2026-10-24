@@ -1,0 +1,151 @@
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from workboard.config import load_config
+from workboard.model import Observation
+from workboard import events
+from workboard.projection import project, REPO_ENTITY_PREFIX
+
+NOW = datetime(2026, 10, 23, 20, 0, tzinfo=timezone.utc)
+SHA_A, SHA_B, SHA_S = "a" * 40, "b" * 40, "c" * 40
+
+
+def cm(name, status="draft", valid="passing", **kw):
+    f = {"codimango.status": status, "codimango.validation_status": valid, "codimango.created_at": "2026-10-20T00:00:00Z",
+         "codimango.commit_sha": SHA_S, "codimango.validation_commit_sha": SHA_S, "codimango.reviewed_at": None,
+         "codimango.entered_pool_at": None, "codimango.track": "swe-bench-multi-turn"}
+    f.update({f"codimango.{k}": v for k, v in kw.items()})
+    return Observation("codimango", name, NOW, f)
+
+
+def gt(name, head=SHA_A, head_time="2026-10-21T00:00:00+00:00", times=None):
+    return Observation("git", name, NOW, {"git.task_head": head, "git.task_head_time": head_time,
+                                           "git.commit_times": times or [head_time], "git.repo": "tasks"})
+
+
+def repo(times):
+    return Observation("git", REPO_ENTITY_PREFIX + "tasks", NOW, {"git.commit_time_by_sha": times})
+
+
+def e(type, task, payload=None, session="s1", alias="h1·tab", host="h1", seq=1, commit=None, at="2026-10-23T19:00:00+00:00"):
+    ev = events.new_event(type, task, payload or {}, actor={"session_id": session, "alias": alias, "kind": "claude"},
+                          commit=commit, source="test")
+    ev = events.stamp(ev, host, seq)
+    ev["occurred_at"] = at
+    return ev
+
+
+class ProjectionTest(unittest.TestCase):
+    def setUp(self):
+        self.cfg = load_config(Path("/nonexistent"))
+
+    def view(self, obs, evs=(), name="t"):
+        views = {v.entity_id: v for v in project(list(obs), list(evs), self.cfg, NOW)}
+        return views[name]
+
+    def test_used_in_training_counts_accepted(self):
+        v = self.view([cm("t", "used_in_training", reviewed_at="2026-10-22T00:00:00Z")])
+        self.assertEqual(v.fields["state"], "ACCEPTED")
+        self.assertEqual(v.fields["group"], "DONE")
+
+    def test_r2_needs_two_sessions_same_commit(self):
+        obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        one = [e("review", "t", {"verdict": "ready", "confidence": 4}, commit=SHA_A)]
+        self.assertEqual(self.view(obs, one).fields["review"], "R1")
+        same_session_twice = one + [e("review", "t", {"verdict": "ready", "confidence": 5}, commit=SHA_A, seq=2)]
+        self.assertEqual(self.view(obs, same_session_twice).fields["review"], "R1")
+        two = one + [e("review", "t", {"verdict": "ready", "confidence": 5}, session="s2", host="h2", commit=SHA_A)]
+        v = self.view(obs, two)
+        self.assertEqual(v.fields["review"], "R2")
+        self.assertEqual(v.fields["next"], "RUN check")        # presubmit is required before submit
+        checked = two + [e("check", "t", {"pass": 20, "warn": 1, "fail": 0}, commit=SHA_A)]
+        self.assertEqual(self.view(obs, checked).fields["next"], "SUBMIT")
+
+    def test_new_commit_makes_review_stale(self):
+        obs = [cm("t"), gt("t", head=SHA_B), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        evs = [e("review", "t", {"verdict": "ready", "confidence": 4}, commit=SHA_A)]
+        v = self.view(obs, evs)
+        self.assertEqual(v.fields["review"], "R~")
+        self.assertTrue(v.fields["confidence_stale"])
+
+    def test_changes_verdict_not_counted_and_visible(self):
+        obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        evs = [e("review", "t", {"verdict": "ready", "confidence": 4}, commit=SHA_A),
+               e("review", "t", {"verdict": "changes", "confidence": 2}, session="s2", host="h2", commit=SHA_A)]
+        v = self.view(obs, evs)
+        self.assertEqual(v.fields["review"], "R1")
+        self.assertEqual(v.fields["dissent"], 1)
+
+    def test_head_newer_than_server_is_finding(self):
+        obs = [cm("t"), gt("t", head_time="2026-10-23T10:00:00+00:00"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        v = self.view(obs)
+        self.assertIn("HEAD≠SERVER", [f.code for f in v.findings])
+        self.assertEqual(v.fields["sync"], "HEAD≠SERVER")
+        self.assertEqual(v.fields["next"], "RERUN server")
+
+    def test_head_older_than_server_is_ok(self):
+        obs = [cm("t"), gt("t", head_time="2026-10-21T00:00:00+00:00"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        self.assertEqual(self.view(obs).fields["sync"], "OK")
+
+    def test_validation_on_older_commit_finding(self):
+        v = self.view([cm("t", validation_commit_sha=SHA_B)])
+        self.assertIn("VALID≠SERVER", [f.code for f in v.findings])
+
+    def test_disagreement_is_finding_not_overwrite(self):
+        v = self.view([cm("t", validation_commit_sha=SHA_B)])
+        self.assertEqual(v.fields["valid"], "PASS")       # server's word kept; the drift is a finding
+
+    def test_failing_validation_attention(self):
+        v = self.view([cm("t", valid="failed")])
+        self.assertEqual((v.fields["group"], v.fields["next"]), ("ATTENTION", "FIX validation"))
+
+    def test_done_not_available(self):
+        v = self.view([cm("t", "archived")])
+        self.assertEqual(v.fields["group"], "DONE")
+        self.assertEqual(v.fields["owner"], "")
+
+    def test_claim_owner_alias_and_expiry(self):
+        obs = [cm("t")]
+        evs = [e("alias", None, {"alias": "h1·lane loop"}, seq=1), e("claim", "t", seq=2, at="2026-10-23T19:00:00+00:00")]
+        self.assertEqual(self.view(obs, evs).fields["owner"], "h1·lane loop")
+        old = [e("claim", "t", seq=1, at="2026-10-21T00:00:00+00:00")]
+        self.assertEqual(self.view(obs, old).fields["owner_state"], "EXPIRED")
+
+    def test_release_frees(self):
+        evs = [e("claim", "t", seq=1), e("release", "t", seq=2)]
+        self.assertEqual(self.view([cm("t")], evs).fields["owner_state"], "FREE")
+
+    def test_conflicting_live_claims(self):
+        evs = [e("claim", "t", seq=1), e("claim", "t", session="s9", alias="h2·other", host="h2", seq=1)]
+        v = self.view([cm("t")], evs)
+        self.assertIn("CONFLICT", [f.code for f in v.findings])
+        self.assertEqual(v.fields["next"], "RESOLVE CONFLICT")
+
+    def test_check_stale_on_new_commit(self):
+        obs = [cm("t"), gt("t", head=SHA_B), repo({})]
+        evs = [e("check", "t", {"pass": 20, "warn": 2, "fail": 0}, commit=SHA_A)]
+        v = self.view(obs, evs)
+        self.assertEqual(v.fields["check"], "P20 W2 F0")
+        self.assertTrue(v.fields["check_stale"])
+
+    def test_pushes_split_at_submission(self):
+        times = ["2026-10-23T00:00:00+00:00", "2026-10-22T00:00:00+00:00", "2026-10-18T00:00:00+00:00", "2026-10-17T00:00:00+00:00"]
+        obs = [cm("t", "needs_revision", entered_pool_at="2026-10-20T00:00:00Z", reviewed_at="2026-10-21T00:00:00Z"),
+               gt("t", times=times, head_time=times[0]), repo({SHA_S: "2026-10-23T12:00:00+00:00"})]
+        v = self.view(obs)
+        self.assertEqual((v.fields["pushes_draft"], v.fields["pushes_after"]), (2, 2))
+
+    def test_next_priority_draft_ladder(self):
+        obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        self.assertEqual(self.view(obs).fields["next"], "RUN check")
+        with_check = [e("check", "t", {"pass": 20, "warn": 0, "fail": 0}, commit=SHA_A)]
+        self.assertEqual(self.view(obs, with_check).fields["next"], "GET R1")
+
+    def test_waiting_states(self):
+        self.assertEqual(self.view([cm("t", "being_reviewed")]).fields["next"], "WAIT reviewer")
+        self.assertEqual(self.view([cm("t", valid="pending")]).fields["next"], "WAIT validation")
+
+    def test_age_uses_state_timestamp(self):
+        v = self.view([cm("t", "needs_revision", reviewed_at="2026-10-22T20:00:00Z")])
+        self.assertEqual(v.fields["state_age_s"], 86400)
+        self.assertEqual(v.fields["age_level"], "warn")      # needs_revision warns after 24h

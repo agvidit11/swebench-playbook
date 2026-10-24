@@ -17,17 +17,18 @@ NAME = "git"
 class GitSource:
     name = NAME
 
-    def __init__(self, cfg, *, since_days: int = 200, timeout: float = 90):
+    def __init__(self, cfg, *, since_days: int | None = None, timeout: float = 90):
         self.cfg, self.since_days, self.timeout = cfg, since_days, timeout
 
     def fetch(self, *, since=None, timeout_seconds=None) -> FetchResult:
         obs, findings, ok, details = [], [], True, []
         now = datetime.now(timezone.utc)
+        timeout = timeout_seconds or self.timeout
         for repo in self.cfg.repositories:
             path = Path(repo.path).expanduser()
             ref = f"refs/workboard/{repo.branch}"
             if repo.remote_url:
-                p = gitutil.run(path, "fetch", "-q", repo.remote_url, f"+{repo.branch}:{ref}", timeout=timeout_seconds or self.timeout)
+                p = gitutil.run(path, "fetch", "-q", repo.remote_url, f"+{repo.branch}:{ref}", timeout=timeout)
                 if p.returncode != 0:
                     ok = False
                     details.append(f"{repo.id}: fetch failed ({gitutil.err(p)})")
@@ -35,17 +36,19 @@ class GitSource:
                                             f"check access to {repo.id}; showing last fetched commits"))
             if gitutil.run(path, "rev-parse", "-q", "--verify", ref).returncode != 0:
                 ref = f"origin/{repo.branch}"     # never fetched privately yet
-            log = gitutil.run(path, "log", ref, f"--since={self.since_days}.days", "--format=@%H %cI", "--name-only",
-                              timeout=self.timeout)
+            window = [f"--since={self.since_days}.days"] if self.since_days else []
+            log = gitutil.run(path, "log", ref, *window, "--format=@%H %cI", "--name-only", timeout=timeout)
             if log.returncode != 0:
                 ok = False
                 details.append(f"{repo.id}: log failed ({gitutil.err(log)})")
                 continue
             per_task: dict[str, list[tuple[str, str]]] = {}
+            time_by_sha: dict[str, str] = {}
             sha = when = None
             for line in log.stdout.splitlines():
                 if line.startswith("@"):
                     sha, when = line[1:].split(" ", 1)
+                    time_by_sha[sha] = when
                     seen_in_commit = set()
                 elif line and "/" in line and sha:
                     task = line.split("/", 1)[0]
@@ -61,5 +64,8 @@ class GitSource:
                     "git.repo": repo.id,
                 }
                 obs.append(Observation(NAME, task, now, fields, {k: "authoritative" for k in fields}))
+            # repo-level map so the projection can compare a task head with the server's (repo-wide) commit
+            obs.append(Observation(NAME, f"__repo__:{repo.id}", now, {"git.commit_time_by_sha": time_by_sha},
+                                   {"git.commit_time_by_sha": "authoritative"}))
         health = SourceHealth(NAME, ok, now, 900, "; ".join(details) or "ok")
         return FetchResult(obs, health, findings)
