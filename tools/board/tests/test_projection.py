@@ -256,3 +256,14 @@ class ProjectionTest(unittest.TestCase):
         v = self.view([cm("t", "needs_revision", reviewed_at="2026-10-22T20:00:00Z")])
         self.assertEqual(v.fields["state_age_s"], 86400)
         self.assertEqual(v.fields["age_level"], "warn")      # needs_revision warns after 24h
+
+
+class LegacyOwnerTest(ProjectionTest):
+    def test_legacy_note_shows_until_real_claim(self):
+        note = e("note", "t", {"legacy_owner": "devvm23237", "status": "ACTIVE", "updated": "2026-10-22"}, seq=1)
+        v = self.view([cm("t")], [note])
+        self.assertEqual((v.fields["claim_health"], v.fields["owner"]), ("LEGACY", "devvm23237 (CLAIMS.md)"))
+        claimed = [note, e("claim", "t", seq=2)]
+        self.assertEqual(self.view([cm("t")], claimed).fields["claim_health"], "OWNED")
+        old = e("note", "t", {"legacy_owner": "devvm23237", "status": "ACTIVE", "updated": "2026-10-01"}, seq=1)
+        self.assertEqual(self.view([cm("t")], [old]).fields["claim_health"], "FREE")

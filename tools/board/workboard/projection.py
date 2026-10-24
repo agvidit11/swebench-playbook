@@ -265,6 +265,15 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         else:
             owner, claim_health, claimants = _claims(tev, cfg, now, aliases)
             f["claim_source"] = "ledger (advisory)"
+        if claim_health == "FREE":
+            legacy = [e for e in tev if e["type"] == "note" and isinstance(e["payload"].get("legacy_owner"), str)]
+            if legacy:
+                last = legacy[-1]["payload"]
+                upd = ts((last.get("updated") or "")[:10] + "T00:00:00+00:00")
+                if upd and now - upd <= timedelta(days=7):
+                    machine = last["legacy_owner"]
+                    short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
+                    owner, claim_health = f"{short} (CLAIMS.md)", "LEGACY"
         if state in ("ACCEPTED", "ARCHIVED"):
             owner, claim_health = "", "DONE"
         f["owner"], f["claim_health"] = owner, claim_health

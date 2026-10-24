@@ -74,7 +74,7 @@ def weekly(observations, cfg, now: datetime, weeks: int = 8, start: datetime | N
     table = [{"week": s, "accepted": 0, "accepted_mt": 0, "accepted_st": 0, "submitted": 0, "worked_on": 0} for s in starts]
 
     def slot(t):
-        if t is None or t > end or (start and t < start):
+        if t is None or t >= end or (start and t < start):
             return None
         ws = week_start(t, tz)
         for row in table:
@@ -143,14 +143,35 @@ def _pct(values, q):
     return round((v[lo] + (v[hi] - v[lo]) * (k - lo)) / 3600, 1)
 
 
-def cycle_and_wait(observations, now) -> dict:
-    """Cycle time (submission -> acceptance) for accepted tasks; reviewer wait (submission -> latest human
-    decision) for decided tasks. codimango keeps only the latest decision, so re-submitted tasks measure from
-    their latest pool entry; coverage is reported."""
+def _in(t, start, end):
+    return t is not None and (start is None or t >= start) and (end is None or t < end)
+
+
+def range_totals(observations, now, start=None, end=None) -> dict:
+    end = min(end, now) if end else now
+    acc = sub = work = 0
+    for o in _rows(observations):
+        f = o.fields
+        if is_accepted(f) and _in(ts(f.get("codimango.reviewed_at")), start, end):
+            acc += 1
+        if _in(ts(f.get("codimango.entered_pool_at")), start, end):
+            sub += 1
+        if _in(ts(f.get("codimango.created_at")), start, end):
+            work += 1
+    return {"accepted": acc, "submitted": sub, "worked_on": work}
+
+
+def cycle_and_wait(observations, now, start=None, end=None) -> dict:
+    """Cycle time (latest submission -> acceptance) for accepted tasks and reviewer wait (latest submission ->
+    latest human decision) for decided tasks, for decisions inside [start, end). codimango keeps only the latest
+    pool entry and decision, so these are latest-round measures; coverage is reported."""
     cycle, wait, accepted, decided = [], [], 0, 0
+    end = min(end, now) if end else now
     for o in _rows(observations):
         f = o.fields
         pool, rev = ts(f.get("codimango.entered_pool_at")), _past(ts(f.get("codimango.reviewed_at")), now)
+        if not _in(rev, start, end):
+            continue
         if is_accepted(f):
             accepted += 1
             if pool and rev and rev >= pool:
@@ -164,9 +185,12 @@ def cycle_and_wait(observations, now) -> dict:
 
 
 def tasks_per_repo(cfg, task_names, *, runner=None) -> dict:
-    """Upstream repo per task from <task>/tests/config.json (or steps/*/tests/config.json) at the fetched ref."""
+    """Upstream repo per task from <task>/tests/config.json (or steps/*/tests/config.json) at the fetched ref.
+    Always returns {"by_repo", "coverage", "available", "reason"}."""
     from . import gitutil
     counts, covered = {}, 0
+    if not cfg.repositories:
+        return {"by_repo": {}, "coverage": f"0/{len(task_names)}", "available": False, "reason": "no repositories configured"}
     for repo in cfg.repositories:
         path = Path(repo.path).expanduser()
         ref = f"refs/workboard/{repo.branch}"
@@ -191,7 +215,8 @@ def tasks_per_repo(cfg, task_names, *, runner=None) -> dict:
             if isinstance(up, str) and up:
                 counts[up] = counts.get(up, 0) + 1
                 covered += 1
-    return {"by_repo": dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))), "coverage": f"{covered}/{len(task_names)}"}
+    return {"by_repo": dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))), "coverage": f"{covered}/{len(task_names)}",
+            "available": covered > 0, "reason": "" if covered else "no readable tests/config.json with a repo key"}
 
 
 def pipeline_age(views, now) -> dict[str, dict]:
@@ -252,14 +277,14 @@ def revision_rounds(cfg, observations, cache_dir: Path, *, fetch=True, runner=su
     return {"rounds": rounds, "covered": len(rounds), "eligible": len(eligible)}
 
 
-def first_pass_by_cohort(observations, rounds: dict, cfg) -> list[dict]:
+def first_pass_by_cohort(observations, rounds: dict, cfg, start=None, end=None) -> list[dict]:
     """Per submission week: decided tasks, accepted with zero revision rounds, rate."""
     tz = ZoneInfo(cfg.user.timezone)
     cohorts = {}
     for o in _rows(observations):
         f = o.fields
         pool = ts(f.get("codimango.entered_pool_at"))
-        if not pool or o.entity_id not in rounds:
+        if not pool or o.entity_id not in rounds or not _in(pool, start, end):
             continue
         decided = is_accepted(f) or f.get("codimango.status") in ("needs_revision", "archived")
         if not decided:

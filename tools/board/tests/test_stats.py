@@ -168,3 +168,50 @@ class RankTest(unittest.TestCase):
     def test_no_query_id(self):
         data, why = rank.refresh(load_config(Path("/nonexistent")), Path("/tmp"))
         self.assertIn("daiquery_id", why)
+
+
+class WindowAndRankShapeTest(StatsTest):
+    def test_from_only_and_to_only(self):
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Los_Angeles")
+        t = stats.range_totals(self.obs, NOW, start=datetime(2026, 10, 19, tzinfo=tz))
+        self.assertEqual(t["accepted"], 10)
+        t = stats.range_totals(self.obs, NOW, end=datetime(2026, 10, 12, tzinfo=tz))
+        self.assertEqual(t["accepted"], 19)
+
+    def test_exact_midnight_end_excluded(self):
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Los_Angeles")
+        midnight = datetime(2026, 10, 20, tzinfo=tz)
+        obs = [cm("m", "accepted", midnight.astimezone(timezone.utc).isoformat())]
+        self.assertEqual(stats.range_totals(obs, NOW, end=midnight)["accepted"], 0)
+        self.assertEqual(stats.range_totals(obs, NOW, start=midnight)["accepted"], 1)
+
+    def test_flow_respects_window(self):
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Los_Angeles")
+        obs = [cm("a", "accepted", "2026-10-03T00:00:00Z", pool="2026-10-01T00:00:00Z"),
+               cm("b", "accepted", "2026-10-20T00:00:00Z", pool="2026-10-19T12:00:00Z")]
+        f = stats.cycle_and_wait(obs, NOW, start=datetime(2026, 10, 15, tzinfo=tz))
+        self.assertEqual((f["cycle_coverage"], f["cycle_p50_h"]), ("1/1", 12.0))
+
+    def test_tasks_per_repo_unavailable(self):
+        cfg = load_config(Path("/nonexistent"))
+        r = stats.tasks_per_repo(cfg, ["a", "b"])
+        self.assertEqual((r["available"], r["coverage"]), (False, "0/2"))
+        self.assertTrue(r["reason"])
+
+    def test_rank_normalized_from_wide_rows(self):
+        rows = rank.normalize([{"scope": "SWE MT", "win": "Q4", "acc": "27", "acc_rank": "2/209", "sub": "39",
+                                "sub_rank": "2/260"}])
+        self.assertIn({"scope": "SWE MT", "window": "Q4", "metric": "accepted", "value": 27, "rank": 2, "of": 209}, rows)
+        self.assertTrue(rank.valid_rows(rows))
+
+    def test_rank_canonical_and_bad_rows(self):
+        canon = rank.parse_table("scope,window,metric,value,rank,of\nOrg,H2,accepted,43,286,4999\n")
+        self.assertEqual(rank.normalize(canon)[0]["metric"], "accepted")
+        with self.assertRaises(ValueError):
+            rank.normalize([{"scope": "x"}])                    # no window
+        with self.assertRaises(ValueError):
+            rank.normalize([{"scope": "x", "win": "y", "other": 1}])   # no metrics
+        self.assertFalse(rank.valid_rows([{"scope": "x", "window": "y"}]))

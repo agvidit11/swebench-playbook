@@ -88,6 +88,8 @@ def _cells(v, style: Style) -> dict[str, tuple[str, str | None]]:
         owner = ("FREE", "blue") if claim_health != "DONE" else ("", None)
     elif claim_health in ("EXPIRED", "CONFLICT"):
         owner = (f"{claim_health} {f['owner']}", WORD_COLOUR[claim_health])
+    elif claim_health == "LEGACY":
+        owner = (f"LEGACY {f['owner']}", "dim")
     else:
         owner = (f["owner"], None)
     review = f.get("review", "R0")
@@ -187,7 +189,7 @@ def legend(symbols: set[str], style: Style, everything: bool = False, width: int
         ("R0", "R0 no agent-session review"), ("R1", "R1 one agent session approved"),
         ("R2", "R2 two agent sessions approved"), ("R~", "R~ agent review on an older commit"),
         ("C", "C4 confidence 4/5"), ("STALE", f"{stale} result from an older commit"),
-        ("FREE", "FREE nobody owns it"), ("EXPIRED", "EXPIRED owner idle 24h+"), ("CONFLICT", "CONFLICT two owners"),
+        ("FREE", "FREE nobody owns it"), ("LEGACY", "LEGACY owner from CLAIMS.md (advisory, 7 days)"), ("EXPIRED", "EXPIRED owner idle 24h+"), ("CONFLICT", "CONFLICT two owners"),
         ("HEAD≠SERVER", "HEAD≠SERVER newer push not on server"), ("STALE_VALID", "STALE_VALID validated an older commit"),
         ("OK·doc", "OK·doc only docs changed since validation"), ("UNCHECKED", "UNCHECKED drift not checked"),
         ("PUSHES", "2+1 commits before+after submit"),

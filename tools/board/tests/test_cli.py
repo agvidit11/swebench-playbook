@@ -330,3 +330,74 @@ class StatsCommandTest(unittest.TestCase):
             self.out(["stats", "--from", "2026-10-21", "--to", "2026-10-01"])
         with self.assertRaises(SystemExit):
             self.out(["stats", "--weeks", "0"])
+
+
+class StatsRangeAndRankWidthTest(StatsCommandTest):
+    def test_from_only_renders(self):
+        code, text = self.out(["stats", "--plain", "--from", "2026-10-01"])
+        self.assertEqual(code, 0)
+        self.assertIn("2026-10-01 to now", text)
+        self.assertIn("in range:", text)
+
+    def test_json_to_is_inclusive_date(self):
+        code, text = self.out(["stats", "--json", "--from", "2026-10-01", "--to", "2026-10-21"])
+        w = json.loads(text)["result"]["window"]
+        self.assertEqual((w["from"], w["to"]), ("2026-10-01", "2026-10-21"))
+        self.assertTrue(w["end_exclusive"].startswith("2026-10-22"))
+
+    def test_rank_table_fits_and_discloses(self):
+        from workboard import rank as rk
+        rows = rk.normalize([{"scope": "1 SWE multi-turn track", "win": "This quarter Q4 (from 2026-10-01)",
+                              "acc": "27", "acc_rank": "2/209", "sub": "39", "sub_rank": "2/260",
+                              "work": "41", "work_rank": "8/219"}])
+        for width in (40, 60):
+            lines = cli._rank_table(rows, width)
+            for line in lines:
+                self.assertLessEqual(len(line), width, line)
+            text = " ".join(lines)
+            hidden = [h for h in ("WINDOW", "ACCEPTED", "SUBMITTED", "WORKED ON") if h not in lines[0]]
+            for h in hidden:
+                self.assertIn(h, text)
+
+
+class StatusChecksTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.home = Path(td.name)
+        (self.home / ".claude").mkdir()
+        p = mock.patch.dict(os.environ, {"HOME": str(self.home), "WORKBOARD_CACHE": td.name,
+                                         "WORKBOARD_CONFIG": "/nonexistent", "NO_COLOR": "1"})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def checks(self, cron, settings_text):
+        (self.home / ".claude" / "settings.json").write_text(settings_text)
+        with mock.patch("workboard.__main__.subprocess.run",
+                        return_value=mock.Mock(stdout=cron)), mock.patch("shutil.which", return_value="/usr/bin/x"):
+            from workboard.config import load_config
+            return {c["name"]: c for c in cli.status_checks(load_config(Path("/nonexistent")))}
+
+    def test_malformed_settings_and_wrong_cadence(self):
+        c = self.checks("*/30 * * * * /x/board sync --quiet\n", "{not json")
+        self.assertFalse(c["Claude hooks installed"]["ok"])
+        self.assertFalse(c["background sync (cron */2 board sync)"]["ok"])
+        self.assertIn("another schedule", c["background sync (cron */2 board sync)"]["detail"])
+
+    def test_good_install(self):
+        from workboard import hooks
+        s = self.home / ".claude" / "settings.json"
+        s.write_text("{}")
+        hooks.install(s, "/x/board")
+        c = self.checks("*/2 * * * * /x/board sync --quiet >/dev/null 2>&1\n", s.read_text())
+        self.assertTrue(c["Claude hooks installed"]["ok"])
+        self.assertTrue(c["background sync (cron */2 board sync)"]["ok"])
+
+    def test_status_json_includes_checks_and_strict_fails(self):
+        (self.home / ".claude" / "settings.json").write_text("{}")
+        out = io.StringIO()
+        with mock.patch("workboard.app.gather", return_value=snap()), contextlib.redirect_stdout(out):
+            code = cli.main(["status", "--json", "--strict"])
+        data = json.loads(out.getvalue())
+        self.assertIn("checks", data["result"])
+        self.assertEqual(code, 1)                 # hooks missing -> strict fails
