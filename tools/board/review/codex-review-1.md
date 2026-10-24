@@ -204,7 +204,7 @@ config_version = 1
 profile = "swebench-codimango"
 
 [user]
-id = "vidit"                    # stable local ID, not an FBID
+id = "user-1"                    # stable local ID, not an FBID
 display_name = "the author"
 timezone = "America/Los_Angeles"
 week_start = "monday"
@@ -245,7 +245,7 @@ branch = "main"
 task_path_pattern = "{task}"
 
 [[team.members]]
-id = "vidit"
+id = "user-1"
 display_name = "the author"
 aliases = ["<user>"]
 

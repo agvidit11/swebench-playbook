@@ -77,7 +77,7 @@ OK
    cached-ledger case, pull-ok/push-failed case, unhealthy claim source, and clock skew, covering both claim and
    release where applicable.
 
-9. `tests/test_claim_cli.py:83,133-145` — Remove the committed personal identifier. Replace `"vidit"` in user,
+9. `tests/test_claim_cli.py:83,133-145` — Remove the committed personal identifier. Replace the personal name in user,
    person, session, and alias fixtures with a neutral value such as `"person-1"`; the global constraint explicitly
    keeps identities out of committed code and tests.
 
