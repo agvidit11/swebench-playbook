@@ -76,7 +76,10 @@ def chips(st: UIState, counts: dict) -> list[str]:
 
 def detail_panel(v, width: int) -> list[str]:
     f = v.fields
-    lines = [f"{BOLD}{v.entity_id}{RESET}",
+    links = f.get("links") or {}
+    link_line = "   ".join(tui.link(lbl, links[k]) for k, lbl in (("codimango", "🥭 codimango"), ("github", "🐙 github"),
+                                                                  ("latest", "📂 latest on main")) if links.get(k))
+    lines = [f"{BOLD}{tui.link(v.entity_id, links.get('codimango') or links.get('github'))}{RESET}",
              f"{tui._next(f)}   {tui._pill(f.get('state', '?'), fmt_age(f.get('state_age_s')), f.get('age_level'))}",
              f"owner  {tui._owner(f)}   {fg(GREY)}({f.get('claim_health', '').lower()}){RESET}",
              f"checks validation {tui._tick_valid(f.get('valid', 'UNK'))}   presubmit {tui._check(f)}   "
@@ -86,6 +89,8 @@ def detail_panel(v, width: int) -> list[str]:
         lines.append(f"👀 {a['alias']} {fg(GREY)}touched it {fmt_age(a['ago_s'])} ago{RESET}")
     for x in v.findings:
         lines.append(f"{fg(AMBER)}⚠ {x.code}{RESET} {x.summary} {fg(GREY)}→ {x.next_action}{RESET}")
+    if link_line:
+        lines.append(link_line)
     lines.append(f"{fg(GREY)}more: board show {v.entity_id} · board explain {v.entity_id}{RESET}")
     return tui._panel("🔎 details", lines, width, BLUE)
 

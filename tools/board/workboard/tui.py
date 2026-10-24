@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 
 from .render import fmt_age
 
-ANSI = re.compile(r"\x1b\[[0-9;]*m")
+ANSI = re.compile(r"\x1b\[[0-9;]*m|\x1b\]8;;[^\x1b]*\x1b\\")
+
+
+def link(text: str, url: str | None) -> str:
+    """OSC 8 terminal hyperlink (clickable in VS Code / iTerm / modern terminals); plain text if no url."""
+    return f"\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\" if url else text
 RESET = "\x1b[0m"
 
 

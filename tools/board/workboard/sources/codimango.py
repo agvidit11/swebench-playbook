@@ -24,7 +24,7 @@ KEEP = {
     "enteredPoolAt": "entered_pool_at", "createdAt": "created_at", "archivedAt": "archived_at",
     "commitSha": "commit_sha", "headCommitSha": "head_commit_sha", "validationCommitSha": "validation_commit_sha",
     "trackAssignment": "track", "format": "format", "reviewStatus": "review_status",
-    "tbdReviewStatus": "tbr_status", "updatedAt": "updated_at",
+    "tbdReviewStatus": "tbr_status", "updatedAt": "updated_at", "githubUrl": "github_url",
 }
 
 

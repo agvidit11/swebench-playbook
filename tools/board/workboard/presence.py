@@ -49,8 +49,13 @@ def _title(data: bytes) -> str:
 
 
 def _path_hits(text: str, tasks: set[str]) -> set[str]:
-    """Tasks referenced as a path component: '/<task>/' or '<task>/' at a token start, or `-C <task>`."""
+    """Tasks referenced as a path component: '/<task>/' or '<task>/' at a token start, `-C <task>`, or a path
+    component that contains the full task name (scratch dirs like /tmp/rev-<task>, /tmp/<task>-build)."""
     hits = set()
+    for comp in set(re.findall(r"/([A-Za-z0-9._-]{8,140})(?=/|\s|$|['\"])", text)):
+        for t in tasks:
+            if len(t) >= 12 and t in comp:
+                hits.add(t)
     for m in re.finditer(r"(?:^|[\s/'\"=])([a-z0-9][a-z0-9._-]{6,90})(?:/|['\"\s]*$)", text, re.M):
         if m.group(1) in tasks:
             hits.add(m.group(1))

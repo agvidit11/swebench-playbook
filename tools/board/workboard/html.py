@@ -21,7 +21,7 @@ def payload(snap, cfg) -> dict:
         views.append({"task": v.entity_id, **{k: f.get(k) for k in (
             "group", "next", "state", "state_age_s", "age_level", "owner", "claim_health", "valid", "review",
             "confidence", "confidence_stale", "sync", "check", "check_stale", "check_fail", "pushes_before_submit",
-            "pushes_after_submit", "track", "active", "dissent")},
+            "pushes_after_submit", "track", "active", "dissent", "links")},
             "findings": [{"code": x.code, "severity": x.severity, "summary": x.summary, "next": x.next_action}
                          for x in v.findings]})
     weekly = st.weekly(snap.observations, cfg, snap.now, 10)
@@ -62,7 +62,7 @@ h1{margin:0;font-size:20px;color:var(--pink)}.sub{color:var(--dim);font-style:it
 .seg button.on{background:var(--violet);color:#14161c;font-weight:700}
 input[type=search]{background:var(--panel);border:1px solid var(--line);color:var(--text);padding:6px 12px;border-radius:999px;min-width:220px;font:inherit}
 .health{color:var(--dim);margin-left:auto}.health .ok{color:var(--green)}.health .bad{color:var(--red)}
-table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tbl{overflow-x:auto;border-radius:12px}body{overflow-x:hidden}table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 th{text-align:left;color:var(--dim);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);cursor:pointer;white-space:nowrap}
 td{padding:8px 12px;border-bottom:1px solid #22252f;white-space:nowrap}tr.row{cursor:pointer;animation:fade .35s ease both}
 tr.row:hover td{background:#222633}tr.row td:first-child{border-left:4px solid var(--s)}@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1}}
@@ -76,6 +76,8 @@ tr.group td{background:#171a21;color:var(--dim);font-weight:700;padding:6px 12px
 aside{position:fixed;top:0;right:-460px;width:440px;height:100%;background:var(--panel);border-left:1px solid var(--line);padding:22px;transition:right .25s ease;overflow:auto;box-shadow:-10px 0 30px #0008}
 aside.open{right:0}aside h2{margin:0 0 8px;font-size:16px;word-break:break-all}aside .x{float:right;cursor:pointer;color:var(--dim)}
 aside .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;margin:14px 0}aside .kv div:nth-child(odd){color:var(--dim)}
+.links{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.lnk{padding:5px 12px;border-radius:999px;border:1px solid var(--line);color:var(--text);text-decoration:none;transition:all .15s}
+.lnk:hover{border-color:var(--pink);color:var(--pink);transform:translateY(-1px)}aside h2 a{color:var(--text);text-decoration:none}aside h2 a:hover{color:var(--pink)}
 .finding{background:#2a2216;border:1px solid #4a3a1c;border-radius:8px;padding:8px 10px;margin:6px 0}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}.card .big{font-size:26px;font-weight:800}
@@ -92,9 +94,9 @@ aside .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;margin:14px 
 <div class="controls" id="chips"></div>
 <div class="controls"><div class="seg" id="owner"></div><input type="search" id="q" placeholder="🔍 search tasks  ( / )">
 <span class="health" id="health"></span></div>
-<table><thead><tr><th data-k="task">Task</th><th data-k="next">Next</th><th data-k="state">State</th><th data-k="owner">Owner</th>
+<div class="tbl"><table><thead><tr><th data-k="task">Task</th><th data-k="next">Next</th><th data-k="state">State</th><th data-k="owner">Owner</th>
 <th data-k="valid">Validation</th><th data-k="check">Presubmit</th><th data-k="review">Review</th><th data-k="sync">Sync</th></tr></thead>
-<tbody id="rows"></tbody></table>
+<tbody id="rows"></tbody></table></div>
 <div class="legend"><span><span class="spark">✦</span> changed</span><span><span class="ok ticks">✓✓</span> two sessions approved</span>
 <span><span class="run">✓</span> one</span><span><span class="dim">↻✓</span> older commit</span><span>▰▰▰▰▱ confidence</span>
 <span>👤 owner</span><span>👀 active</span><span>📜 CLAIMS.md</span><span>💤 expired</span><span>🔓 free</span></div>
@@ -159,7 +161,9 @@ function renderStats(){const w=D.week,f=D.funnel,fl=D.flow,hr=x=>x==null?'—':x
  <div class="dim">📦 archived ${f.archived} · 🔧 open ${f.open}</div></div>
  <div class="panel"><h3>🕓 open work by state</h3>${Object.entries(D.ages).map(([k,v])=>`<div class="hbar"><span class="l"><span class="pill" style="background:${PILL[k]||'#666'}">${k.replace('_',' ').toLowerCase().replace('needs rev','sent back')}</span></span><span class="b" style="width:${v.count/Math.max(1,...Object.values(D.ages).map(a=>a.count))*55}%;background:${PILL[k]||'#666'}"></span><b>${v.count}</b><span class="dim">typical ${hr(v.median_h)} · oldest ${hr(v.max_h)}</span></div>`).join('')}</div>`}
 function openDrawer(name){const t=D.tasks.find(x=>x.task===name);if(!t)return;
- document.getElementById('dbody').innerHTML=`<h2>${esc(t.task)}</h2><div>${next(t)}</div><div class="kv">
+ const L=t.links||{};const btn=(k,l)=>L[k]?`<a class="lnk" href="${esc(L[k])}" target="_blank" rel="noopener">${l}</a>`:'';
+ document.getElementById('dbody').innerHTML=`<h2>${L.codimango?`<a href="${esc(L.codimango)}" target="_blank" rel="noopener">${esc(t.task)}</a>`:esc(t.task)}</h2><div>${next(t)}</div>
+ <div class="links">${btn('codimango','🥭 codimango')}${btn('github','🐙 github (server commit)')}${btn('latest','📂 latest on main')}</div><div class="kv">
  <div>state</div><div>${state(t)}</div><div>owner</div><div>${owner(t)||'—'}</div><div>validation</div><div>${valid(t.valid)}</div>
  <div>presubmit</div><div>${check(t)}</div><div>review</div><div>${review(t)}</div><div>sync</div><div>${sync(t.sync)}</div>
  <div>pushes</div><div>${t.pushes_before_submit||0} before submit · ${t.pushes_after_submit||0} after</div></div>

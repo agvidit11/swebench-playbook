@@ -42,3 +42,28 @@ class HtmlTest(unittest.TestCase):
                 urllib.request.urlopen(f"http://127.0.0.1:{port}/etc/passwd")
         finally:
             srv.shutdown()
+
+
+class LinksTest(unittest.TestCase):
+    def test_links_projected_and_rendered(self):
+        from datetime import datetime, timezone
+        from workboard.config import Repository
+        from workboard.model import Observation
+        from workboard.projection import project
+        cfg = load_config(Path("/nonexistent"))
+        cfg.codimango.web_task_url = "https://example.test/tasks/{task}"
+        cfg.repositories = [Repository(id="tasks", path="/x", remote_url="ssh://git@github.com:22/org/tasks.git", branch="main")]
+        now = datetime.now(timezone.utc)
+        obs = [Observation("codimango", "t1", now, {"codimango.status": "draft", "codimango.validation_status": "passing",
+                                                     "codimango.github_url": "https://github.com/org/tasks/tree/abc/t1"}),
+               Observation("git", "t1", now, {"git.repo": "tasks", "git.task_head": "a" * 40})]
+        v = project(obs, [], cfg, now)[0]
+        self.assertEqual(v.fields["links"], {"codimango": "https://example.test/tasks/t1",
+                                             "github": "https://github.com/org/tasks/tree/abc/t1",
+                                             "latest": "https://github.com/org/tasks/tree/main/t1"})
+        page = html.page(html.payload(snap([v]), cfg))
+        self.assertIn("https://example.test/tasks/t1", page)
+
+    def test_osc8_ignored_by_width(self):
+        from workboard import tui
+        self.assertEqual(tui.dwidth(tui.link("abc", "https://x.test/y")), 3)

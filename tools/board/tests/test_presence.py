@@ -52,6 +52,10 @@ class PresenceTest(unittest.TestCase):
         cx.write_text(json.dumps({"type": "session_meta", "payload": {"cwd": "/home/u/repo/alpha-task-one"}}) + "\n")
         self.assertIn(("alpha-task-one", "codex"), {(f["task"], f["kind"]) for f in presence.scan(self.tasks)})
 
+    def test_scratch_dir_containing_task_name(self):
+        self.transcript("s3", [tool_line(cmd="cd /tmp/rev-gamma-task-three && git status")])
+        self.assertIn("gamma-task-three", {f["task"] for f in presence.scan(self.tasks)})
+
     def test_old_transcripts_ignored(self):
         self.transcript("old", [tool_line(path="/r/alpha-task-one/x")], age_s=7 * 3600 * 2)
         self.assertEqual(presence.scan(self.tasks), [])

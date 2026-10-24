@@ -213,7 +213,16 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         tev = per_task_events.get(task, [])
         findings: list[Finding] = []
         state = STATE.get(cm.get("codimango.status"), "NOT_IMPORTED" if not cm else str(cm.get("codimango.status")).upper())
-        f = {"state": state, "track": cm.get("codimango.track") or "",
+        repo_cfg = next((r for r in cfg.repositories if r.id == (g.get("git.repo") or "tasks")), None)
+        links = {}
+        if cfg.codimango.web_task_url:
+            links["codimango"] = cfg.codimango.web_task_url.replace("{task}", task)
+        if cm.get("codimango.github_url"):
+            links["github"] = cm["codimango.github_url"]
+        if repo_cfg and repo_cfg.remote_url and "github.com" in repo_cfg.remote_url:
+            slug = repo_cfg.remote_url.split("github.com", 1)[1].lstrip(":/").replace("22/", "", 1).removesuffix(".git")
+            links["latest"] = f"https://github.com/{slug}/tree/{repo_cfg.branch}/{task}"
+        f = {"links": links, "state": state, "track": cm.get("codimango.track") or "",
              "valid": VALID.get(cm.get("codimango.validation_status"), "UNK" if cm else "—")}
         since = _state_since(state, cm)
         f["state_age_s"] = int((now - since).total_seconds()) if since else None
@@ -274,7 +283,7 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             f["claim_source"] = "ledger (advisory)"
         if claim_health == "FREE":
             legacy = [e for e in tev if e["type"] == "note" and isinstance(e["payload"].get("legacy_owner"), str)]
-            if legacy:
+            if legacy and legacy[-1]["payload"].get("live") is not False:    # latest row finished -> no owner
                 last = legacy[-1]["payload"]
                 expires = ts(last.get("expires_at"))
                 if expires is None:                         # notes from before expires_at: 7 days from the row date

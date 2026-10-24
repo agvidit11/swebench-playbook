@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import os
 import tempfile
 import re
@@ -177,7 +178,9 @@ def cmd_show(args, cfg):
         return _emit(args, snap, result)
     style = _style(args, cfg)
     f = v.fields
-    lines = [style.paint(v.entity_id, "bold"),
+    from . import tui
+    links = f.get("links") or {}
+    lines = [style.paint(tui.link(v.entity_id, links.get("codimango") or links.get("github")) if style.color else v.entity_id, "bold"),
              f"  NEXT     {f['next']}   ({f['group']})",
              f"  state    {f['state']} for {render.fmt_age(f.get('state_age_s'))}   validation {f['valid']}   sync {f['sync']}",
              f"  owner    {f.get('owner') or '-'} [{f.get('claim_health')}]",
@@ -185,6 +188,9 @@ def cmd_show(args, cfg):
              f"{' (older commit)' if f.get('confidence_stale') else ''}  dissent {f.get('dissent', 0)}",
              f"  check    {f['check']}{' (older commit)' if f.get('check_stale') else ''}",
              f"  commits  {f.get('pushes_before_submit', 0)} before submit, {f.get('pushes_after_submit', 0)} after"]
+    for k, lbl in (("codimango", "codimango"), ("github", "github"), ("latest", "latest")):
+        if links.get(k):
+            lines.append(f"  {lbl:<8} {links[k]}")
     if human_reviews:
         lines.append(f"  human    {human_reviews['revision_rounds']} revision round(s), {human_reviews['accepts']} accept(s)")
     elif not args.no_reviews:
@@ -478,10 +484,26 @@ def cmd_hook(args, cfg):
 def cmd_sync(args, cfg):
     from . import app, presence, sync as s
     from .completion import task_names
+    host, known = s.safe_host(s.host_id_for(cfg)), set(task_names())
     try:
-        presence.emit(cfg, s.default_state_dir(), s.safe_host(s.host_id_for(cfg)), set(task_names()))
+        presence.emit(cfg, s.default_state_dir(), host, known)
     except Exception as exc:                       # presence is best-effort; never block the sync
         print(f"presence scan skipped: {exc}", file=sys.stderr)
+    try:
+        from . import claims_md_sync
+        claims_md_sync.sync(cfg, s.default_state_dir(), host, known)
+    except Exception as exc:
+        print(f"CLAIMS.md sync skipped: {exc}", file=sys.stderr)
+    try:
+        from .sources.codimango import CodimangoSource
+        from .sources.gitsrc import GitSource
+        CodimangoSource(cfg, cache_dir=app.cache_dir()).fetch(max_age_seconds=cfg.codimango.cache_ttl_seconds)
+        stamp = app.cache_dir() / app.GIT_STAMP
+        if cfg.repositories and (not stamp.exists() or time.time() - stamp.stat().st_mtime > cfg.codimango.cache_ttl_seconds):
+            if GitSource(cfg).fetch().health.ok:
+                stamp.touch()
+    except Exception as exc:                       # cache warming is best-effort
+        print(f"cache refresh skipped: {exc}", file=sys.stderr)
     st = s.sync(cfg, state_dir=s.default_state_dir())
     app.refresh_claims_cache(cfg, s.default_state_dir())
     if not args.quiet:
