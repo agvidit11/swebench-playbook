@@ -386,6 +386,14 @@ class StatusChecksTest(unittest.TestCase):
             from workboard.config import load_config
             return {c["name"]: c for c in cli.status_checks(load_config(Path("/nonexistent")))}
 
+    def test_stale_hook_path_not_accepted(self):
+        from workboard import hooks
+        s = self.home / ".claude" / "settings.json"
+        s.write_text("{}")
+        hooks.install(s, "/old/checkout/tools/board/board")
+        c = self.checks(cli.cron_line(cli.board_path()) + "\n", s.read_text())
+        self.assertFalse(c["Claude hooks installed"]["ok"])
+
     def test_other_board_binary_not_accepted(self):
         c = self.checks("*/2 * * * * /tmp/not-the-workboard sync --quiet >/dev/null 2>&1\n", "{}")
         self.assertFalse(c["background sync (cron */2 board sync)"]["ok"])
@@ -400,7 +408,7 @@ class StatusChecksTest(unittest.TestCase):
         from workboard import hooks
         s = self.home / ".claude" / "settings.json"
         s.write_text("{}")
-        hooks.install(s, "/x/board")
+        hooks.install(s, cli.board_path())
         c = self.checks(cli.cron_line(cli.board_path()) + "\n", s.read_text())
         self.assertTrue(c["Claude hooks installed"]["ok"])
         self.assertTrue(c["background sync (cron */2 board sync)"]["ok"])
@@ -452,6 +460,40 @@ class SetupCommandTest(unittest.TestCase):
                                          "WORKBOARD_STATE": td.name, "WORKBOARD_CACHE": td.name})
         p.start()
         self.addCleanup(p.stop)
+
+    def run_setup(self, crontab_out=""):
+        from workboard import claims
+        calls = []
+
+        def fake_run(argv, **kw):
+            calls.append((argv, kw.get("input")))
+            return mock.Mock(returncode=0, stdout=crontab_out, stderr="")
+
+        with mock.patch.object(claims, "probe", return_value=claims.ProbeResult(True, "refs/claims", "ok")), \
+             mock.patch("workboard.sync.sync", return_value=SyncState(last_pull_ok=True, last_push_ok=True)), \
+             mock.patch("workboard.__main__.subprocess.run", fake_run), \
+             contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+            code = cli.main(["setup"])
+        return code, err.getvalue(), calls
+
+    def test_setup_idempotent_and_preserves_unrelated_cron(self):
+        other = "0 * * * * /usr/bin/someone-elses board sync job"
+        code, err, calls = self.run_setup(other + "\n")
+        self.assertEqual(code, 0, err)
+        written = [c[1] for c in calls if c[0] == ["crontab", "-"]][0]
+        self.assertIn(other, written)
+        self.assertIn(cli.cron_line(cli.board_path()), written)
+        code, err, _ = self.run_setup(written)
+        self.assertEqual(code, 0, err)
+
+    def test_setup_refuses_regular_file_conflict(self):
+        dest = self.home / ".local" / "bin" / "board"
+        dest.parent.mkdir(parents=True)
+        dest.write_text("#!/bin/sh\necho someone else\n")
+        code, err, _ = self.run_setup()
+        self.assertEqual(code, 1)
+        self.assertIn("not our link", err)
+        self.assertEqual(dest.read_text(), "#!/bin/sh\necho someone else\n")
 
     def test_failed_probe_and_cron_make_setup_fail(self):
         from workboard import claims

@@ -104,7 +104,8 @@ def release(cfg, task, reason, *, state_dir, actor=None) -> claims.ClaimResult:
     if res.status == "RELEASED":
         with local_claims(state_dir) as local:
             local.pop(task, None)
-        record(state_dir, "release", task, actor, {"reason": reason, "was": cur.owner.get("alias", "")})
+        if not record(state_dir, "release", task, actor, {"reason": reason, "was": cur.owner.get("alias", "")}):
+            res.detail += " (warning: audit event could not be queued)"
     return res
 
 
@@ -122,9 +123,10 @@ def release_own_agent(cfg, task, reason, *, state_dir, actor, current=None) -> c
     if res.status == "RELEASED":
         with local_claims(state_dir) as local:
             local.pop(task, None)
-        record(state_dir, "release", task, actor, {"reason": reason, "override": True,
-                                                  "released_owner": {"session_id": cur.owner.get("session_id"),
-                                                                     "alias": cur.owner.get("alias", "")}})
+        if not record(state_dir, "release", task, actor, {"reason": reason, "override": True,
+                                                         "released_owner": {"session_id": cur.owner.get("session_id"),
+                                                                            "alias": cur.owner.get("alias", "")}}):
+            res.detail += " (warning: audit event could not be queued)"
     return res
 
 

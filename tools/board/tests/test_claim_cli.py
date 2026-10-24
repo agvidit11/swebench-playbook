@@ -219,3 +219,20 @@ class OwnAgentOverrideTest(ClaimHardeningTest):
         res = coord.release_own_agent(self.c1, "t", "x", state_dir=self.s1, actor=human, current=stale)
         self.assertEqual(res.status, "REFUSED")
         self.assertEqual(claims.read(self.c1, "t", state_dir=self.s1).status, "HELD")
+
+
+class ReleaseAuditTest(ClaimHardeningTest):
+    def test_release_reports_unqueued_audit(self):
+        coord.claim(self.c1, "t", state_dir=self.s1, actor=A1)
+        with mock.patch.object(coord, "record", return_value=False):
+            res = coord.release(self.c1, "t", "done", state_dir=self.s1, actor=A1)
+        self.assertEqual(res.status, "RELEASED")
+        self.assertIn("audit event could not be queued", res.detail)
+
+    def test_own_agent_release_reports_unqueued_audit(self):
+        coord.claim(self.c1, "t", state_dir=self.s1, actor=dict(A1, person="person-1"))
+        human = {"session_id": "human:p@h1", "alias": "h1·p", "kind": "human", "host": "h1", "person": "person-1"}
+        with mock.patch.object(coord, "record", return_value=False):
+            res = coord.release(self.c1, "t", "x", state_dir=self.s1, actor=human)
+        self.assertEqual(res.status, "RELEASED")
+        self.assertIn("audit event could not be queued", res.detail)

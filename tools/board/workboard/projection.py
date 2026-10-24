@@ -73,8 +73,10 @@ def _claims(task_events, cfg, now, aliases):
             if e["type"] == "steal":
                 live.clear()
             prev = live.get(target, {})
+            since = prev.get("since") if (e["type"] == "renew" and prev) else at
             live[target] = {"alias": e["payload"].get("to_alias") or aliases.get(target) or e["actor"].get("alias", ""),
-                            "host": e["host_id"], "session": target, "at": max(at, prev.get("at") or at)}
+                            "host": e["host_id"], "session": target, "at": max(at, prev.get("at") or at),
+                            "since": since or at}
         elif e["type"] == "release":
             live.pop(sid, None)
             released = e["payload"].get("released_owner")
@@ -185,11 +187,12 @@ def _ref_claim(g_claims: dict, cfg, now):
     """Owner from the authoritative claim ref fields (claims.*)."""
     renewed = ts(g_claims.get("claims.renewed_at"))
     alias = g_claims.get("claims.alias", "")
+    acquired = ts(g_claims.get("claims.acquired_at")) or renewed
     if renewed is None:
         return alias, "EXPIRED", g_claims.get("claims.session_id"), None
     if now - renewed > timedelta(hours=cfg.claims.expire_after_hours):
-        return alias, "EXPIRED", g_claims.get("claims.session_id"), renewed
-    return alias, "OWNED", g_claims.get("claims.session_id"), renewed
+        return alias, "EXPIRED", g_claims.get("claims.session_id"), acquired
+    return alias, "OWNED", g_claims.get("claims.session_id"), acquired
 
 
 def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> list[TaskView]:
@@ -273,8 +276,11 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             legacy = [e for e in tev if e["type"] == "note" and isinstance(e["payload"].get("legacy_owner"), str)]
             if legacy:
                 last = legacy[-1]["payload"]
-                upd = ts((last.get("updated") or "")[:10] + "T00:00:00+00:00")
-                if upd and now - upd <= timedelta(days=7):
+                expires = ts(last.get("expires_at"))
+                if expires is None:                         # notes from before expires_at: 7 days from the row date
+                    upd = ts((last.get("updated") or "")[:10] + "T00:00:00+00:00")
+                    expires = upd + timedelta(days=7) if upd else None
+                if expires and now <= expires:
                     machine = last["legacy_owner"]
                     short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
                     owner, claim_health = f"{short} (CLAIMS.md)", "LEGACY"
@@ -291,7 +297,8 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             findings.append(Finding("CLOCK_SKEW", "warn", f"{len(future)} event(s) dated in the future from {', '.join(hosts)}",
                                     "check the clock on that host (timedatectl)"))
         if claim_health == "OWNED" and claimants:
-            owner_sid, since = claimants[0]["session"], claimants[0]["at"]
+            owner_sid = claimants[0]["session"]
+            since = claimants[0].get("since") or claimants[0]["at"]
             foreign = [e for e in tev if e["type"] == "touch" and e["payload"].get("tool") in EDIT_TOOLS
                        and e["actor"]["session_id"] != owner_sid and (ts(e["occurred_at"]) or now) >= since]
             if foreign:

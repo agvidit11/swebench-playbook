@@ -284,3 +284,25 @@ class Step13ProjectionTest(ProjectionTest):
                                                  "claims.renewed_at": "2026-10-23T19:00:00+00:00"})
         views = {v.entity_id: v for v in project([gt("t"), claim], [], self.cfg, NOW, claims_healthy=True)}
         self.assertEqual((views["t"].fields["claim_health"], views["t"].fields["owner"]), ("OWNED", "h1·x"))
+
+
+class RenewKeepsForeignEditTest(ProjectionTest):
+    def test_ledger_claim_edit_renew(self):
+        evs = [e("claim", "t", seq=1, at="2026-10-23T17:00:00+00:00"),
+               e("touch", "t", {"tool": "Write"}, session="s9", host="h2", seq=1, at="2026-10-23T18:00:00+00:00"),
+               e("renew", "t", seq=2, at="2026-10-23T19:00:00+00:00")]
+        self.assertIn("NONOWNER_EDIT", [f.code for f in self.view([cm("t")], evs).findings])
+
+    def test_ref_claim_edit_renew(self):
+        claim = Observation("claims", "t", NOW, {"claims.session_id": "s1", "claims.alias": "h1·x",
+                                                 "claims.acquired_at": "2026-10-23T17:00:00+00:00",
+                                                 "claims.renewed_at": "2026-10-23T19:00:00+00:00"})
+        evs = [e("touch", "t", {"tool": "Edit"}, session="s9", host="h2", seq=1, at="2026-10-23T18:00:00+00:00")]
+        views = {v.entity_id: v for v in project([cm("t"), claim], evs, self.cfg, NOW, claims_healthy=True)}
+        self.assertIn("NONOWNER_EDIT", [f.code for f in views["t"].findings])
+
+    def test_legacy_expiry_from_note(self):
+        long = e("note", "t", {"legacy_owner": "host-b", "updated": "2026-10-01", "expires_at": "2026-11-01T00:00:00+00:00"}, seq=1)
+        self.assertEqual(self.view([cm("t")], [long]).fields["claim_health"], "LEGACY")
+        short = e("note", "t", {"legacy_owner": "host-b", "updated": "2026-10-23", "expires_at": "2026-10-23T12:00:00+00:00"}, seq=1)
+        self.assertEqual(self.view([cm("t")], [short]).fields["claim_health"], "FREE")

@@ -225,3 +225,21 @@ class WindowAndRankShapeTest(StatsTest):
         with self.assertRaises(ValueError):
             rank.normalize([{"scope": "x", "win": "y", "other": 1}])   # no metrics
         self.assertFalse(rank.valid_rows([{"scope": "x", "window": "y"}]))
+
+
+class StrictRankValuesTest(unittest.TestCase):
+    def test_rejected_shapes(self):
+        head = "scope,window,metric,value,rank,of\n"
+        for body in ("Org,H2,accepted,1.5,1,2\n", "Org,H2,accepted,x,1,2\n", "  ,H2,accepted,1,1,2\n",
+                     "Org,H2,accepted,0,5,2\n", "Org,H2,accepted,1,1,0\n"):
+            with self.assertRaises(ValueError, msg=body):
+                rank.normalize(rank.parse_table(head + body))
+        for wide in ({"scope": "S", "win": "W", "acc": "1.5", "acc_rank": "1/2"},
+                     {"scope": "S", "win": "W", "acc": "1", "acc_rank": "9/2"},
+                     {"scope": "S", "win": "W", "acc": True, "acc_rank": "1/2"}):
+            with self.assertRaises(ValueError, msg=str(wide)):
+                rank.normalize([wide])
+
+    def test_null_allowed(self):
+        rows = rank.normalize([{"scope": "S", "win": "W", "acc": "0", "acc_rank": None}])
+        self.assertEqual((rows[0]["value"], rows[0]["rank"], rows[0]["of"]), (0, None, None))

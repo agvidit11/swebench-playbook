@@ -1,6 +1,6 @@
 You are reviewing a design doc for a terminal tool. Read tools/board/DESIGN.md (this directory: DESIGN.md) in full.
-Context you may read (read-only): ../../ledger/CLAIMS.md (current free-text claims ledger the tool replaces),
-~/swebench/presubmit.py (gate tool it integrates), ~/swebench/track_tasks.py (task snapshots),
+Context you may read (read-only): the free-text claims ledger the tool replaces (configured path),
+the pre-submit gate it integrates (configured command), the task-snapshot script (configured path),
 `codimango --help` and `codimango task list --json | head -c 3000` for the live server data shape.
 
 Review it wearing ALL of these hats, and label each finding with the hat:

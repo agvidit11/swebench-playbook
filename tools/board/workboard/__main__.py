@@ -304,11 +304,13 @@ def status_checks(cfg) -> list[dict]:
     for repo in cfg.repositories:
         out.append({"name": f"repo {repo.id} at {repo.path}", "ok": Path(repo.path).expanduser().is_dir()})
     settings = Path("~/.claude/settings.json").expanduser()
+    want = {ev: entry["hooks"][0]["command"] for ev, (entry,) in hk._plan(board_path()).items()}
     try:
         data = json.loads(settings.read_text())
         hooks_cfg = data.get("hooks", {}) if isinstance(data, dict) else {}
-        installed = {ev for ev, entries in hooks_cfg.items()
-                     if isinstance(entries, list) and any(hk._ours(e) for e in entries)}
+        installed = {ev for ev, cmd in want.items()
+                     if any(isinstance(h, dict) and h.get("command") == cmd
+                            for e in (hooks_cfg.get(ev) or []) if isinstance(e, dict) for h in e.get("hooks", []))}
         detail = ""
     except (OSError, ValueError) as exc:
         installed, detail = set(), f"settings unreadable: {exc.__class__.__name__}"
@@ -416,7 +418,7 @@ def cmd_release(args, cfg):
         return 2
     res = coord.release(cfg, args.task, args.reason, state_dir=state)
     st = s.sync(cfg, state_dir=state)
-    audit_ok = st.last_push_ok and not st.pending
+    audit_ok = "audit event could not be queued" not in res.detail and st.last_push_ok and not st.pending
     if args.json:
         print(json.dumps(dict(asdict(res), audit_recorded=audit_ok)))
     else:
@@ -727,8 +729,10 @@ def cmd_import_claims(args, cfg):
         print(f"refusing to import: ledger did not sync ({why})", file=sys.stderr)
         return 2
     actor = coord.actor_for(cfg)
+    expires = (snap.now + timedelta(days=args.days)).isoformat(timespec="seconds")
     n = sum(coord.record(state, "note", r["task"], actor, {"legacy_owner": r["machine"], "status": r["status"],
-                                                           "updated": r["updated"], "text": r["note"]}) for r in live)
+                                                           "updated": r["updated"], "text": r["note"],
+                                                           "expires_at": expires}) for r in live)
     st = s.sync(cfg, state_dir=state)
     if n < len(live) or not (st.last_push_ok and not st.pending):
         print(f"imported {n}/{len(live)}, but not all are in the ledger yet ({st.error or 'queued'}); run `workboard sync`",
@@ -773,22 +777,23 @@ def cmd_setup(args, cfg):
         print(f"config error: {exc}", file=sys.stderr)
         return 2
     board = board_path()
-    bindir = Path("~/.local/bin").expanduser()
-    bindir.mkdir(parents=True, exist_ok=True)
-    link = bindir / "board"
-    if link.is_symlink() or not link.exists():
-        if link.is_symlink():
-            link.unlink()
-        link.symlink_to(board)
-        print(f"`board` linked at {link} (make sure ~/.local/bin is on PATH)")
-    skill_dir = Path("~/.claude/skills/workboard").expanduser()
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    skill_link = skill_dir / "SKILL.md"
-    if skill_link.is_symlink() or not skill_link.exists():
-        if skill_link.is_symlink():
-            skill_link.unlink()
-        skill_link.symlink_to(Path(board).parent / "skill" / "SKILL.md")
-        print(f"skill installed at {skill_link}")
+    def link(dest: Path, src: Path, what: str):
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.is_symlink():
+                if Path(os.readlink(dest)) == src:
+                    return
+                dest.unlink()
+            elif dest.exists():
+                problems.append(f"{what}: {dest} exists and is not our link; remove it and re-run setup")
+                return
+            dest.symlink_to(src)
+            print(f"{what} installed at {dest}")
+        except OSError as exc:
+            problems.append(f"{what}: {exc}")
+
+    link(Path("~/.local/bin/board").expanduser(), Path(board), "`board` command (needs ~/.local/bin on PATH)")
+    link(Path("~/.claude/skills/workboard/SKILL.md").expanduser(), Path(board).parent / "skill" / "SKILL.md", "skill")
     try:
         hooks.install(Path("~/.claude/settings.json").expanduser(), board)
         print("hooks installed (backup kept next to ~/.claude/settings.json)")
@@ -796,7 +801,8 @@ def cmd_setup(args, cfg):
         problems.append(f"hooks: {exc}")
     if sh.which("crontab"):
         cur = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout
-        lines = [l for l in cur.splitlines() if not re.search(r"\bboard sync\b", l)]
+        managed = re.compile(r"^\*/2 \* \* \* \* \S*/tools/board/board sync --quiet >/dev/null 2>&1$")
+        lines = [l for l in cur.splitlines() if not managed.match(l.strip())]
         lines.append(cron_line(board))
         r = subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n", text=True, capture_output=True)
         if r.returncode != 0:

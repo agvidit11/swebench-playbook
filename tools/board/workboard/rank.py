@@ -40,7 +40,7 @@ METRICS = set(WIDE.values())
 def _row_ok(r) -> bool:
     if not (isinstance(r, dict) and all(k in r for k in CANON)):
         return False
-    if not (isinstance(r["scope"], str) and r["scope"] and isinstance(r["window"], str) and r["window"]):
+    if not (isinstance(r["scope"], str) and r["scope"].strip() and isinstance(r["window"], str) and r["window"].strip()):
         return False
     if r["metric"] not in METRICS:
         return False
@@ -49,7 +49,7 @@ def _row_ok(r) -> bool:
             return False
     if (r["rank"] is None) != (r["of"] is None):
         return False
-    return r["rank"] is None or 1 <= r["rank"] <= max(r["of"], 1) or r["value"] == 0
+    return r["rank"] is None or (r["of"] >= 1 and 1 <= r["rank"] <= r["of"])
 
 
 def valid_rows(rows) -> bool:
@@ -57,11 +57,21 @@ def valid_rows(rows) -> bool:
     return isinstance(rows, list) and bool(rows) and all(_row_ok(r) for r in rows)
 
 
+class _Bad(Exception):
+    pass
+
+
 def _num(v):
-    try:
-        return int(float(v))
-    except (TypeError, ValueError):
+    """Integer, integer string, or explicit null; anything else is invalid."""
+    if v is None or (isinstance(v, str) and v.strip() == ""):
         return None
+    if isinstance(v, bool):
+        raise _Bad(v)
+    if isinstance(v, int):
+        return v
+    if isinstance(v, str) and v.strip().lstrip("-").isdigit():
+        return int(v.strip())
+    raise _Bad(v)
 
 
 def normalize(rows) -> list[dict]:
@@ -72,8 +82,11 @@ def normalize(rows) -> list[dict]:
     out = []
     for i, r in enumerate(rows):
         if all(k in r for k in CANON):
-            row = {"scope": r["scope"], "window": r["window"], "metric": r["metric"],
-                   "value": _num(r["value"]), "rank": _num(r["rank"]), "of": _num(r["of"])}
+            try:
+                row = {"scope": r["scope"], "window": r["window"], "metric": r["metric"],
+                       "value": _num(r["value"]), "rank": _num(r["rank"]), "of": _num(r["of"])}
+            except _Bad:
+                raise ValueError(f"row {i}: values must be integers or empty") from None
             if not _row_ok(row):
                 raise ValueError(f"row {i}: invalid canonical row")
             out.append(row)
@@ -88,8 +101,11 @@ def normalize(rows) -> list[dict]:
             found = True
             rank_text = str(r.get(f"{short}_rank") or "")
             rk, _, of = rank_text.partition("/")
-            row = {"scope": scope, "window": window, "metric": metric, "value": _num(r.get(short)),
-                   "rank": _num(rk), "of": _num(of)}
+            try:
+                row = {"scope": scope, "window": window, "metric": metric, "value": _num(r.get(short)),
+                       "rank": _num(rk), "of": _num(of)}
+            except _Bad:
+                raise ValueError(f"row {i}: {metric} values must be integers or empty") from None
             if not _row_ok(row):
                 raise ValueError(f"row {i}: invalid {metric} values")
             out.append(row)
