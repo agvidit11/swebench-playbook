@@ -140,6 +140,38 @@ def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.
     return code
 
 
+def record_check(cfg, task: str, *, passed: int, warn: int, fail: int, summary: str = "", state_dir,
+                 actor=None, commit: str | None = None, source: str = "manual") -> tuple[bool, str]:
+    """Record a presubmit result run elsewhere (another session, a batch run). Bound to the task's current commit."""
+    commit = commit or task_head(cfg, task)
+    payload = {"pass": passed, "warn": warn, "fail": max(fail, 0), "parsed": True, "exit": 1 if fail else 0,
+               "summary": summary[:300], "imported_from": source}
+    actor = actor or coord.actor_for(cfg)
+    if not coord.record(state_dir, "check", task, actor, payload, commit=commit):
+        return False, "could not queue the result"
+    return True, commit or "no commit (shows as stale)"
+
+
+def import_dir(cfg, directory: Path, *, state_dir, known: set[str] | None = None, actor=None) -> list[tuple[str, str]]:
+    """Import presubmit outputs: one `<task>.txt` per task containing the gate's summary line."""
+    out = []
+    for f in sorted(Path(directory).expanduser().glob("*.txt")):
+        task = f.stem
+        if known is not None and task not in known:
+            out.append((task, "skipped: unknown task"))
+            continue
+        text = f.read_text(errors="replace")
+        counts = parse_summary(text, cfg.checks.summary_regex)
+        if not counts:
+            out.append((task, "skipped: no summary line"))
+            continue
+        fails = [l.strip() for l in text.splitlines() if "FAIL" in l and "·" not in l][:3]
+        ok, detail = record_check(cfg, task, passed=counts["pass"], warn=counts["warn"], fail=counts["fail"],
+                                  summary="; ".join(fails), state_dir=state_dir, actor=actor, source=f"import {f.name}")
+        out.append((task, f"P{counts['pass']} W{counts['warn']} F{counts['fail']}" if ok else detail))
+    return out
+
+
 def add_review(cfg, task: str, verdict: str, confidence: int | None, note: str, *, state_dir, actor=None) -> tuple[bool, str]:
     if verdict not in VERDICTS:
         return False, f"verdict must be one of {', '.join(VERDICTS)}"

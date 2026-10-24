@@ -18,14 +18,14 @@ from . import tui
 from .render import fmt_age
 from .tui import AMBER, BLUE, BOLD, DIM, GREEN, GREY, PINK, RED, RESET, SPINNER, VIOLET, bg, dwidth, fg, flow
 
-GROUP_KEYS = {"a": "ATTENTION", "r": "READY", "w": "WAITING", "d": "DONE"}
+GROUP_KEYS = {"a": "ATTENTION", "r": "READY", "v": "VALIDATING", "e": "REVIEWING", "d": "DONE"}
 OWNER_FILTERS = ["all", "free", "active", "mine"]
 
 
 @dataclass
 class UIState:
     tab: str = "board"
-    groups: set = field(default_factory=lambda: {"ATTENTION", "READY", "WAITING"})
+    groups: set = field(default_factory=lambda: {"ATTENTION", "READY", "VALIDATING", "REVIEWING"})
     owner: str = "all"
     query: str = ""
     typing: bool = False
@@ -98,7 +98,7 @@ def detail_panel(v, width: int) -> list[str]:
 HELP = [
     f"{BOLD}tabs{RESET}       1 board · 2 stats · ? help · tab cycles",
     f"{BOLD}move{RESET}       ↑/↓ or j/k · g top · G bottom · enter opens details",
-    f"{BOLD}filters{RESET}    a 🔥 needs you · r ✨ ready · w ⏳ waiting · d 🎉 done · f owner: all → free → active → mine",
+    f"{BOLD}filters{RESET}    a 🔥 needs you · r ✨ ready · v ⏳ validating · e 👀 with reviewers · d 🎉 done · f owner: all → free → active → mine",
     f"{BOLD}search{RESET}     / then type part of a task name · enter keeps it · esc clears",
     f"{BOLD}live{RESET}       refreshes on its own (countdown at the bottom) · r refreshes now · ✦ marks rows that changed",
     f"{BOLD}ticks{RESET}      {fg(GREEN)}✓✓{RESET} two agent sessions approved · {fg(AMBER)}✓{RESET} one · {fg(GREY)}↻✓{RESET} approval on an older commit · ▰▰▰▰▱ confidence",

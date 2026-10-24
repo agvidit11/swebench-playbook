@@ -19,8 +19,17 @@ STATE = {
 }
 THRESHOLD_KEY = {"QUEUE": "review", "REVIEW": "review", "NEEDS_REV": "needs_revision"}
 VALID = {"passing": "PASS", "passed": "PASS", "pending": "RUN", "running": "RUN", "failed": "FAIL", "failing": "FAIL"}
-GROUP_ORDER = {"ATTENTION": 0, "READY": 1, "WAITING": 2, "DONE": 3}
+GROUP_ORDER = {"ATTENTION": 0, "READY": 1, "VALIDATING": 2, "REVIEWING": 3, "DONE": 4}
+TAG = {"draft": "Draft", "needs_revision": "Sent back", "needs_reviewers_assigned": "Needs reviewers",
+       "being_reviewed": "In review", "accepted": "Accepted", "used_in_training": "In training", "archived": "Archived"}
+IMPORT_GRACE_S = 15 * 60          # a push newer than the server by less than this is "importing", not drift
+GIT_ONLY_MAX_AGE_S = 14 * 86400   # git-only folders older than this are not tasks (templates, samples)
 SEV_ORDER = {"block": 0, "warn": 1, "info": 2}
+
+
+def fmt_ago(seconds: float) -> str:
+    s = int(max(0, seconds))
+    return f"{s // 60}m" if s < 3600 else f"{s // 3600}h" if s < 86400 else f"{s // 86400}d"
 
 
 def ts(value) -> datetime | None:
@@ -157,16 +166,18 @@ def _next(f, findings):
         return "ATTENTION", "FIX validation"
     if codes & {"HEAD≠SERVER", "STALE_VALID"}:
         return "ATTENTION", "RERUN server"
+    if f.get("sync") == "IMPORTING":
+        return "VALIDATING", "WAIT import"
     if "NONOWNER_EDIT" in codes:
         return "ATTENTION", "RESOLVE ownership"
     if "CLOCK_SKEW" in codes:
         return "ATTENTION", "CHECK clock"
     if "VALID≠SERVER" in codes:
-        return ("WAITING", "WAIT validation") if valid == "RUN" else ("ATTENTION", "RERUN server")
+        return ("VALIDATING", "WAIT validation") if valid == "RUN" else ("ATTENTION", "RERUN server")
     if valid == "RUN":
-        return "WAITING", "WAIT validation"
+        return "VALIDATING", "WAIT validation"
     if state in ("QUEUE", "REVIEW"):
-        return "WAITING", "WAIT reviewer"
+        return "REVIEWING", "WAIT reviewer"
     if state == "NEEDS_REV":
         return "READY", "ADDRESS review"
     if state == "NOT_IMPORTED":
@@ -222,7 +233,17 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         if repo_cfg and repo_cfg.remote_url and "github.com" in repo_cfg.remote_url:
             slug = repo_cfg.remote_url.split("github.com", 1)[1].lstrip(":/").replace("22/", "", 1).removesuffix(".git")
             links["latest"] = f"https://github.com/{slug}/tree/{repo_cfg.branch}/{task}"
+        raw = cm.get("codimango.status")
+        if not cm:
+            ht = ts(g.get("git.task_head_time"))
+            if not ht or (now - ht).total_seconds() > GIT_ONLY_MAX_AGE_S:
+                continue                                   # old git-only folder: template/sample, not a task
         f = {"links": links, "state": state, "track": cm.get("codimango.track") or "",
+             "status_raw": raw or "", "tag": TAG.get(raw, "Not imported" if not cm else str(raw)),
+             "done_kind": ("in_training" if raw == "used_in_training" else "accepted" if raw == "accepted"
+                           else "archived" if raw == "archived" else None),
+             "category": {k: cm.get(f"codimango.{k}") for k in ("category", "subdomain", "usecase", "difficulty",
+                                                                 "languages", "domain")},
              "valid": VALID.get(cm.get("codimango.validation_status"), "UNK" if cm else "—")}
         since = _state_since(state, cm)
         f["state_age_s"] = int((now - since).total_seconds()) if since else None
@@ -253,11 +274,20 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                     f["sync"] = "OK·doc" if changed else "OK"
         elif head_time and seen_time:
             if open_task and head_time > seen_time:
-                f["sync"] = "HEAD≠SERVER"
-                findings.append(Finding("HEAD≠SERVER", "warn", "a newer commit to this task is not on the server yet",
-                                        "codimango task rerun <task> (free), then wait for validation"))
+                lag = (now - head_time).total_seconds()
+                if lag < IMPORT_GRACE_S:
+                    f["sync"] = "IMPORTING"
+                else:
+                    f["sync"] = "HEAD≠SERVER"
+                    findings.append(Finding(
+                        "HEAD≠SERVER", "warn",
+                        f"your commit {head[:8]} ({fmt_ago(lag)} ago) is not on the server; it last imported "
+                        f"{(server_head or server_sha or '')[:8]} from {fmt_ago((now - seen_time).total_seconds())} ago",
+                        "auto-import normally catches up within minutes; if not: codimango task rerun <task>"))
             else:
                 f["sync"] = "OK"
+        f["imported"] = None if f["sync"] in ("UNCHECKED", "—") else f["sync"] not in ("HEAD≠SERVER", "IMPORTING")
+        f["validated"] = None if f["imported"] is None else (f["sync"] in ("OK", "OK·doc") and f["valid"] != "RUN")
         vsha = cm.get("codimango.validation_commit_sha")
         if server_sha and vsha and vsha != server_sha:
             running = f["valid"] == "RUN"

@@ -27,6 +27,8 @@ KEEP = {
     "tbdReviewStatus": "tbr_status", "updatedAt": "updated_at", "githubUrl": "github_url",
     "oraclePassCount": "oracle_pass", "oracleTotalCount": "oracle_total", "avocadoPassCount": "avocado_pass",
     "avocadoTotalCount": "avocado_total", "codexPassCount": "codex_pass", "codexTotalCount": "codex_total",
+    "category": "category", "categorySubdomain": "subdomain", "categoryUsecase": "usecase", "difficulty": "difficulty",
+    "programmingLanguages": "languages",
 }
 
 
@@ -46,6 +48,9 @@ def _snake_validation(details) -> list:
 def normalise(task: dict, *, archived: bool) -> dict:
     row = {snake: task.get(camel) for camel, snake in KEEP.items()}
     row["name"] = task.get("name")
+    dom = task.get("domainContext")
+    if isinstance(dom, list) and dom and isinstance(dom[0], dict):
+        row["domain"] = " / ".join(str(dom[0].get(k)) for k in ("domain", "subCategory") if dom[0].get(k))
     row["validation"] = _snake_validation(task.get("validationDetails"))
     if archived:
         row["status_before_archive"] = row["status"]

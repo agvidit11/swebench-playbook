@@ -27,9 +27,9 @@ class AppUITest(unittest.TestCase, VisualContract):
         st.owner = "free"
         self.assertEqual([v.entity_id for v in app_ui.visible(views, st)], ["openspout-transactional-sheet-replacement",
                                                                            "aato-tag-copy-bulk-retag"])
-        st.owner, st.groups = "all", {"WAITING"}
+        st.owner, st.groups = "all", {"REVIEWING", "VALIDATING"}
         self.assertEqual(len(app_ui.visible(views, st)), 2)
-        st.groups, st.query = {"ATTENTION", "READY", "WAITING"}, "bigtree"
+        st.groups, st.query = {"ATTENTION", "READY", "VALIDATING", "REVIEWING"}, "bigtree"
         self.assertEqual(app_ui.visible(views, st), [])
         st.query, st.owner = "", "mine"
         self.assertEqual([v.entity_id for v in app_ui.visible(views, st, "23237")], ["removestar-star-import-binding-fidelity"])

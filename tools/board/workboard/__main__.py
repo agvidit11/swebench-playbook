@@ -542,9 +542,23 @@ def cmd_install_hooks(args, cfg):
 
 def cmd_check(args, cfg):
     from . import checks, sync as s
+    from .completion import task_names
     state = s.default_state_dir()
-    code = checks.run_check(cfg, args.task, state_dir=state)
-    s.sync(cfg, state_dir=state, timeout_seconds=10)
+    if args.action == "run":
+        code = checks.run_check(cfg, args.target, state_dir=state)
+    elif args.action == "record":
+        ok, detail = checks.record_check(cfg, args.target, passed=args.passed, warn=args.warn, fail=args.fail,
+                                         summary=args.summary or "", state_dir=state)
+        print(f"recorded on {detail[:8]}" if ok else f"not recorded: {detail}")
+        code = 0 if ok else 2
+    else:
+        known = set(task_names())
+        for task, result in checks.import_dir(cfg, Path(args.target), state_dir=state, known=known or None):
+            print(f"  {task:<50} {result}")
+        code = 0
+    st = s.sync(cfg, state_dir=state, timeout_seconds=15)
+    if args.action != "run" and not (st.last_push_ok and not st.pending):
+        print("results queued locally; run `workboard sync` to publish them", file=sys.stderr)
     return code
 
 
@@ -988,7 +1002,7 @@ def build_parser():
     hp.add_argument("--out", default="~/.cache/workboard/board.html")
     sv = sub.add_parser("serve", help="serve the live HTML dashboard on localhost")
     sv.add_argument("--port", type=int, default=8765)
-    sv.add_argument("--interval", type=int, default=120)
+    sv.add_argument("--interval", type=int, default=60)
     s = sub.add_parser("show", parents=[common], help="one task in full")
     s.add_argument("task")
     s.add_argument("--no-reviews", action="store_true", help="skip fetching human reviews")
@@ -1016,8 +1030,12 @@ def build_parser():
     rk.add_argument("action", choices=["show", "import"], nargs="?", default="show")
     rk.add_argument("file", nargs="?")
     ck = sub.add_parser("check", help="run the pre-submit gate and record its result")
-    ck.add_argument("action", choices=["run"])
-    ck.add_argument("task")
+    ck.add_argument("action", choices=["run", "record", "import"])
+    ck.add_argument("target", help="task name (run/record) or a directory of <task>.txt outputs (import)")
+    ck.add_argument("--pass", dest="passed", type=int, default=0)
+    ck.add_argument("--warn", type=int, default=0)
+    ck.add_argument("--fail", type=int, default=0)
+    ck.add_argument("--summary", default="")
     rv = sub.add_parser("review", parents=[common], help="add or list agent-session reviews")
     rv.add_argument("action", choices=["add", "list"])
     rv.add_argument("task")
@@ -1067,7 +1085,11 @@ def cmd_html(args, cfg):
 def cmd_serve(args, cfg):
     from . import html
     from .app import gather
-    srv = html.serve(lambda: gather(cfg), cfg, port=args.port, interval=args.interval)
+    def fresh():
+        snap = gather(cfg, do_sync=False)
+        return snap
+    cfg.codimango.cache_ttl_seconds = min(cfg.codimango.cache_ttl_seconds, 60)   # the page should never lag
+    srv = html.serve(fresh, cfg, port=args.port, interval=args.interval)
     print(f"🧭 workboard live at http://localhost:{args.port}/  (VS Code forwards the port; Ctrl-C to stop)")
     try:
         srv.serve_forever()

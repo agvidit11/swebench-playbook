@@ -43,9 +43,9 @@ def realistic():
         tv("trickster-authoritative-refresh-reconciliation", "READY", next="GET R2", review="R~", confidence_stale=True,
            check_stale=True),
         tv("hello-world", "READY", next="IMPORT task", state="NOT_IMPORTED", valid="—", sync="—", state_age_s=None),
-        tv("aato-tag-copy-bulk-retag", "WAITING", next="WAIT reviewer", state="REVIEW", claim_health="EXPIRED",
+        tv("aato-tag-copy-bulk-retag", "REVIEWING", next="WAIT reviewer", state="REVIEW", claim_health="EXPIRED",
            owner="23237·harness loop"),
-        tv("removestar-star-import-binding-fidelity", "WAITING", next="WAIT validation", valid="RUN",
+        tv("removestar-star-import-binding-fidelity", "VALIDATING", next="WAIT validation", valid="RUN",
            owner="23237·agvidit (shell)", sync="HEAD≠SERVER"),
         tv("done-one", "DONE", next="—", state="ACCEPTED"),
     ]

@@ -7,7 +7,7 @@ import textwrap
 from dataclasses import dataclass
 from datetime import datetime
 
-GROUPS = ("ATTENTION", "READY", "WAITING")
+GROUPS = ("ATTENTION", "READY", "VALIDATING", "REVIEWING")
 COMPACT = ["task", "next", "state", "owner", "valid", "review", "sync"]
 WIDE_EXTRA = ["round", "pushes", "check", "track"]
 DROP_ORDER = ["track", "round", "check", "pushes", "sync", "review", "valid", "owner", "state"]  # never "task"/"next"

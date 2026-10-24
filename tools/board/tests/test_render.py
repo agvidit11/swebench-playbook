@@ -25,11 +25,11 @@ class RenderTest(unittest.TestCase):
         return render._render_list(views, health, now=NOW, width=width, style=style, wide=wide, **kw)
 
     def test_groups_in_order_and_done_collapsed(self):
-        views = [tv("a", "WAITING", "WAIT reviewer"), tv("b", "ATTENTION", "FIX validation", valid="FAIL"),
+        views = [tv("a", "REVIEWING", "WAIT reviewer"), tv("b", "ATTENTION", "FIX validation", valid="FAIL"),
                  tv("c", "DONE", "—", state="ACCEPTED"), tv("d")]
         text = self.out(views)
         self.assertLess(text.index("ATTENTION"), text.index("READY"))
-        self.assertLess(text.index("READY"), text.index("WAITING"))
+        self.assertLess(text.index("READY"), text.index("REVIEWING"))
         self.assertIn("Done: 1 (use --all)", text)
         self.assertNotIn(" c ", text)
 
@@ -67,7 +67,7 @@ class RenderTest(unittest.TestCase):
                 self.assertLessEqual(len(line), width, f"owner {width}: {line!r}")
 
     def test_group_by_state(self):
-        text = self.out([tv("a", state="DRAFT"), tv("b", state="REVIEW", group="WAITING")], group="state")
+        text = self.out([tv("a", state="DRAFT"), tv("b", state="REVIEW", group="REVIEWING")], group="state")
         self.assertIn("DRAFT (1)", text)
         self.assertIn("REVIEW (1)", text)
 

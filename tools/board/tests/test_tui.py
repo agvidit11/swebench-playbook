@@ -33,7 +33,7 @@ class TuiTest(unittest.TestCase):
         self.views = [tv("sbdiff-unified-patch-squash", "ATTENTION", next="RERUN server", sync="STALE_VALID", review="R~"),
                       tv("pgmem-null-aggregate-conformance", "ATTENTION", next="FIX validation", valid="FAIL",
                          claim_health="FREE", owner=""),
-                      tv("aato-tag-copy-bulk-retag", "WAITING", next="WAIT reviewer", review="R1", confidence=3),
+                      tv("aato-tag-copy-bulk-retag", "REVIEWING", next="WAIT reviewer", review="R1", confidence=3),
                       tv("a" * 70, "READY"), tv("done-task", "DONE", next="—", state="ACCEPTED")]
 
     def table_lines(self, text):

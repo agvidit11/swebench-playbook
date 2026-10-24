@@ -150,3 +150,31 @@ class ChecksTest(unittest.TestCase):
         self.assertTrue(ok)
         ev = self.spool()[-1]
         self.assertEqual((ev["type"], ev["commit"], ev["payload"]["confidence"]), ("review", HEAD, 4))
+
+
+class RecordImportTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.dir = Path(td.name)
+        self.cfg = load_config(Path("/nonexistent"))
+        p = mock.patch.object(checks, "task_head", return_value=HEAD)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_record_and_import(self):
+        ok, commit = checks.record_check(self.cfg, "alpha", passed=20, warn=1, fail=0, summary="clean",
+                                         state_dir=self.dir / "s", actor=ACTOR)
+        self.assertTrue(ok)
+        runs = self.dir / "runs"
+        runs.mkdir()
+        (runs / "alpha.txt").write_text("  FAIL stage x: pending\n  1 FAIL · 2 WARN · 21 PASS\n")
+        (runs / "beta.txt").write_text("no summary here\n")
+        (runs / "ghost.txt").write_text("0 FAIL · 0 WARN · 1 PASS\n")
+        res = dict(checks.import_dir(self.cfg, runs, state_dir=self.dir / "s", known={"alpha", "beta"}, actor=ACTOR))
+        self.assertEqual(res["alpha"], "P21 W2 F1")
+        self.assertIn("no summary", res["beta"])
+        self.assertIn("unknown", res["ghost"])
+        evs = [json.loads(l) for l in (self.dir / "s" / events.SPOOL_NAME).read_text().splitlines()]
+        self.assertEqual([e["payload"].get("imported_from", "")[:6] for e in evs], ["manual", "import"])
+        self.assertEqual(evs[-1]["payload"]["summary"], "FAIL stage x: pending")

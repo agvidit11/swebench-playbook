@@ -13,6 +13,14 @@ attempts the atomic claim, so there is a short window before ownership is real �
 `board claim <task>` when it matters. Edits to a task another live session owns are blocked
 ("owned by … — run: workboard show <task>").
 
+**Shared routine for every session (this keeps both servers in sync and avoids overlap):**
+1. Before picking work: `board available` and `board show <task>` (owner, next steps, last review).
+2. Starting a NEW task: `board claim <slug>` *before* scaffolding, even if it isn't in codimango yet — the slug then
+   shows as yours on every server, so no one builds the same idea. Also add your CLAIMS.md row as usual.
+3. Presubmit: `board check run <task>`; if you ran the gate yourself, `board check record <task> --pass N --warn N
+   --fail N --summary "..."`; for a batch, `board check import <dir>` (one `<task>.txt` per task).
+4. Done or handing over: `board release <task> --reason "..."`.
+
 **After reviewing a task (the one manual step):**
 `board review add <task> --verdict ready|changes|comment --confidence 1-5 --note "<one line>"`
 R2 = two different sessions said ready on the same commit. A new push turns reviews into R~.

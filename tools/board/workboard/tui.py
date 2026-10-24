@@ -38,7 +38,8 @@ BOLD, DIM, ITALIC = "\x1b[1m", "\x1b[2m", "\x1b[3m"
 # palette (256-colour; readable on dark and light backgrounds)
 GREEN, AMBER, RED, BLUE, VIOLET, GREY, PINK, TEAL = 114, 221, 203, 111, 141, 245, 211, 80
 GROUP = {"ATTENTION": (RED, "🔥", "needs you"), "READY": (GREEN, "✨", "ready to act"),
-         "WAITING": (BLUE, "⏳", "waiting"), "DONE": (GREY, "🎉", "done")}
+         "VALIDATING": (BLUE, "⏳", "validating"), "REVIEWING": (VIOLET, "👀", "with reviewers"),
+         "DONE": (GREY, "🎉", "done")}
 PILL = {"DRAFT": (179, 16), "QUEUE": (110, 16), "REVIEW": (75, 16), "NEEDS_REV": (209, 16),
         "ACCEPTED": (114, 16), "ARCHIVED": (244, 16), "NOT_IMPORTED": (240, 255)}
 NEXT_EMOJI = {"FIX": "🔧", "RESOLVE": "🤺", "RERUN": "🔁", "SUBMIT": "🚀", "GET": "👀", "RUN": "🧪",
@@ -237,13 +238,13 @@ def render(snap, cfg, *, width=None, changed: set | None = None, show_all=False,
     total = max(1, sum(counts.values()))
     bar_w = max(10, width - 4)
     segs, used = [], 0
-    for g in ("ATTENTION", "READY", "WAITING", "DONE"):
+    for g in ("ATTENTION", "READY", "VALIDATING", "REVIEWING", "DONE"):
         w = round(bar_w * counts[g] / total) if g != "DONE" else bar_w - used
         used += w
         segs.append(f"{fg(GROUP[g][0])}{'━' * max(0, w)}{RESET}")
     out.append("  " + "".join(segs))
     out += flow([f"{fg(GROUP[g][0])}●{RESET} {GROUP[g][1]} {GROUP[g][2]} {BOLD}{counts[g]}{RESET}"
-                 for g in ("ATTENTION", "READY", "WAITING", "DONE")], width)
+                 for g in ("ATTENTION", "READY", "VALIDATING", "REVIEWING", "DONE")], width)
     health = []
     for name, h in snap.health.items():
         health.append(f"{fg(GREEN)}✔{RESET} {name}" if h.ok else f"{fg(RED)}✘ {name}{RESET}")
