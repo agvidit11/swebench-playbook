@@ -162,6 +162,24 @@ def sync(cfg, *, host_id: str | None = None, state_dir: Path | None = None, time
         lock.close()
 
 
+AUTO_CLAIM = [True]
+
+
+def _touched(lines: list[bytes]) -> list[tuple[str, dict]]:
+    seen, out = set(), []
+    for raw in lines:
+        try:
+            ev = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(ev, dict) and ev.get("type") == "touch" and isinstance(ev.get("entity"), dict):
+            key = (ev["entity"].get("id"), ev.get("actor", {}).get("session_id"))
+            if key not in seen and key[0] and key[1] and ev["actor"].get("kind") != "human":
+                seen.add(key)
+                out.append((key[0], ev["actor"]))
+    return out
+
+
 def _stamp_lines(lines: list[bytes], host_id: str, seq: int) -> list[str]:
     out = []
     for raw in lines:
@@ -222,8 +240,16 @@ def _sync_locked(cfg, host_id, state_dir, dl: Deadline, retries) -> SyncState:
             return st
         p = _push(led, branch, dl.left())
         if p.returncode == 0:
+            touched = _touched(lines)
             _ack_spool(state_dir, len(lines))
-            st.last_push_ok, st.error = True, ""
+            if touched and getattr(cfg.claims, "mode", "atomic") == "atomic" and AUTO_CLAIM[0]:
+                try:
+                    from .coord import auto_claims
+                    auto_claims(cfg, state_dir, touched)
+                except Exception as exc:          # claims must never break event delivery
+                    st.error = f"auto-claim: {exc}"
+            st.last_push_ok = True
+            st.error = st.error if st.error.startswith("auto-claim") else ""
             st.pending = len(_spool_lines(state_dir))
             return st
         st.error = f"push failed: {gitutil.err(p)}"

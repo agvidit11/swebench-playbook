@@ -13,6 +13,8 @@ def spool_some(spool, n, tag="t"):
 
 class SyncTest(unittest.TestCase):
     def setUp(self):
+        sync.AUTO_CLAIM[0] = False                       # transport tests only; auto-claim tested in test_claim_cli
+        self.addCleanup(lambda: sync.AUTO_CLAIM.__setitem__(0, True))
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         self.tmp = Path(td.name)
         self.remote = bare_remote(self.tmp)

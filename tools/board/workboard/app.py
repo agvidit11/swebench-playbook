@@ -13,6 +13,7 @@ from .model import SourceHealth
 from .projection import project
 from .sources.codimango import CodimangoSource
 from .model import Observation
+from .sources.claimrefs import ClaimRefSource
 from .sources.gitsrc import GitSource, changed_files
 
 GIT_STAMP = "git-last-fetch"
@@ -95,10 +96,18 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
     if cfg.ledger.remote:
         sync_state = sync_mod.sync(cfg, state_dir=state_dir, timeout_seconds=sync_timeout) if do_sync \
             else sync_mod.load_state(state_dir)
+    claims_healthy = False
+    if cfg.ledger.remote and cfg.claims.mode == "atomic":
+        cres = ClaimRefSource(cfg, state_dir=state_dir).fetch()
+        health["claims"] = cres.health
+        findings += cres.findings
+        claim_obs = [o for o in cres.observations if o.entity_id in {x.entity_id for x in cm.observations}]
+        obs += claim_obs
+        claims_healthy = cres.health.ok
     evs, ev_findings = events.read_events(ledger_event_files(cfg))
     known = {e["event_id"] for e in evs}
     evs += [e for e in pending_spool_events(state_dir, sync_mod.safe_host(sync_mod.host_id_for(cfg)))
             if e["event_id"] not in known]
     findings += ev_findings
-    views = project(obs, evs, cfg, now)
+    views = project(obs, evs, cfg, now, claims_healthy=claims_healthy)
     return Snapshot(views, obs, evs, health, findings, sync_state, now)

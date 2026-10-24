@@ -177,7 +177,16 @@ def _next(f, findings):
     return "READY", "SUBMIT"
 
 
-def project(observations, evs, cfg, now) -> list[TaskView]:
+def _ref_claim(g_claims: dict, cfg, now):
+    """Owner from the authoritative claim ref fields (claims.*)."""
+    renewed = ts(g_claims.get("claims.renewed_at"))
+    alias = g_claims.get("claims.alias", "")
+    if renewed and now - renewed > timedelta(hours=cfg.claims.expire_after_hours):
+        return alias, "EXPIRED", g_claims.get("claims.session_id"), renewed
+    return alias, "OWNED", g_claims.get("claims.session_id"), renewed
+
+
+def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> list[TaskView]:
     by_task, repos = _merge(observations)
     aliases = ev_mod.latest_aliases(evs)
     per_task_events: dict[str, list] = {}
@@ -243,7 +252,17 @@ def project(observations, evs, cfg, now) -> list[TaskView]:
         f["check"], f["check_stale"], check_payload = _check(tev, current)
         f["check_fail"] = bool(check_payload and check_payload.get("fail"))
 
-        owner, claim_health, claimants = _claims(tev, cfg, now, aliases)
+        refc = {k: v for k, v in fields.items() if k.startswith("claims.")}
+        if claims_healthy:
+            if refc:
+                owner, claim_health, owner_sid, since = _ref_claim(refc, cfg, now)
+                claimants = [{"session": owner_sid, "at": since or now, "alias": owner}]
+            else:
+                owner, claim_health, claimants = "", "FREE", []
+            f["claim_source"] = "ref"
+        else:
+            owner, claim_health, claimants = _claims(tev, cfg, now, aliases)
+            f["claim_source"] = "ledger (advisory)"
         if state in ("ACCEPTED", "ARCHIVED"):
             owner, claim_health = "", "DONE"
         f["owner"], f["claim_health"] = owner, claim_health
@@ -256,7 +275,7 @@ def project(observations, evs, cfg, now) -> list[TaskView]:
             hosts = sorted({e["host_id"] for e in future})
             findings.append(Finding("CLOCK_SKEW", "warn", f"{len(future)} event(s) dated in the future from {', '.join(hosts)}",
                                     "check the clock on that host (timedatectl)"))
-        if claim_health == "OWNED":
+        if claim_health == "OWNED" and claimants:
             owner_sid, since = claimants[0]["session"], claimants[0]["at"]
             foreign = [e for e in tev if e["type"] == "touch" and e.get("commit") and e["actor"]["session_id"] != owner_sid
                        and (ts(e["occurred_at"]) or now) >= since]

@@ -331,6 +331,58 @@ def cmd_status(args, cfg):
     return 1 if args.strict and _unhealthy(snap) else 0
 
 
+def _resolve_session(snap, fragment):
+    from . import events as ev
+    aliases = ev.latest_aliases(snap.events)
+    hits = {sid: a for sid, a in aliases.items() if fragment.lower() in a.lower()}
+    if len(hits) == 1:
+        sid, alias = next(iter(hits.items()))
+        host = alias.split("·", 1)[0]
+        return {"session_id": sid, "alias": alias, "kind": "claude", "host": host}
+    if not hits:
+        sys.exit(f"no known session matches {fragment!r} (sessions appear once they have run with the hooks)")
+    sys.exit(f"ambiguous session {fragment!r}: " + ", ".join(sorted(hits.values())[:6]))
+
+
+def cmd_claim(args, cfg):
+    from . import coord, sync as s
+    state = s.default_state_dir()
+    ok, err = coord.ledger_fresh(cfg, state)
+    if not ok:
+        print(f"refusing to claim: ledger did not sync ({err})", file=sys.stderr)
+        return 2
+    snap = _gather(args, cfg)
+    task = _find(snap, args.task).entity_id
+    to_actor = _resolve_session(snap, args.to) if args.to else None
+    res = coord.claim(cfg, task, state_dir=state, to_actor=to_actor, steal=args.steal)
+    s.sync(cfg, state_dir=state)
+    if args.json:
+        print(json.dumps(asdict(res)))
+    elif res.status == "ACQUIRED":
+        print(f"claimed {task} for {(to_actor or res.owner).get('alias')}")
+    elif res.status == "LOST":
+        print(f"{task} is already owned by {res.owner.get('alias')} (since {res.owner.get('acquired_at')})")
+    else:
+        print(f"{res.status}: {res.detail}")
+    return 0 if res.status == "ACQUIRED" else 1
+
+
+def cmd_release(args, cfg):
+    from . import coord, sync as s
+    state = s.default_state_dir()
+    ok, err = coord.ledger_fresh(cfg, state)
+    if not ok:
+        print(f"refusing to release: ledger did not sync ({err})", file=sys.stderr)
+        return 2
+    res = coord.release(cfg, args.task, args.reason, state_dir=state)
+    s.sync(cfg, state_dir=state)
+    if args.json:
+        print(json.dumps(asdict(res)))
+    else:
+        print(f"{res.status}: {args.task} {res.detail}")
+    return 0 if res.status == "RELEASED" else 1
+
+
 def cmd_legend(args, cfg):
     text = render.legend(set(), _style(args, cfg), everything=True, width=_width(args))
     print(json.dumps({"legend": text.splitlines()}) if args.json else text)
@@ -403,6 +455,13 @@ def build_parser():
     c.add_argument("--since", help="ledger events in a window instead, e.g. 2h")
     sub.add_parser("status", parents=[common], help="health of sources, ledger, config, hooks")
     sub.add_parser("legend", parents=[common], help="every symbol explained")
+    cl = sub.add_parser("claim", parents=[common], help="claim a task (atomic), or assign it with --to")
+    cl.add_argument("task")
+    cl.add_argument("--to", help="assign to the session whose tab title contains this text")
+    cl.add_argument("--steal", action="store_true", help="take over an expired claim")
+    rl = sub.add_parser("release", parents=[common], help="give a task up")
+    rl.add_argument("task")
+    rl.add_argument("--reason", required=True)
     cf = sub.add_parser("config", parents=[common], help="show or validate config")
     cf.add_argument("action", choices=["show", "validate"], nargs="?", default="show")
     pl = sub.add_parser("plugins", parents=[common], help="list loaded plugins")
@@ -412,7 +471,7 @@ def build_parser():
 
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
-            "plugins": cmd_plugins}
+            "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release}
 
 
 def main(argv=None) -> int:
