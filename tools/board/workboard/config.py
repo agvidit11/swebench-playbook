@@ -28,6 +28,7 @@ class UI:
     color: str = "auto"          # auto | always | never
     unicode: str = "auto"        # auto | always | never
     default_group: str = "attention"
+    style: str = "pretty"        # pretty (boxed, emoji, live-ready) | classic (compact words); plain/pipes use classic
 
 
 @dataclass

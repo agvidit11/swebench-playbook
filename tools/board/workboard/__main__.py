@@ -34,6 +34,27 @@ def _width(args):
     return args.width or shutil.get_terminal_size((120, 40)).columns
 
 
+def app_cache():
+    from .app import cache_dir
+    return cache_dir()
+
+
+def _pretty(args, cfg) -> bool:
+    if getattr(args, "classic", False) or args.plain or cfg.ui.style != "pretty":
+        return False
+    st = _style(args, cfg)
+    return st.color and st.unicode and getattr(args, "group", "attention") == "attention" and not getattr(args, "wide", False)
+
+
+def cmd_watch(args, cfg):
+    from . import tui
+    from .app import gather
+    if not sys.stdout.isatty():
+        print("board watch needs an interactive terminal; use `board` for a one-off view", file=sys.stderr)
+        return 2
+    return tui.watch(lambda: gather(cfg), cfg, interval=args.interval)
+
+
 def _gather(args, cfg):
     from .app import gather
     return gather(cfg, refresh=args.refresh, do_sync=not args.no_sync)
@@ -102,6 +123,14 @@ def cmd_list(args, cfg):
         views = [v for v in views if v.fields.get("owner", "").startswith(me) or v.fields.get("claim_health") == "FREE"]
     if args.json:
         print(json.dumps(_envelope(snap, [_view_json(v) for v in views]), default=str, indent=1))
+    elif _pretty(args, cfg):
+        from . import tui
+        try:
+            prev = json.loads((app_cache() / LAST_LOOK).read_text())["tasks"]
+        except (OSError, ValueError, KeyError):
+            prev = None
+        snap.views = views
+        print(tui.render(snap, cfg, width=_width(args), changed=tui._changed_since(prev, snap), show_all=args.all))
     else:
         warnings = [f.summary for f in snap.findings if f.code not in ("SYNC_FAILED",)] + cfg.warnings
         color = "never" if args.plain else (args.color or cfg.ui.color)
@@ -668,6 +697,11 @@ def cmd_stats(args, cfg):
         return _emit(args, snap, stats_data(snap, cfg, weeks=args.weeks, start=start, end=end, shown_to=shown_to,
                                             quality=quality, rank_data=rank_data, per_repo=per_repo))
     style = _style(args, cfg)
+    if _pretty(args, cfg):
+        from . import tui
+        print(tui.render_stats(snap, cfg, width=_width(args), weeks=args.weeks, start=start, end=end,
+                               rank_data=rank_data, per_repo=per_repo, quality=quality))
+        return 1 if args.strict and _unhealthy(snap) else 0
     return _emit(args, snap, human=render_stats(snap, cfg, weeks=args.weeks, width=_width(args), uni=style.unicode,
                                                 quality=quality, rank_data=rank_data, start=start, end=end,
                                                 shown_to=shown_to, per_repo=per_repo))
@@ -798,6 +832,26 @@ def cmd_setup(args, cfg):
 
     link(Path("~/.local/bin/board").expanduser(), Path(board), "`board` command (needs ~/.local/bin on PATH)")
     link(Path("~/.claude/skills/workboard/SKILL.md").expanduser(), Path(board).parent / "skill" / "SKILL.md", "skill")
+    link(Path("~/.claude/commands/board.md").expanduser(), Path(board).parent / "skill" / "board-command.md",
+         "/board slash command")
+    try:
+        from . import completion
+        comp_dir = Path("~/.local/share/workboard").expanduser()
+        comp_dir.mkdir(parents=True, exist_ok=True)
+        (comp_dir / "completion.bash").write_text(completion.BASH)
+        (comp_dir / "completion.zsh").write_text(completion.ZSH)
+        for rc, f in (("~/.bashrc", "completion.bash"), ("~/.zshrc", "completion.zsh")):
+            rcp = Path(rc).expanduser()
+            if rc.endswith("zshrc") and not rcp.exists():
+                continue
+            line = f'[ -f "$HOME/.local/share/workboard/{f}" ] && . "$HOME/.local/share/workboard/{f}"  # workboard'
+            text = rcp.read_text() if rcp.exists() else ""
+            if "# workboard" not in text:
+                with open(rcp, "a") as fh:
+                    fh.write(("\n" if text and not text.endswith("\n") else "") + line + "\n")
+        print("tab completion installed (open a new shell, or: source ~/.bashrc)")
+    except OSError as exc:
+        problems.append(f"completion: {exc}")
     try:
         hooks.install(Path("~/.claude/settings.json").expanduser(), board)
         print("hooks installed (backup kept next to ~/.claude/settings.json)")
@@ -891,6 +945,9 @@ def build_parser():
     lp.add_argument("--all", action="store_true", help="include done tasks")
     lp.add_argument("--mine", action="store_true", help="only tasks owned on this host, or free")
     lp.add_argument("--group", choices=["attention", "state", "owner"], default="attention")
+    lp.add_argument("--classic", action="store_true", help="compact word-based table instead of the pretty view")
+    wt = sub.add_parser("watch", parents=[common], help="live board: refreshes itself, ✦ marks changes (q quits)")
+    wt.add_argument("--interval", type=int, default=120, help="seconds between refreshes")
     s = sub.add_parser("show", parents=[common], help="one task in full")
     s.add_argument("task")
     s.add_argument("--no-reviews", action="store_true", help="skip fetching human reviews")
@@ -913,6 +970,7 @@ def build_parser():
     stp.add_argument("--from", dest="from_", help="first day, e.g. 2026-10-01 (your timezone)")
     stp.add_argument("--to", help="last day, inclusive")
     stp.add_argument("--quality", action="store_true", help="fetch human review history (cached) for revision stats")
+    stp.add_argument("--classic", action="store_true", help="plain sections with full definitions")
     rk = sub.add_parser("rank", parents=[common], help="your rank on track/team/org (saved DaiQuery query)")
     rk.add_argument("action", choices=["show", "import"], nargs="?", default="show")
     rk.add_argument("file", nargs="?")
@@ -931,6 +989,8 @@ def build_parser():
     ic.add_argument("--dry-run", action="store_true")
     su = sub.add_parser("setup", help="set up this server (config from ledger, hooks, cron, probe, first sync)")
     su.add_argument("--ledger", help="private ledger git url holding config/workboard.toml")
+    cp = sub.add_parser("completion", help="print shell completion script (bash or zsh)")
+    cp.add_argument("shell", choices=["bash", "zsh"], nargs="?", default="bash")
     hk = sub.add_parser("hook", help="(internal) Claude Code hook entry point")
     hk.add_argument("kind", choices=["session-start", "pre-tool", "post-tool"])
     sy = sub.add_parser("sync", parents=[common], help="push queued events and refresh claim data")
@@ -949,15 +1009,31 @@ def build_parser():
     return p
 
 
+def cmd_completion(args, cfg):
+    from . import completion
+    print(completion.ZSH if args.shell == "zsh" else completion.BASH, end="")
+    return 0
+
+
+COMMANDS_EXTRA = {"watch": cmd_watch}
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
             "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release, "hook": cmd_hook,
             "sync": cmd_sync, "install-hooks": cmd_install_hooks, "check": cmd_check, "review": cmd_review,
-            "stats": cmd_stats, "rank": cmd_rank, "import-claims": cmd_import_claims, "setup": cmd_setup}
+            "stats": cmd_stats, "rank": cmd_rank, "import-claims": cmd_import_claims, "setup": cmd_setup,
+            "completion": cmd_completion, **COMMANDS_EXTRA}
 
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["__complete"]:                     # shell completion fast path: no config, no network
+        from . import completion
+        try:
+            cword, words = int(argv[1]), argv[2:]
+            print("\n".join(completion.candidates(build_parser(), words, cword)))
+        except Exception:
+            pass
+        return 0
     if not argv or argv[0].startswith("-") and argv[0] not in ("-h", "--help", "--version"):
         argv = ["list", *argv]
     if argv[:1] == ["hook"]:
