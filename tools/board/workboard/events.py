@@ -5,9 +5,11 @@ host's event file in the ledger repo, assigning host_id + seq. Readers never tru
 """
 from __future__ import annotations
 
+import errno
 import fcntl
 import json
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,64 +47,161 @@ def new_event(type: str, entity_id: str | None, payload: dict, *, actor: dict, c
     }
 
 
-def spool_append(spool_dir: Path, event: dict, *, max_line: int = MAX_LINE, max_queue: int = MAX_QUEUE) -> bool:
-    """Append one event line under flock. Never raises: returns False if the event was not recorded."""
+def stamp(event: dict, host_id: str, seq: int) -> dict:
+    """Fields the sync worker adds when moving a spool line into the host's ledger file."""
+    out = dict(event)
+    out.update(host_id=host_id, seq=seq, recorded_at=utcnow())
+    return out
+
+
+def _write_all(fd: int, data: bytes, write=os.write) -> None:
+    view = memoryview(data)
+    while view:
+        try:
+            n = write(fd, view)
+        except InterruptedError:
+            continue
+        if n <= 0:
+            raise OSError(errno.EIO, "short write")
+        view = view[n:]
+
+
+def _queued_records(fd: int) -> int:
+    count, tail = 0, False
+    os.lseek(fd, 0, os.SEEK_SET)
+    while True:
+        chunk = os.read(fd, 65536)
+        if not chunk:
+            break
+        count += chunk.count(b"\n")
+        tail = not chunk.endswith(b"\n")
+    return count + (1 if tail else 0)
+
+
+def spool_append(spool_dir: Path, event: dict, *, max_line: int = MAX_LINE, max_queue: int = MAX_QUEUE,
+                 _write=os.write) -> bool:
+    """Append one complete event line under flock. Never raises; False means the event was not recorded."""
     try:
-        line = json.dumps(event, separators=(",", ":"), ensure_ascii=False) + "\n"
-        data = line.encode("utf-8")
+        data = (json.dumps(event, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
         if len(data) > max_line:
             return False
         spool_dir.mkdir(parents=True, exist_ok=True)
-        path = spool_dir / SPOOL_NAME
-        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            if max_queue and os.fstat(fd).st_size > max_queue * max_line:
-                return False
-            os.write(fd, data)
-            return True
-        finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
+        fd = os.open(spool_dir / SPOOL_NAME, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o600)
     except Exception:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        if max_queue and _queued_records(fd) >= max_queue:
+            return False
+        start = os.fstat(fd).st_size
+        try:
+            _write_all(fd, data, _write)
+        except Exception:
+            try:
+                os.ftruncate(fd, start)   # never leave a partial line behind
+            except OSError:
+                pass
+            return False
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_SHA = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _aware(ts) -> bool:
+    if not isinstance(ts, str):
+        return False
+    try:
+        return datetime.fromisoformat(ts).tzinfo is not None
+    except ValueError:
         return False
 
 
-def _valid(ev) -> bool:
-    return (
-        isinstance(ev, dict)
-        and ev.get("schema_version") == SCHEMA_VERSION
-        and isinstance(ev.get("event_id"), str)
-        and ev.get("type") in EVENT_TYPES
-        and isinstance(ev.get("actor"), dict)
-    )
+def validate_committed(ev) -> str | None:
+    """None if ev is a well-formed committed ledger event, else the reason it is not."""
+    if not isinstance(ev, dict):
+        return "not an object"
+    if ev.get("schema_version") != SCHEMA_VERSION:
+        return "schema_version"
+    if not (isinstance(ev.get("event_id"), str) and _UUID.match(ev["event_id"])):
+        return "event_id"
+    if not (isinstance(ev.get("host_id"), str) and ev["host_id"]):
+        return "host_id"
+    seq = ev.get("seq")
+    if not (isinstance(seq, int) and not isinstance(seq, bool) and seq >= 0):
+        return "seq"
+    if not (_aware(ev.get("occurred_at")) and _aware(ev.get("recorded_at"))):
+        return "timestamps"
+    if ev.get("type") not in EVENT_TYPES:
+        return "type"
+    actor = ev.get("actor")
+    if not (isinstance(actor, dict) and all(isinstance(actor.get(k, ""), str) for k in ("session_id", "alias", "kind"))):
+        return "actor"
+    ent = ev.get("entity")
+    if ent is not None and not (isinstance(ent, dict) and isinstance(ent.get("kind"), str) and isinstance(ent.get("id"), str)):
+        return "entity"
+    if ev.get("commit") is not None and not (isinstance(ev["commit"], str) and _SHA.match(ev["commit"])):
+        return "commit"
+    if not (isinstance(ev.get("source"), str) and ev["source"]):
+        return "source"
+    if not isinstance(ev.get("payload"), dict):
+        return "payload"
+    return None
+
+
+def _bounded_lines(path: Path, limit: int):
+    """Yield (lineno, bytes|None). None marks an oversize record, drained without holding it in memory."""
+    with open(path, "rb") as fh:
+        lineno = 0
+        while True:
+            line = fh.readline(limit + 1)
+            if not line:
+                return
+            lineno += 1
+            if len(line) > limit and not line.endswith(b"\n"):
+                while True:   # drain the rest of the oversize record
+                    more = fh.readline(65536)
+                    if not more or more.endswith(b"\n"):
+                        break
+                yield lineno, None
+                continue
+            yield lineno, line.rstrip(b"\n")
 
 
 def read_events(paths: list[Path]) -> tuple[list[dict], list[Finding]]:
-    """Read event files: dedupe by event_id, order by (host_id, seq), quarantine bad lines as one finding."""
+    """Read ledger files: validate, dedupe by event_id, order by (host_id, seq); bad lines -> one finding."""
     seen: dict[str, dict] = {}
     bad: list[str] = []
     for path in paths:
+        path = Path(path)
         try:
-            raw = Path(path).read_bytes()
+            for lineno, line in _bounded_lines(path, MAX_LINE):
+                if line is None:
+                    bad.append(f"{path.name}:{lineno} oversize")
+                    continue
+                if not line.strip():
+                    continue
+                try:
+                    ev = json.loads(line)
+                except (ValueError, UnicodeDecodeError):
+                    bad.append(f"{path.name}:{lineno} unparseable")
+                    continue
+                why = validate_committed(ev)
+                if why:
+                    bad.append(f"{path.name}:{lineno} bad {why}")
+                    continue
+                seen.setdefault(ev["event_id"], ev)
         except FileNotFoundError:
             continue
-        for lineno, line in enumerate(raw.split(b"\n"), 1):
-            if not line.strip():
-                continue
-            if len(line) > MAX_LINE:
-                bad.append(f"{Path(path).name}:{lineno} oversize")
-                continue
-            try:
-                ev = json.loads(line)
-            except (ValueError, UnicodeDecodeError):
-                bad.append(f"{Path(path).name}:{lineno} unparseable")
-                continue
-            if not _valid(ev):
-                bad.append(f"{Path(path).name}:{lineno} invalid schema")
-                continue
-            seen.setdefault(ev["event_id"], ev)
-    evs = sorted(seen.values(), key=lambda e: (str(e.get("host_id", "")), int(e.get("seq") or 0), e["occurred_at"]))
+    evs = sorted(seen.values(), key=lambda e: (e["host_id"], e["seq"]))
     findings = []
     if bad:
         findings.append(Finding("MALFORMED_EVENTS", "warn",
@@ -116,8 +215,9 @@ def latest_aliases(evs: list[dict]) -> dict[str, str]:
     out: dict[str, str] = {}
     for ev in evs:
         sid = ev["actor"].get("session_id")
-        if sid and ev["type"] == "alias":
-            out[sid] = ev["payload"].get("alias") or out.get(sid, "")
-        elif sid and sid not in out and ev["actor"].get("alias"):
+        alias = ev["payload"].get("alias") if ev["type"] == "alias" else None
+        if sid and isinstance(alias, str) and alias:
+            out[sid] = alias
+        elif sid and sid not in out and isinstance(ev["actor"].get("alias"), str) and ev["actor"]["alias"]:
             out[sid] = ev["actor"]["alias"]
     return out
