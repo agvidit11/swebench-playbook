@@ -69,6 +69,7 @@ class Claims:
     healthy_ttl_seconds: int = 120
     clock_skew_warn_seconds: int = 120
     max_live_claims: int = 200
+    active_window_minutes: int = 120     # presence (recent work in a session) counts as ACTIVE for this long
 
 
 @dataclass

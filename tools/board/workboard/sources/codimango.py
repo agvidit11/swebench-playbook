@@ -130,7 +130,8 @@ class CodimangoSource:
         except OSError as exc:
             raise RuntimeError(f"cannot run {argv[0]}: {exc}")
         if proc.returncode != 0:
-            err = re.sub(r"\s+", " ", (proc.stderr or "").strip())[-200:]
+            err = re.sub(r"\s+", " ", (proc.stderr or "").strip())
+            err = re.sub(r"(https?://\S+|malink/\S+|Need help\?.*$|=+)", "", err).strip(" .:")[-160:]
             raise RuntimeError(f"exit {proc.returncode}: {err or 'no stderr'}")
         try:
             return _parse_envelope(proc.stdout or "")

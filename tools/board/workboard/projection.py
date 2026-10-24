@@ -284,6 +284,18 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                     machine = last["legacy_owner"]
                     short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
                     owner, claim_health = f"{short} (CLAIMS.md)", "LEGACY"
+        pres = {}
+        for e in tev:
+            if e["type"] == "presence":
+                seen_at = e["payload"].get("last_seen")
+                if isinstance(seen_at, (int, float)):
+                    sid = e["actor"]["session_id"]
+                    pres[sid] = max(pres.get(sid, (0, ""))[0], seen_at), e["actor"].get("alias", "")
+        window = cfg.claims.active_window_minutes * 60
+        active = sorted(((now.timestamp() - t, a) for t, a in pres.values() if 0 <= now.timestamp() - t <= window))
+        f["active"] = [{"alias": a, "ago_s": int(ago)} for ago, a in active]
+        if active and claim_health in ("FREE", "LEGACY", "EXPIRED"):
+            owner, claim_health = active[0][1], "ACTIVE"
         if state in ("ACCEPTED", "ARCHIVED"):
             owner, claim_health = "", "DONE"
         f["owner"], f["claim_health"] = owner, claim_health

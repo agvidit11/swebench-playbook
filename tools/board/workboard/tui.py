@@ -142,6 +142,9 @@ def _owner(f) -> str:
         return ""
     if h == "CONFLICT":
         return f"{fg(RED)}🤺 {o}{RESET}"
+    if h == "ACTIVE":
+        ago = (f.get("active") or [{}])[0].get("ago_s")
+        return f"{fg(AMBER)}👀 {o}{RESET}" + (f" {fg(GREY)}{fmt_age(ago)}{RESET}" if ago is not None else "")
     if h in ("EXPIRED", "LEGACY"):
         return f"{fg(GREY)}💤 {o}{RESET}" if h == "EXPIRED" else f"{fg(GREY)}📜 {o}{RESET}"
     return f"{fg(VIOLET)}👤 {o}{RESET}"

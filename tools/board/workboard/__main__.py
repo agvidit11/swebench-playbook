@@ -248,7 +248,7 @@ def _available_reason(v, snap):
 def cmd_available(args, cfg):
     snap = _gather(args, cfg)
     free = [(v, _available_reason(v, snap)) for v in snap.views
-            if v.fields.get("group") != "DONE" and v.fields.get("claim_health") in ("FREE", "EXPIRED")]
+            if v.fields.get("group") != "DONE" and v.fields.get("claim_health") in ("FREE", "EXPIRED")]   # ACTIVE is not free
     if args.reason:
         free = [(v, r) for v, r in free if r == args.reason]
     if args.json:
@@ -476,7 +476,12 @@ def cmd_hook(args, cfg):
 
 
 def cmd_sync(args, cfg):
-    from . import app, sync as s
+    from . import app, presence, sync as s
+    from .completion import task_names
+    try:
+        presence.emit(cfg, s.default_state_dir(), s.safe_host(s.host_id_for(cfg)), set(task_names()))
+    except Exception as exc:                       # presence is best-effort; never block the sync
+        print(f"presence scan skipped: {exc}", file=sys.stderr)
     st = s.sync(cfg, state_dir=s.default_state_dir())
     app.refresh_claims_cache(cfg, s.default_state_dir())
     if not args.quiet:
