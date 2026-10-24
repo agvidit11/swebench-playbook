@@ -1,0 +1,45 @@
+# workboard personal config: copy to ~/.config/workboard/config.toml. Never commit your real one.
+config_version = 1
+profile = "swebench-codimango"
+
+[user]
+id = "your-unixname"
+display_name = "Your Name"
+timezone = "America/Los_Angeles"
+week_start = "monday"
+match_ids = ["your-unixname"]        # importer ids that mean you (unixname and/or numeric id)
+
+[ui]
+color = "auto"      # auto | always | never   (NO_COLOR and non-TTY always win)
+unicode = "auto"
+
+[codimango]
+command = "codimango"
+timeout_seconds = 60
+
+[[servers]]
+id = "a"
+host_alias = "devserver-a"
+
+[[repositories]]
+id = "tasks"
+path = "~/your-task-repo"
+remote_url = "ssh://git@github.com:22/org/your-task-repo.git"
+branch = "main"
+
+[ledger]
+path = "~/.local/share/workboard/ledger"
+remote = "git@github.com:you/your-private-ledger.git"
+
+[claims]
+mode = "atomic"
+expire_after_hours = 24
+
+[rank]
+daiquery_id = ""     # saved DaiQuery id for `workboard rank` (optional)
+
+[reports]
+include_contribution = false   # per-session/model stats in exports (private, non-causal)
+
+[plugins]
+enabled = []
