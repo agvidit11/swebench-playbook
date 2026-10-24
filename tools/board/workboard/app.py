@@ -1,0 +1,102 @@
+"""Gathering: run sources (cache-first), a time-bounded ledger sync, read events, project."""
+from __future__ import annotations
+
+import json
+import os
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+
+from . import events, sync as sync_mod
+from .model import SourceHealth
+from .projection import project
+from .sources.codimango import CodimangoSource
+from .model import Observation
+from .sources.gitsrc import GitSource, changed_files
+
+GIT_STAMP = "git-last-fetch"
+
+
+@dataclass
+class Snapshot:
+    views: list
+    observations: list
+    events: list
+    health: dict
+    findings: list = field(default_factory=list)
+    sync_state: object = None
+    now: datetime = None
+
+
+def cache_dir() -> Path:
+    d = Path(os.environ.get("WORKBOARD_CACHE", "~/.cache/workboard")).expanduser()
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def ledger_event_files(cfg) -> list[Path]:
+    d = Path(cfg.ledger.path).expanduser() / "events"
+    return sorted(d.glob("*.jsonl")) if d.is_dir() else []
+
+
+def pending_spool_events(state_dir: Path, host_id: str) -> list[dict]:
+    """Unsynced local events, stamped provisionally so the board shows them before they are pushed."""
+    out = []
+    for i, raw in enumerate(sync_mod._spool_lines(state_dir), 1):
+        try:
+            ev = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(ev, dict):
+            stamped = events.stamp(ev, host_id, 10**9 + i)
+            if events.validate_committed(stamped) is None:
+                out.append(stamped)
+    return out
+
+
+def _enrich_changed(cfg, cm_obs, git_obs, now) -> list:
+    """For tasks whose head differs from the validated commit, which files changed (one git diff each)."""
+    validated = {o.entity_id: o.fields.get("codimango.commit_sha") for o in cm_obs}
+    open_ = {o.entity_id for o in cm_obs if o.fields.get("codimango.status") not in ("accepted", "used_in_training", "archived")}
+    out = []
+    for o in git_obs:
+        task, head = o.entity_id, o.fields.get("git.task_head")
+        old = validated.get(task)
+        if task in open_ and head and old and head != old:
+            files = changed_files(cfg, o.fields.get("git.repo"), task, old, head)
+            if files is not None:
+                out.append(Observation("git", task, now, {"git.changed_since_validated": files},
+                                       {"git.changed_since_validated": "derived"}))
+    return out
+
+
+def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: float = 8) -> Snapshot:
+    now = datetime.now(timezone.utc)
+    cdir = cache_dir()
+    health, findings, obs = {}, [], []
+
+    cm = CodimangoSource(cfg, cache_dir=cdir).fetch(max_age_seconds=0 if refresh else cfg.codimango.cache_ttl_seconds)
+    health["codimango"], findings = cm.health, list(cm.findings)
+    obs += cm.observations
+
+    if cfg.repositories:
+        stamp = cdir / GIT_STAMP
+        fresh = stamp.exists() and time.time() - stamp.stat().st_mtime < cfg.codimango.cache_ttl_seconds
+        gres = GitSource(cfg, fetch_remote=refresh or not fresh).fetch()
+        if gres.health.ok and (refresh or not fresh):
+            stamp.touch()
+        health["git"] = gres.health
+        findings += gres.findings
+        obs += gres.observations + _enrich_changed(cfg, cm.observations, gres.observations, now)
+
+    state_dir = sync_mod.default_state_dir()
+    sync_state = None
+    if cfg.ledger.remote:
+        sync_state = sync_mod.sync(cfg, state_dir=state_dir, timeout_seconds=sync_timeout) if do_sync \
+            else sync_mod.load_state(state_dir)
+    evs, ev_findings = events.read_events(ledger_event_files(cfg))
+    evs += pending_spool_events(state_dir, sync_mod.safe_host(sync_mod.host_id_for(cfg)))
+    findings += ev_findings
+    views = project(obs, evs, cfg, now)
+    return Snapshot(views, obs, evs, health, findings, sync_state, now)

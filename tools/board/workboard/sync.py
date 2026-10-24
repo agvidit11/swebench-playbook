@@ -111,8 +111,7 @@ def _ack_spool(state_dir: Path, n: int) -> None:
 
 
 def _last_seq(path: Path) -> int:
-    evs, _ = events.read_events([path])
-    return max((e["seq"] for e in evs), default=0)
+    return events.max_physical_seq(path)
 
 
 def _ensure_clone(cfg, dl: Deadline) -> tuple[Path, str]:

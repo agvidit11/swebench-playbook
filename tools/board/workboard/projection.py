@@ -32,6 +32,14 @@ def ts(value) -> datetime | None:
     return out if out.tzinfo else None
 
 
+DOC_NAMES = ("readme", "changelog", "notes", "license")
+
+
+def _is_doc(path: str) -> bool:
+    name = path.rsplit("/", 1)[-1].lower()
+    return name.endswith(".md") and any(name.startswith(d) for d in DOC_NAMES) or name in ("readme", "readme.txt")
+
+
 def _merge(observations):
     by_task, repos = {}, {}
     for o in observations:
@@ -43,29 +51,30 @@ def _merge(observations):
 
 
 def _claims(task_events, cfg, now, aliases):
-    """Live claims per (host, session). Returns (owner_alias, owner_state, live_claimants)."""
+    """Live claims from claim/renew/steal/assign/release audit events only (DESIGN §5: ordinary activity is
+    not a heartbeat). Returns (owner_alias, claim_health, live_claimants)."""
     live: dict[str, dict] = {}
-    last_activity: dict[str, datetime] = {}
+    skew = timedelta(seconds=cfg.claims.clock_skew_warn_seconds)
     for e in task_events:
         sid = e["actor"]["session_id"]
         at = ts(e["occurred_at"])
+        if at is None or at - now > skew:
+            continue                       # future-dated: reported as CLOCK_SKEW, never trusted for liveness
         if e["type"] in ("claim", "renew", "steal", "assign"):
             target = e["payload"].get("to_session") or sid
             if e["type"] == "steal":
                 live.clear()
+            prev = live.get(target, {})
             live[target] = {"alias": e["payload"].get("to_alias") or aliases.get(target) or e["actor"].get("alias", ""),
-                            "host": e["host_id"], "at": at}
-            last_activity[target] = at
+                            "host": e["host_id"], "session": target, "at": max(at, prev.get("at") or at)}
         elif e["type"] == "release":
             live.pop(sid, None)
-        elif e["type"] in ("touch", "check", "review") and sid in live and at:
-            last_activity[sid] = max(at, last_activity.get(sid) or at)
     expire = timedelta(hours=cfg.claims.expire_after_hours)
-    fresh = {s: c for s, c in live.items() if last_activity.get(s) and now - last_activity[s] <= expire}
+    fresh = {s: c for s, c in live.items() if now - c["at"] <= expire}
     if not live:
         return "", "FREE", []
     if not fresh:
-        newest = max(live.values(), key=lambda c: c["at"] or now)
+        newest = max(live.values(), key=lambda c: c["at"])
         return newest["alias"], "EXPIRED", []
     if len(fresh) > 1:
         return " / ".join(c["alias"] for c in fresh.values()), "CONFLICT", list(fresh.values())
@@ -133,8 +142,10 @@ def _next(f, findings):
         return "ATTENTION", "RESOLVE CONFLICT"
     if valid == "FAIL":
         return "ATTENTION", "FIX validation"
-    if "HEAD≠SERVER" in codes:
-        return "READY", "RERUN server"
+    if codes & {"HEAD≠SERVER", "STALE_VALID"}:
+        return "ATTENTION", "RERUN server"
+    if "VALID≠SERVER" in codes:
+        return ("WAITING", "WAIT validation") if valid == "RUN" else ("ATTENTION", "RERUN server")
     if valid == "RUN":
         return "WAITING", "WAIT validation"
     if state in ("QUEUE", "REVIEW"):
@@ -179,16 +190,29 @@ def project(observations, evs, cfg, now) -> list[TaskView]:
         f["state_age_s"] = int((now - since).total_seconds()) if since else None
         f["age_level"] = _age_level(state, f["state_age_s"], cfg)
 
-        # sync: newer task-dir commit than the server imported?
-        server_sha = cm.get("codimango.commit_sha")
+        # sync: has the server seen this task's latest commit, and validated it?
+        server_sha = cm.get("codimango.commit_sha")            # version the server validated
+        server_head = cm.get("codimango.head_commit_sha")      # newest commit the server has seen
         head, head_time = g.get("git.task_head"), ts(g.get("git.task_head_time"))
-        f["sync"] = "OK"
         repo_times = repos.get(g.get("git.repo"), {}).get("git.commit_time_by_sha", {})
-        server_time = ts(repo_times.get(server_sha)) if server_sha else None
-        if head_time and server_time and head_time > server_time and state not in ("ACCEPTED", "ARCHIVED"):
+        seen_time = ts(repo_times.get(server_head)) if server_head else None
+        if seen_time is None and server_sha:
+            seen_time = ts(repo_times.get(server_sha))
+        f["sync"] = "OK" if (head_time and seen_time) else ("UNCHECKED" if g and cm else "—")
+        open_task = state not in ("ACCEPTED", "ARCHIVED")
+        if open_task and head_time and seen_time and head_time > seen_time:
             f["sync"] = "HEAD≠SERVER"
             findings.append(Finding("HEAD≠SERVER", "warn", "a newer commit to this task is not on the server yet",
                                     "codimango task rerun <task> (free), then wait for validation"))
+        elif open_task and head and server_sha and head != server_sha and "git.changed_since_validated" in g:
+            changed = g["git.changed_since_validated"]
+            if changed and not all(_is_doc(x) for x in changed):
+                f["sync"] = "STALE_VALID"
+                findings.append(Finding("STALE_VALID", "warn",
+                                        f"server validated an older commit; {len(changed)} non-doc file(s) changed since",
+                                        "codimango task rerun <task>, then wait for validation"))
+            elif changed:
+                f["sync"] = "OK·doc"
         vsha = cm.get("codimango.validation_commit_sha")
         if server_sha and vsha and vsha != server_sha and f["valid"] != "RUN":
             findings.append(Finding("VALID≠SERVER", "warn", "validation results are for an older server commit",
@@ -199,18 +223,33 @@ def project(observations, evs, cfg, now) -> list[TaskView]:
         f["check"], f["check_stale"], check_payload = _check(tev, current)
         f["check_fail"] = bool(check_payload and check_payload.get("fail"))
 
-        owner, owner_state, claimants = _claims(tev, cfg, now, aliases)
+        owner, claim_health, claimants = _claims(tev, cfg, now, aliases)
         if state in ("ACCEPTED", "ARCHIVED"):
-            owner, owner_state = "", "DONE"
-        f["owner"], f["owner_state"] = owner, owner_state
-        if owner_state == "CONFLICT":
+            owner, claim_health = "", "DONE"
+        f["owner"], f["claim_health"] = owner, claim_health
+        if claim_health == "CONFLICT":
             findings.append(Finding("CONFLICT", "block", f"claimed by more than one live session: {owner}",
                                     "workboard release <task> on one of them"))
+        skew = timedelta(seconds=cfg.claims.clock_skew_warn_seconds)
+        future = [e for e in tev if (ts(e["occurred_at"]) or now) - now > skew]
+        if future:
+            hosts = sorted({e["host_id"] for e in future})
+            findings.append(Finding("CLOCK_SKEW", "warn", f"{len(future)} event(s) dated in the future from {', '.join(hosts)}",
+                                    "check the clock on that host (timedatectl)"))
+        if claim_health == "OWNED":
+            owner_sid, since = claimants[0]["session"], claimants[0]["at"]
+            foreign = [e for e in tev if e["type"] == "touch" and e.get("commit") and e["actor"]["session_id"] != owner_sid
+                       and (ts(e["occurred_at"]) or now) >= since]
+            if foreign:
+                who = foreign[-1]["actor"].get("alias") or foreign[-1]["actor"]["session_id"]
+                findings.append(Finding("NONOWNER_COMMIT", "warn", f"{who} committed to this task while {owner} owns it",
+                                        "agree who owns it; release or reassign"))
 
         pool = ts(cm.get("codimango.entered_pool_at"))
         times = [t for t in (ts(x) for x in g.get("git.commit_times", [])) if t]
-        f["pushes_draft"] = sum(1 for t in times if not pool or t < pool)
-        f["pushes_after"] = sum(1 for t in times if pool and t >= pool)
+        f["pushes_before_submit"] = sum(1 for t in times if not pool or t < pool)
+        f["pushes_after_submit"] = sum(1 for t in times if pool and t >= pool)
+        f["pushes"] = f"{f['pushes_before_submit']}+{f['pushes_after_submit']}"
         f["round"] = None
         f["group"], f["next"] = _next(f, findings)
         views.append(TaskView(task, f, findings))

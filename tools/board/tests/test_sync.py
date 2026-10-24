@@ -83,6 +83,12 @@ class SyncTest(unittest.TestCase):
         evs, findings = events.read_events([Path(cfg.ledger.path) / "events" / "h1.jsonl"])
         self.assertEqual(len(evs), 3)                 # duplicates collapsed by event_id
         self.assertEqual(findings, [])
+        spool_some(state, 1, "after")
+        self.assertTrue(sync.sync(cfg, host_id="h1", state_dir=state).last_push_ok)
+        raw = [json.loads(l)["seq"] for l in (Path(cfg.ledger.path) / "events" / "h1.jsonl").read_text().splitlines()]
+        self.assertEqual(raw, sorted(set(raw)))       # physical seqs strictly increasing and unique
+        evs, _ = events.read_events([Path(cfg.ledger.path) / "events" / "h1.jsonl"])
+        self.assertEqual(len(evs), 4)
 
     def test_deadline_exhausted_keeps_spool(self):
         cfg, state = self.host("h1")

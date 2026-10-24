@@ -228,6 +228,24 @@ def read_events(paths: list[Path]) -> tuple[list[dict], list[Finding]]:
     return evs, findings
 
 
+def max_physical_seq(path: Path) -> int:
+    """Highest seq over every valid physical record (before event_id dedupe): the allocation watermark."""
+    top = 0
+    try:
+        for _, line in _bounded_lines(Path(path), MAX_LINE):
+            if not line:
+                continue
+            try:
+                ev = json.loads(line)
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if validate_committed(ev) is None:
+                top = max(top, ev["seq"])
+    except FileNotFoundError:
+        pass
+    return top
+
+
 def latest_aliases(evs: list[dict]) -> dict[str, str]:
     """session_id -> latest alias. History stays in the log; only rendering uses the latest."""
     out: dict[str, str] = {}

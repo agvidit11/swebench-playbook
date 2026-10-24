@@ -18,9 +18,11 @@ def cm(name, status="draft", valid="passing", **kw):
     return Observation("codimango", name, NOW, f)
 
 
-def gt(name, head=SHA_A, head_time="2026-10-21T00:00:00+00:00", times=None):
-    return Observation("git", name, NOW, {"git.task_head": head, "git.task_head_time": head_time,
-                                           "git.commit_times": times or [head_time], "git.repo": "tasks"})
+def gt(name, head=SHA_A, head_time="2026-10-21T00:00:00+00:00", times=None, changed=None):
+    f = {"git.task_head": head, "git.task_head_time": head_time, "git.commit_times": times or [head_time], "git.repo": "tasks"}
+    if changed is not None:
+        f["git.changed_since_validated"] = changed
+    return Observation("git", name, NOW, f)
 
 
 def repo(times):
@@ -76,16 +78,86 @@ class ProjectionTest(unittest.TestCase):
         self.assertEqual(v.fields["review"], "R1")
         self.assertEqual(v.fields["dissent"], 1)
 
+    def test_required_keys_present(self):
+        keys = {"state", "state_age_s", "owner", "claim_health", "review", "confidence", "check", "pushes", "round",
+                "valid", "sync", "next", "group"}
+        cm_view = self.view([cm("t")])
+        git_only = self.view([gt("t")])
+        self.assertTrue(keys <= set(cm_view.fields), keys - set(cm_view.fields))
+        self.assertTrue(keys <= set(git_only.fields), keys - set(git_only.fields))
+
+    def test_next_priority_order(self):
+        base = [gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        conflict = [e("claim", "t", seq=1), e("claim", "t", session="s9", alias="h2·x", host="h2", seq=1)]
+        # conflict beats failing validation
+        self.assertEqual(self.view([cm("t", valid="failed")] + base, conflict).fields["next"], "RESOLVE CONFLICT")
+        # failing validation beats drift
+        drift = [cm("t", valid="failed", validation_commit_sha=SHA_B)] + base
+        self.assertEqual(self.view(drift).fields["next"], "FIX validation")
+        # stale validation on a passing draft blocks the ladder
+        v = self.view([cm("t", validation_commit_sha=SHA_B)] + base,
+                      [e("check", "t", {"pass": 1}, commit=SHA_A),
+                       e("review", "t", {"verdict": "ready"}, commit=SHA_A),
+                       e("review", "t", {"verdict": "ready"}, session="s2", host="h2", commit=SHA_A)])
+        self.assertEqual((v.fields["group"], v.fields["next"]), ("ATTENTION", "RERUN server"))
+        # full ladder
+        ladder = [([], "RUN check"),
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A)], "GET R1"),
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("review", "t", {"verdict": "ready"}, commit=SHA_A)], "GET R2"),
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("review", "t", {"verdict": "ready"}, commit=SHA_A),
+                    e("review", "t", {"verdict": "ready"}, session="s2", host="h2", commit=SHA_A)], "SUBMIT")]
+        for evs, expected in ladder:
+            self.assertEqual(self.view([cm("t")] + base, evs).fields["next"], expected)
+
+    def test_activity_does_not_renew_claim(self):
+        old = [e("claim", "t", seq=1, at="2026-10-21T00:00:00+00:00"),
+               e("touch", "t", seq=2, at="2026-10-23T19:00:00+00:00"),
+               e("check", "t", {"pass": 1}, seq=3, at="2026-10-23T19:10:00+00:00"),
+               e("review", "t", {"verdict": "ready"}, seq=4, at="2026-10-23T19:20:00+00:00")]
+        self.assertEqual(self.view([cm("t")], old).fields["claim_health"], "EXPIRED")
+
+    def test_clock_skew_finding_and_not_trusted(self):
+        future = [e("claim", "t", seq=1, at="2026-10-24T20:00:00+00:00")]
+        v = self.view([cm("t")], future)
+        self.assertIn("CLOCK_SKEW", [f.code for f in v.findings])
+        self.assertEqual(v.fields["claim_health"], "FREE")
+        ok = [e("claim", "t", seq=1, at="2026-10-23T20:01:00+00:00")]     # 1 min ahead: within tolerance
+        self.assertNotIn("CLOCK_SKEW", [f.code for f in self.view([cm("t")], ok).findings])
+
+    def test_nonowner_commit_finding(self):
+        evs = [e("claim", "t", seq=1, at="2026-10-23T18:00:00+00:00"),
+               e("touch", "t", session="s9", alias="h2·other", host="h2", seq=1, commit=SHA_B, at="2026-10-23T19:00:00+00:00")]
+        self.assertIn("NONOWNER_COMMIT", [f.code for f in self.view([cm("t")], evs).findings])
+        review_only = [e("claim", "t", seq=1, at="2026-10-23T18:00:00+00:00"),
+                       e("review", "t", {"verdict": "ready"}, session="s9", host="h2", seq=1, commit=SHA_B,
+                         at="2026-10-23T19:00:00+00:00")]
+        self.assertNotIn("NONOWNER_COMMIT", [f.code for f in self.view([cm("t")], review_only).findings])
+
     def test_head_newer_than_server_is_finding(self):
         obs = [cm("t"), gt("t", head_time="2026-10-23T10:00:00+00:00"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
         v = self.view(obs)
         self.assertIn("HEAD≠SERVER", [f.code for f in v.findings])
         self.assertEqual(v.fields["sync"], "HEAD≠SERVER")
-        self.assertEqual(v.fields["next"], "RERUN server")
+        self.assertEqual((v.fields["group"], v.fields["next"]), ("ATTENTION", "RERUN server"))
 
     def test_head_older_than_server_is_ok(self):
         obs = [cm("t"), gt("t", head_time="2026-10-21T00:00:00+00:00"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
         self.assertEqual(self.view(obs).fields["sync"], "OK")
+
+    def test_server_saw_head_readme_only_is_ok(self):
+        obs = [cm("t", head_commit_sha=SHA_A), gt("t", head=SHA_A, head_time="2026-10-23T10:00:00+00:00", changed=["t/README.md"]),
+               repo({SHA_S: "2026-10-22T00:00:00+00:00", SHA_A: "2026-10-23T10:00:00+00:00"})]
+        v = self.view(obs)
+        self.assertEqual(v.fields["sync"], "OK·doc")
+        self.assertEqual(v.findings, [])
+
+    def test_server_saw_head_code_changed_is_stale_valid(self):
+        obs = [cm("t", head_commit_sha=SHA_A), gt("t", head=SHA_A, head_time="2026-10-23T10:00:00+00:00",
+                                                     changed=["t/tests/test.sh"]),
+               repo({SHA_S: "2026-10-22T00:00:00+00:00", SHA_A: "2026-10-23T10:00:00+00:00"})]
+        v = self.view(obs)
+        self.assertEqual(v.fields["sync"], "STALE_VALID")
+        self.assertEqual(v.fields["next"], "RERUN server")
 
     def test_validation_on_older_commit_finding(self):
         v = self.view([cm("t", validation_commit_sha=SHA_B)])
@@ -109,11 +181,11 @@ class ProjectionTest(unittest.TestCase):
         evs = [e("alias", None, {"alias": "h1·lane loop"}, seq=1), e("claim", "t", seq=2, at="2026-10-23T19:00:00+00:00")]
         self.assertEqual(self.view(obs, evs).fields["owner"], "h1·lane loop")
         old = [e("claim", "t", seq=1, at="2026-10-21T00:00:00+00:00")]
-        self.assertEqual(self.view(obs, old).fields["owner_state"], "EXPIRED")
+        self.assertEqual(self.view(obs, old).fields["claim_health"], "EXPIRED")
 
     def test_release_frees(self):
         evs = [e("claim", "t", seq=1), e("release", "t", seq=2)]
-        self.assertEqual(self.view([cm("t")], evs).fields["owner_state"], "FREE")
+        self.assertEqual(self.view([cm("t")], evs).fields["claim_health"], "FREE")
 
     def test_conflicting_live_claims(self):
         evs = [e("claim", "t", seq=1), e("claim", "t", session="s9", alias="h2·other", host="h2", seq=1)]
@@ -133,7 +205,8 @@ class ProjectionTest(unittest.TestCase):
         obs = [cm("t", "needs_revision", entered_pool_at="2026-10-20T00:00:00Z", reviewed_at="2026-10-21T00:00:00Z"),
                gt("t", times=times, head_time=times[0]), repo({SHA_S: "2026-10-23T12:00:00+00:00"})]
         v = self.view(obs)
-        self.assertEqual((v.fields["pushes_draft"], v.fields["pushes_after"]), (2, 2))
+        self.assertEqual((v.fields["pushes_before_submit"], v.fields["pushes_after_submit"]), (2, 2))
+        self.assertEqual(v.fields["pushes"], "2+2")
 
     def test_next_priority_draft_ladder(self):
         obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]

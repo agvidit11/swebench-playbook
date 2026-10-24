@@ -17,8 +17,8 @@ NAME = "git"
 class GitSource:
     name = NAME
 
-    def __init__(self, cfg, *, since_days: int | None = None, timeout: float = 90):
-        self.cfg, self.since_days, self.timeout = cfg, since_days, timeout
+    def __init__(self, cfg, *, since_days: int | None = None, timeout: float = 90, fetch_remote: bool = True):
+        self.cfg, self.since_days, self.timeout, self.fetch_remote = cfg, since_days, timeout, fetch_remote
 
     def fetch(self, *, since=None, timeout_seconds=None) -> FetchResult:
         obs, findings, ok, details = [], [], True, []
@@ -27,7 +27,7 @@ class GitSource:
         for repo in self.cfg.repositories:
             path = Path(repo.path).expanduser()
             ref = f"refs/workboard/{repo.branch}"
-            if repo.remote_url:
+            if repo.remote_url and self.fetch_remote:
                 p = gitutil.run(path, "fetch", "-q", repo.remote_url, f"+{repo.branch}:{ref}", timeout=timeout)
                 if p.returncode != 0:
                     ok = False
@@ -69,3 +69,14 @@ class GitSource:
                                    {"git.commit_time_by_sha": "authoritative"}))
         health = SourceHealth(NAME, ok, now, 900, "; ".join(details) or "ok")
         return FetchResult(obs, health, findings)
+
+
+def changed_files(cfg, repo_id: str, task: str, old: str, new: str, timeout: float = 20) -> list[str] | None:
+    """Files under <task>/ that differ between two commits; None if git can't tell (e.g. commit unknown)."""
+    repo = next((r for r in cfg.repositories if r.id == repo_id), None)
+    if not repo:
+        return None
+    p = gitutil.run(Path(repo.path).expanduser(), "diff", "--name-only", old, new, "--", f"{task}/", timeout=timeout)
+    if p.returncode != 0:
+        return None
+    return [l for l in p.stdout.splitlines() if l]

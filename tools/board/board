@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# workboard shim: run from anywhere.
+here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m workboard "$@"
