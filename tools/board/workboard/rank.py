@@ -28,12 +28,18 @@ def _save(cache_dir: Path, rows: list[dict], source: str) -> dict:
     return data
 
 
+def valid_rows(rows) -> bool:
+    return isinstance(rows, list) and bool(rows) and all(isinstance(r, dict) for r in rows)
+
+
 def load(cache_dir: Path) -> dict | None:
     try:
         data = json.loads((cache_dir / CACHE).read_text())
-        return data if isinstance(data.get("rows"), list) else None
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError):
         return None
+    if not (isinstance(data, dict) and valid_rows(data.get("rows")) and isinstance(data.get("fetched_at"), str)):
+        return None
+    return data
 
 
 def _clean(v):
@@ -72,14 +78,14 @@ def refresh(cfg, cache_dir: Path, *, runner=subprocess.run) -> tuple[dict | None
         data, _ = json.JSONDecoder().raw_decode(text[start:])
     except ValueError:
         return None, "unexpected output from the query runner"
-    rows = data if isinstance(data, list) else data.get("rows") or data.get("data") or []
-    if not rows or not isinstance(rows[0], dict):
-        return None, "the query returned no rows"
+    rows = data if isinstance(data, list) else (data.get("rows") or data.get("data")) if isinstance(data, dict) else None
+    if not valid_rows(rows):
+        return None, "the query returned no rows (or an unexpected shape)"
     return _save(cache_dir, rows, f"daiquery {cfg.rank.daiquery_id}"), "ok"
 
 
 def import_file(path: Path, cache_dir: Path) -> dict:
     rows = parse_table(Path(path).read_text())
-    if not rows or "scope" not in rows[0]:
+    if not valid_rows(rows) or "scope" not in rows[0]:
         raise ValueError("no table with a 'scope' column found in that file")
     return _save(cache_dir, rows, f"import {Path(path).name}")

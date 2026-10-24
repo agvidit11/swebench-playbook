@@ -44,20 +44,20 @@ class StatsTest(unittest.TestCase):
         self.assertEqual(rows["2026-10-19"]["accepted"], 10)
         self.assertEqual((rows["2026-10-19"]["accepted_mt"], rows["2026-10-19"]["accepted_st"]), (8, 2))
         self.assertEqual(rows["2026-10-12"]["accepted"], 12)
-        self.assertEqual(rows["2026-10-05"]["accepted"], 20)      # 19 + one archived after acceptance
+        self.assertEqual(rows["2026-10-05"]["accepted"], 19)      # archived-after-acceptance not counted
 
     def test_this_week_vs_same_point_and_median(self):
         n = stats.week_numbers(self.obs, self.cfg, NOW)
         self.assertEqual(n["this_week"], 10)
         self.assertEqual(n["same_point_last_week"], 12)          # Oct 14 18:00Z is before Wed 16:22 PT
-        self.assertEqual(n["median_4wk"], 6)                     # [12, 20, 0, 0] -> median 6
+        self.assertEqual(n["median_4wk"], 6)                     # [12, 19, 0, 0] -> median 6
 
     def test_funnel_uses_codimango_archived(self):
         f = stats.funnel(self.obs)
         self.assertEqual(f["archived"], 1)
         self.assertEqual(f["archived_after_accept"], 1)
         self.assertEqual(f["built"], 1)                          # __repo__ entity excluded
-        self.assertEqual(f["accepted"], 42)
+        self.assertEqual(f["accepted"], 41)
 
     def test_first_submission_rate_by_cohort(self):
         rounds = {"f": 1}
@@ -80,6 +80,36 @@ class StatsTest(unittest.TestCase):
             self.assertEqual((r["covered"], r["eligible"]), (1, 1))
             stats.revision_rounds(self.cfg, self.obs, Path(d), runner=runner)
             self.assertEqual(len(calls), 1)                      # second run served from cache
+
+    def test_submitted_is_entered_pool_only(self):
+        obs = [cm("p", "draft", pool="2026-10-20T00:00:00Z"), cm("q", "needs_revision")]
+        rows = {r["week"].date().isoformat(): r for r in stats.weekly(obs, self.cfg, NOW, 1)}
+        self.assertEqual(rows["2026-10-19"]["submitted"], 1)      # bounced back to draft still counts its submission
+        self.assertEqual(stats.funnel(obs)["submitted"], 1)
+
+    def test_window_bounds_pt_weeks(self):
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Los_Angeles")
+        start = datetime(2026, 10, 12, tzinfo=tz)
+        end = datetime(2026, 10, 19, tzinfo=tz)
+        rows = stats.weekly(self.obs, self.cfg, NOW, start=start, end=end)
+        self.assertEqual([r["week"].date().isoformat() for r in rows], ["2026-10-12"])
+        self.assertEqual(rows[0]["accepted"], 12)
+
+    def test_future_timestamps_ignored(self):
+        obs = self.obs + [cm("z", "accepted", "2026-11-30T00:00:00Z")]
+        self.assertEqual(stats.week_numbers(obs, self.cfg, NOW)["total"], 41)
+
+    def test_cycle_and_wait(self):
+        obs = [cm("a", "accepted", "2026-10-03T00:00:00Z", pool="2026-10-01T00:00:00Z"),
+               cm("b", "accepted", "2026-10-05T00:00:00Z", pool="2026-10-01T00:00:00Z"),
+               cm("c", "needs_revision", "2026-10-02T00:00:00Z", pool="2026-10-01T00:00:00Z"),
+               cm("d", "accepted", "2026-10-02T00:00:00Z")]
+        f = stats.cycle_and_wait(obs, NOW)
+        self.assertEqual((f["cycle_p50_h"], f["cycle_coverage"]), (72.0, "2/3"))
+        self.assertEqual(f["wait_coverage"], "3/4")
+        empty = stats.cycle_and_wait([], NOW)
+        self.assertIsNone(empty["cycle_p50_h"])
 
     def test_ascii_chart_fallback(self):
         self.assertEqual(stats.bar(5, 10, 10, unicode=False), "#####")
@@ -121,6 +151,19 @@ class RankTest(unittest.TestCase):
             data, why = rank.refresh(cfg, Path(d), runner=runner)
         self.assertIsNone(data)
         self.assertIn("rank import", why)
+
+    def test_bad_shapes_rejected(self):
+        import subprocess
+        cfg = load_config(Path("/nonexistent"))
+        cfg.rank.daiquery_id = "1"
+        for out in ("42", '{"rows": {}}', "[]", "[1, 2]"):
+            with tempfile.TemporaryDirectory() as d:
+                data, why = rank.refresh(cfg, Path(d), runner=lambda a, **k: subprocess.CompletedProcess(a, 0, out, ""))
+                self.assertIsNone(data, out)
+        with tempfile.TemporaryDirectory() as d:
+            for bad in ('{"rows": []}', '{"rows": [1]}', "7"):
+                (Path(d) / rank.CACHE).write_text(bad)
+                self.assertIsNone(rank.load(Path(d)))
 
     def test_no_query_id(self):
         data, why = rank.refresh(load_config(Path("/nonexistent")), Path("/tmp"))

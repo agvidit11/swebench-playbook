@@ -323,9 +323,17 @@ def cmd_status(args, cfg):
     checks = [("codimango CLI", shutil.which(cfg.codimango.command) is not None), ("git", shutil.which("git") is not None)]
     for repo in cfg.repositories:
         checks.append((f"repo {repo.id} at {repo.path}", Path(repo.path).expanduser().is_dir()))
+    from . import hooks as hk
     settings = Path("~/.claude/settings.json").expanduser()
-    hooks = settings.exists() and "workboard" in settings.read_text(errors="replace")
-    checks.append(("Claude hooks installed", hooks))
+    try:
+        installed = {ev for ev, entries in json.loads(settings.read_text()).get("hooks", {}).items()
+                     if any(hk._ours(e) for e in entries)}
+    except (OSError, ValueError):
+        installed = set()
+    checks.append(("Claude hooks installed (" + ", ".join(sorted(installed)) + ")" if installed else "Claude hooks installed",
+                   {"SessionStart", "PreToolUse", "PostToolUse"} <= installed))
+    cron = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout if shutil.which("crontab") else ""
+    checks.append(("background sync (cron `board sync`)", "board sync" in cron))
     for name, ok in checks:
         print(f"  {'ok ' if ok else 'NO '} {name}")
     return 1 if args.strict and _unhealthy(snap) else 0
@@ -485,67 +493,120 @@ def cmd_review(args, cfg):
     return 0
 
 
-def render_stats(snap, cfg, *, weeks, width, uni, quality=None, rank_data=None) -> str:
-    from zoneinfo import ZoneInfo
+def _rank_table(rows, width) -> list[str]:
+    """Width-aware: keep as many columns (left to right) as fit; say how many were left out."""
+    cols = list(rows[0])
+    widths = {c: min(32, max(len(c), *(len(str(r.get(c) or "")) for r in rows))) for c in cols}
+    shown, used = [], 2
+    for c in cols:
+        if used + widths[c] + 2 > width and shown:
+            break
+        shown.append(c)
+        used += widths[c] + 2
+    out = ["  " + "  ".join(c.upper().ljust(widths[c]) for c in shown)]
+    out += ["  " + "  ".join(render.middle(str(r.get(c) or ""), widths[c]).ljust(widths[c]) for c in shown) for r in rows]
+    if len(shown) < len(cols):
+        out.append(f"  ({len(cols) - len(shown)} more column(s): {', '.join(cols[len(shown):])} — widen the terminal or use --json)")
+    return out
+
+
+def stats_data(snap, cfg, *, weeks, start=None, end=None, quality=None, rank_data=None, per_repo=None) -> dict:
     from . import stats as st
-    rows = st.weekly(snap.observations, cfg, snap.now, weeks)
+    return {"window": {"from": start.isoformat() if start else None, "to": end.isoformat() if end else None},
+            "weekly": [dict(r, week=r["week"].isoformat()) for r in st.weekly(snap.observations, cfg, snap.now, weeks, start, end)],
+            "week": st.week_numbers(snap.observations, cfg, snap.now),
+            "funnel": st.funnel(snap.observations), "flow": st.cycle_and_wait(snap.observations, snap.now),
+            "tasks_per_repo": per_repo, "pipeline_age": st.pipeline_age(snap.views, snap.now),
+            "quality": quality, "rank": rank_data,
+            "definitions": st.DEFINITIONS.format(tz=cfg.user.timezone),
+            "sources": {k: {"ok": h.ok, "observed_at": h.observed_at.isoformat() if h.observed_at else None}
+                        for k, h in snap.health.items()}}
+
+
+def render_stats(snap, cfg, *, weeks, width, uni, quality=None, rank_data=None, start=None, end=None, per_repo=None) -> str:
+    from . import stats as st
+    rows = st.weekly(snap.observations, cfg, snap.now, weeks, start, end)
     n = st.week_numbers(snap.observations, cfg, snap.now)
     top = max([r["accepted"] for r in rows] + [1])
-    barw = max(8, min(30, width - 60))
-    out = [f"Weekly output — accepted by acceptance date (last {weeks} weeks)",
+    barw = max(6, min(30, width - 62))
+    span = f"{start:%Y-%m-%d} to {end:%Y-%m-%d}" if start else f"last {len(rows)} weeks"
+    out = [f"Weekly output — completions (accepted) vs arrivals (submitted), {span}",
            f"  {'week of':<11} {'accepted':<10} {'':<{barw}}  {'submitted':>9}  {'worked on':>9}"]
     for r in rows:
         acc = f"{r['accepted']} ({r['accepted_mt']}/{r['accepted_st']})"
         out.append(f"  {r['week']:%Y-%m-%d}  {acc:<10} {st.bar(r['accepted'], top, barw, uni):<{barw}}  "
                    f"{r['submitted']:>9}  {r['worked_on']:>9}")
-    out.append(f"  accepted (MT/ST) · trend {st.spark([r['accepted'] for r in rows], uni)}")
+    out.append(f"  accepted shown as total (multi-turn/single-turn) · trend {st.spark([r['accepted'] for r in rows], uni)}")
     out.append(f"  W{n['week']} so far {n['this_week']} · same point last week {n['same_point_last_week']} · "
                f"4-week median {n['median_4wk']:g} · all-time accepted {n['total']}")
+    flow = st.cycle_and_wait(snap.observations, snap.now)
+    fmt = lambda v: "unavailable" if v is None else f"{v}h"
+    out += ["", "Flow",
+            f"  cycle time (submit -> accepted) p50 {fmt(flow['cycle_p50_h'])} · p75 {fmt(flow['cycle_p75_h'])} "
+            f"(coverage {flow['cycle_coverage']})",
+            f"  reviewer wait (submit -> latest decision) p50 {fmt(flow['wait_p50_h'])} · p75 {fmt(flow['wait_p75_h'])} "
+            f"(coverage {flow['wait_coverage']})"]
     f = st.funnel(snap.observations)
     out += ["", "Funnel (exact sources)",
-            f"  built {f['built']} (task dirs) -> imported {f['imported']} -> submitted {f['submitted']} -> "
+            f"  built {f['built']} (task dirs in git) -> imported {f['imported']} -> submitted {f['submitted']} -> "
             f"accepted {f['accepted']}",
             f"  archived {f['archived']} ({f['archived_after_accept']} after acceptance) · open {f['open']}"]
+    if per_repo:
+        top_repos = list(per_repo["by_repo"].items())[:8]
+        out.append(f"  tasks per upstream repo (coverage {per_repo['coverage']}): " +
+                   (", ".join(f"{k.split('/')[-1]} {v}" for k, v in top_repos) or "unavailable"))
     ages = st.pipeline_age(snap.views, snap.now)
     if ages:
         out += ["", "Pipeline age (open tasks: count · median · max time in state)"]
         out += [f"  {k:<10} {v['count']:>3} · {v['median_h']:>6}h · {v['max_h']:>6}h" for k, v in ages.items()]
     if quality is not None:
-        cov = f"{quality['covered']}/{quality['eligible']}"
         r = quality["rounds"]
-        bounced = sum(1 for x in r.values() if x)
-        out += ["", f"Quality (human review history, coverage {cov} submitted tasks)",
-                f"  tasks sent back at least once {bounced} · total revision rounds {sum(r.values())}"]
-        for c in st.first_pass_by_cohort(snap.observations, r, cfg)[-weeks:]:
+        out += ["", f"Quality (human review history, coverage {quality['covered']}/{quality['eligible']} submitted tasks)",
+                f"  tasks sent back at least once {sum(1 for x in r.values() if x)} · total revision rounds {sum(r.values())}"]
+        for c in st.first_pass_by_cohort(snap.observations, r, cfg)[-len(rows):]:
             rate = "-" if c["rate"] is None else f"{c['rate']}%"
             out.append(f"  submitted week {c['week']:%Y-%m-%d}: {c['first_pass']}/{c['decided']} accepted first time ({rate})")
     if rank_data:
-        out += ["", f"Rank (from {rank_data['source']}, fetched {rank_data['fetched_at'][:16]} UTC)"]
-        cols = [c for c in ("scope", "win", "acc", "acc_rank", "acc_top", "sub", "sub_rank", "work", "work_rank")
-                if c in rank_data["rows"][0]] or list(rank_data["rows"][0])[:8]
-        widths = {c: min(32, max(len(c), *(len(str(r.get(c) or "")) for r in rank_data["rows"]))) for c in cols}
-        out.append("  " + "  ".join(c.upper().ljust(widths[c]) for c in cols))
-        for r in rank_data["rows"]:
-            out.append("  " + "  ".join(render.middle(str(r.get(c) or ""), widths[c]).ljust(widths[c]) for c in cols))
-    out += ["", "Definitions: " + st.DEFINITIONS.format(tz=cfg.user.timezone)]
-    return "\n".join(l if len(l) <= width else l[:width - 1] + "…" for l in out)
+        out += ["", f"Rank (from {rank_data['source']}, fetched {rank_data['fetched_at'][:16]} UTC)"] + _rank_table(rank_data["rows"], width)
+    out.append("")
+    out += render.wrap("Definitions: " + st.DEFINITIONS.format(tz=cfg.user.timezone), width, "  ")
+    final = []
+    for line in out:
+        final += [line] if len(line) <= width else render.wrap(line, width, "    ")
+    return "\n".join(final)
+
+
+def _parse_day(text, tz, name):
+    from datetime import date
+    try:
+        d = date.fromisoformat(text)
+    except ValueError:
+        raise SystemExit(f"--{name} takes a date like 2026-10-01")
+    return datetime(d.year, d.month, d.day, tzinfo=tz)
 
 
 def cmd_stats(args, cfg):
+    from zoneinfo import ZoneInfo
     from . import app, rank, stats as st
+    tz = ZoneInfo(cfg.user.timezone)
+    start = _parse_day(args.from_, tz, "from") if args.from_ else None
+    end = _parse_day(args.to, tz, "to") + timedelta(days=1) if args.to else None   # --to is inclusive
+    if start and end and end <= start:
+        raise SystemExit("--to must be on or after --from")
+    if not 1 <= args.weeks <= 104:
+        raise SystemExit("--weeks must be between 1 and 104")
     snap = _gather(args, cfg)
     quality = st.revision_rounds(cfg, snap.observations, app.cache_dir(), fetch=True) if args.quality else None
+    per_repo = st.tasks_per_repo(cfg, [o.entity_id for o in snap.observations if o.source == "codimango"]) \
+        if cfg.repositories else None
     rank_data = rank.load(app.cache_dir())
     if args.json:
-        rows = st.weekly(snap.observations, cfg, snap.now, args.weeks)
-        return _emit(args, snap, {"weekly": [dict(r, week=r["week"].isoformat()) for r in rows],
-                                  "week": st.week_numbers(snap.observations, cfg, snap.now),
-                                  "funnel": st.funnel(snap.observations),
-                                  "pipeline_age": st.pipeline_age(snap.views, snap.now),
-                                  "quality": quality, "rank": rank_data})
+        return _emit(args, snap, stats_data(snap, cfg, weeks=args.weeks, start=start, end=end, quality=quality,
+                                            rank_data=rank_data, per_repo=per_repo))
     style = _style(args, cfg)
     return _emit(args, snap, human=render_stats(snap, cfg, weeks=args.weeks, width=_width(args), uni=style.unicode,
-                                                quality=quality, rank_data=rank_data))
+                                                quality=quality, rank_data=rank_data, start=start, end=end,
+                                                per_repo=per_repo))
 
 
 def cmd_rank(args, cfg):
@@ -575,12 +636,8 @@ def cmd_rank(args, cfg):
     if args.json:
         print(json.dumps(data))
         return 0
-    cols = list(data["rows"][0])
     print(f"Rank from {data['source']} (fetched {data['fetched_at'][:16]} UTC)")
-    widths = {c: min(32, max(len(c), *(len(str(r.get(c) or "")) for r in data["rows"]))) for c in cols}
-    print("  " + "  ".join(c.upper().ljust(widths[c]) for c in cols))
-    for r in data["rows"]:
-        print("  " + "  ".join(render.middle(str(r.get(c) or ""), widths[c]).ljust(widths[c]) for c in cols))
+    print("\n".join(_rank_table(data["rows"], _width(args))))
     return 0
 
 
@@ -662,6 +719,8 @@ def build_parser():
     cl.add_argument("--steal", action="store_true", help="take over an expired claim")
     stp = sub.add_parser("stats", parents=[common], help="weekly progress, funnel, pipeline age, quality, rank")
     stp.add_argument("--weeks", type=int, default=8)
+    stp.add_argument("--from", dest="from_", help="first day, e.g. 2026-10-01 (your timezone)")
+    stp.add_argument("--to", help="last day, inclusive")
     stp.add_argument("--quality", action="store_true", help="fetch human review history (cached) for revision stats")
     rk = sub.add_parser("rank", parents=[common], help="your rank on track/team/org (saved DaiQuery query)")
     rk.add_argument("action", choices=["show", "import"], nargs="?", default="show")

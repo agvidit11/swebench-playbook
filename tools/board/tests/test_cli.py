@@ -293,3 +293,40 @@ class ReviewAddCommandTest(unittest.TestCase):
     def test_success(self):
         code, err = self.code((True, ""), SyncState(last_pull_ok=True, last_push_ok=True, pending=0))
         self.assertEqual(code, 0)
+
+
+class StatsCommandTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        p = mock.patch.dict(os.environ, {"WORKBOARD_CACHE": td.name, "WORKBOARD_CONFIG": "/nonexistent", "NO_COLOR": "1"})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def out(self, argv):
+        buf = io.StringIO()
+        with mock.patch.object(cli, "_gather", lambda a, c: snap()), contextlib.redirect_stdout(buf):
+            code = cli.main(argv)
+        return code, buf.getvalue()
+
+    def test_narrow_plain_keeps_full_definitions(self):
+        from workboard import stats as st
+        code, text = self.out(["stats", "--plain", "--width", "60"])
+        for line in text.splitlines():
+            self.assertLessEqual(len(line), 60, line)
+        joined = " ".join(l.strip() for l in text[text.index("Definitions:"):].splitlines())
+        self.assertIn(st.DEFINITIONS.format(tz="America/Los_Angeles"), joined.replace("Definitions: ", ""))
+
+    def test_json_has_definitions_and_window(self):
+        code, text = self.out(["stats", "--json", "--from", "2026-10-01", "--to", "2026-10-21"])
+        data = json.loads(text)["result"]
+        self.assertIn("definitions", data)
+        self.assertEqual(data["window"]["from"][:10], "2026-10-01")
+        for key in ("flow", "funnel", "weekly", "pipeline_age"):
+            self.assertIn(key, data)
+
+    def test_reversed_range_rejected(self):
+        with self.assertRaises(SystemExit):
+            self.out(["stats", "--from", "2026-10-21", "--to", "2026-10-01"])
+        with self.assertRaises(SystemExit):
+            self.out(["stats", "--weeks", "0"])

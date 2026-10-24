@@ -18,8 +18,11 @@ from zoneinfo import ZoneInfo
 from .projection import ts
 
 ACCEPTED = {"accepted", "used_in_training"}
-DEFINITIONS = ("accepted = status accepted/used_in_training, dated by reviewedAt; submitted = enteredPoolAt; "
-               "worked on = createdAt; weeks Monday-start in {tz}")
+DEFINITIONS = ("accepted = current status accepted or used_in_training, dated by reviewedAt; "
+               "submitted = has enteredPoolAt (dated by it); worked on = createdAt; MT = multi-turn track, "
+               "ST = single-turn; imported = known to codimango; cycle time = first submission -> acceptance; "
+               "reviewer wait = submission -> latest human decision (codimango keeps only the latest); "
+               "weeks Monday-start in {tz}; timestamps after now are ignored")
 
 
 def week_start(dt: datetime, tz: ZoneInfo) -> datetime:
@@ -32,31 +35,46 @@ def _rows(observations):
 
 
 def is_accepted(f) -> bool:
-    return f.get("codimango.status") in ACCEPTED or f.get("codimango.status_before_archive") in ACCEPTED
+    """Current codimango status only (archived-after-acceptance is reported separately)."""
+    return f.get("codimango.status") in ACCEPTED
 
 
 def is_mt(f) -> bool:
     return "multi" in (f.get("codimango.track") or "")
 
 
-def accepted_times(observations) -> list[tuple[datetime, str]]:
+def _past(t, now):
+    return t if (t is not None and (now is None or t <= now)) else None
+
+
+def accepted_times(observations, now=None) -> list[tuple[datetime, str]]:
     out = []
     for o in _rows(observations):
         if is_accepted(o.fields):
-            at = ts(o.fields.get("codimango.reviewed_at"))
+            at = _past(ts(o.fields.get("codimango.reviewed_at")), now)
             if at:
                 out.append((at, o.fields.get("codimango.track") or ""))
     return out
 
 
-def weekly(observations, cfg, now: datetime, weeks: int = 8) -> list[dict]:
+def weekly(observations, cfg, now: datetime, weeks: int = 8, start: datetime | None = None,
+           end: datetime | None = None) -> list[dict]:
+    """Per-week counts. With start/end, weeks covering [start, end) are listed and only events inside count."""
     tz = ZoneInfo(cfg.user.timezone)
-    this_mon = week_start(now, tz)
-    starts = [this_mon - timedelta(days=7 * k) for k in range(weeks - 1, -1, -1)]
+    end = min(end, now) if end else now
+    if start:
+        first, starts = week_start(start, tz), []
+        w = first
+        while w < end:
+            starts.append(w)
+            w += timedelta(days=7)
+    else:
+        this_mon = week_start(end, tz)
+        starts = [this_mon - timedelta(days=7 * k) for k in range(weeks - 1, -1, -1)]
     table = [{"week": s, "accepted": 0, "accepted_mt": 0, "accepted_st": 0, "submitted": 0, "worked_on": 0} for s in starts]
 
     def slot(t):
-        if t is None:
+        if t is None or t > end or (start and t < start):
             return None
         ws = week_start(t, tz)
         for row in table:
@@ -71,10 +89,9 @@ def weekly(observations, cfg, now: datetime, weeks: int = 8) -> list[dict]:
             if row:
                 row["accepted"] += 1
                 row["accepted_mt" if is_mt(f) else "accepted_st"] += 1
-        if f.get("codimango.status") != "draft":
-            row = slot(ts(f.get("codimango.entered_pool_at")))
-            if row:
-                row["submitted"] += 1
+        row = slot(ts(f.get("codimango.entered_pool_at")))
+        if row:
+            row["submitted"] += 1
         row = slot(ts(f.get("codimango.created_at")))
         if row:
             row["worked_on"] += 1
@@ -83,7 +100,7 @@ def weekly(observations, cfg, now: datetime, weeks: int = 8) -> list[dict]:
 
 def week_numbers(observations, cfg, now: datetime) -> dict:
     tz = ZoneInfo(cfg.user.timezone)
-    times = [t for t, _ in accepted_times(observations)]
+    times = [t for t, _ in accepted_times(observations, now)]
     this_mon = week_start(now, tz)
     elapsed = now.astimezone(tz) - this_mon
     last_mon = this_mon - timedelta(days=7)
@@ -107,7 +124,7 @@ def funnel(observations) -> dict:
     status = {}
     for o in cm:
         status[o.fields.get("codimango.status")] = status.get(o.fields.get("codimango.status"), 0) + 1
-    submitted = sum(1 for o in cm if o.fields.get("codimango.entered_pool_at"))
+    submitted = sum(1 for o in cm if ts(o.fields.get("codimango.entered_pool_at")))
     return {"built": len(git_tasks), "imported": len(cm), "submitted": submitted,
             "accepted": sum(1 for o in cm if is_accepted(o.fields)),
             "archived": status.get("archived", 0),
@@ -115,6 +132,66 @@ def funnel(observations) -> dict:
                                          and o.fields.get("codimango.status_before_archive") in ACCEPTED),
             "open": sum(v for k, v in status.items() if k not in ACCEPTED | {"archived"}),
             "by_status": status}
+
+
+def _pct(values, q):
+    if not values:
+        return None
+    v = sorted(values)
+    k = (len(v) - 1) * q
+    lo, hi = int(k), min(int(k) + 1, len(v) - 1)
+    return round((v[lo] + (v[hi] - v[lo]) * (k - lo)) / 3600, 1)
+
+
+def cycle_and_wait(observations, now) -> dict:
+    """Cycle time (submission -> acceptance) for accepted tasks; reviewer wait (submission -> latest human
+    decision) for decided tasks. codimango keeps only the latest decision, so re-submitted tasks measure from
+    their latest pool entry; coverage is reported."""
+    cycle, wait, accepted, decided = [], [], 0, 0
+    for o in _rows(observations):
+        f = o.fields
+        pool, rev = ts(f.get("codimango.entered_pool_at")), _past(ts(f.get("codimango.reviewed_at")), now)
+        if is_accepted(f):
+            accepted += 1
+            if pool and rev and rev >= pool:
+                cycle.append((rev - pool).total_seconds())
+        if f.get("codimango.status") in ACCEPTED | {"needs_revision"}:
+            decided += 1
+            if pool and rev and rev >= pool:
+                wait.append((rev - pool).total_seconds())
+    return {"cycle_p50_h": _pct(cycle, .5), "cycle_p75_h": _pct(cycle, .75), "cycle_coverage": f"{len(cycle)}/{accepted}",
+            "wait_p50_h": _pct(wait, .5), "wait_p75_h": _pct(wait, .75), "wait_coverage": f"{len(wait)}/{decided}"}
+
+
+def tasks_per_repo(cfg, task_names, *, runner=None) -> dict:
+    """Upstream repo per task from <task>/tests/config.json (or steps/*/tests/config.json) at the fetched ref."""
+    from . import gitutil
+    counts, covered = {}, 0
+    for repo in cfg.repositories:
+        path = Path(repo.path).expanduser()
+        ref = f"refs/workboard/{repo.branch}"
+        if gitutil.run(path, "rev-parse", "-q", "--verify", ref).returncode != 0:
+            ref = f"origin/{repo.branch}"
+        listing = gitutil.run(path, "ls-tree", "-r", "--name-only", ref, timeout=60)
+        if listing.returncode != 0:
+            continue
+        files = {}
+        for name in listing.stdout.splitlines():
+            if name.endswith("tests/config.json"):
+                files.setdefault(name.split("/", 1)[0], name)
+        for task in task_names:
+            fname = files.get(task)
+            if not fname:
+                continue
+            shown = gitutil.run(path, "show", f"{ref}:{fname}", timeout=20)
+            try:
+                up = json.loads(shown.stdout).get("repo") if shown.returncode == 0 else None
+            except (ValueError, AttributeError):
+                up = None
+            if isinstance(up, str) and up:
+                counts[up] = counts.get(up, 0) + 1
+                covered += 1
+    return {"by_repo": dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))), "coverage": f"{covered}/{len(task_names)}"}
 
 
 def pipeline_age(views, now) -> dict[str, dict]:
