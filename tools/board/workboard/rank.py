@@ -61,9 +61,18 @@ class _Bad(Exception):
     pass
 
 
+def _label(v):
+    return v.strip() if isinstance(v, str) else v
+
+
+def _cell(v):
+    """Empty CSV/rank cells become null; everything else is passed to _num unchanged."""
+    return None if isinstance(v, str) and v.strip() == "" else v
+
+
 def _num(v):
     """Integer, integer string, or explicit null; anything else is invalid."""
-    if v is None or (isinstance(v, str) and v.strip() == ""):
+    if v is None:
         return None
     if isinstance(v, bool):
         raise _Bad(v)
@@ -83,15 +92,15 @@ def normalize(rows) -> list[dict]:
     for i, r in enumerate(rows):
         if all(k in r for k in CANON):
             try:
-                row = {"scope": r["scope"], "window": r["window"], "metric": r["metric"],
-                       "value": _num(r["value"]), "rank": _num(r["rank"]), "of": _num(r["of"])}
+                row = {"scope": _label(r["scope"]), "window": _label(r["window"]), "metric": r["metric"],
+                       "value": _num(_cell(r["value"])), "rank": _num(_cell(r["rank"])), "of": _num(_cell(r["of"]))}
             except _Bad:
                 raise ValueError(f"row {i}: values must be integers or empty") from None
             if not _row_ok(row):
                 raise ValueError(f"row {i}: invalid canonical row")
             out.append(row)
             continue
-        scope, window = r.get("scope"), r.get("win") or r.get("window")
+        scope, window = _label(r.get("scope")), _label(r.get("win") or r.get("window"))
         if not (isinstance(scope, str) and isinstance(window, str)):
             raise ValueError(f"row {i}: needs scope and win/window")
         found = False
@@ -102,8 +111,8 @@ def normalize(rows) -> list[dict]:
             rank_text = str(r.get(f"{short}_rank") or "")
             rk, _, of = rank_text.partition("/")
             try:
-                row = {"scope": scope, "window": window, "metric": metric, "value": _num(r.get(short)),
-                       "rank": _num(rk), "of": _num(of)}
+                row = {"scope": scope, "window": window, "metric": metric, "value": _num(_cell(r.get(short))),
+                       "rank": _num(_cell(rk)), "of": _num(_cell(of))}
             except _Bad:
                 raise ValueError(f"row {i}: {metric} values must be integers or empty") from None
             if not _row_ok(row):

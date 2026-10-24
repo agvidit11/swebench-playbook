@@ -495,6 +495,22 @@ class SetupCommandTest(unittest.TestCase):
         self.assertIn("not our link", err)
         self.assertEqual(dest.read_text(), "#!/bin/sh\necho someone else\n")
 
+    def test_setup_leaves_foreign_symlinks_alone(self):
+        for dest in (self.home / ".local" / "bin" / "board", self.home / ".claude" / "skills" / "workboard" / "SKILL.md"):
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.symlink_to("/usr/bin/true")
+        code, err, _ = self.run_setup()
+        self.assertEqual(code, 1)
+        self.assertIn("links somewhere else", err)
+        self.assertEqual(os.readlink(self.home / ".local" / "bin" / "board"), "/usr/bin/true")
+
+    def test_setup_accepts_relative_link_to_our_board(self):
+        dest = self.home / ".local" / "bin" / "board"
+        dest.parent.mkdir(parents=True)
+        dest.symlink_to(os.path.relpath(cli.board_path(), dest.parent))
+        code, err, _ = self.run_setup()
+        self.assertEqual(code, 0, err)
+
     def test_failed_probe_and_cron_make_setup_fail(self):
         from workboard import claims
         with mock.patch.object(claims, "probe", return_value=claims.ProbeResult(False, "", "denied")), \

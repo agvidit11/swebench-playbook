@@ -59,7 +59,7 @@ OK
    short and long windows.
 
 6. `review/codex-brief-1.md:2-3` — Complete the item-9 tracked-file scrub. Remove or neutralize the private ledger
-   reference `../../ledger/CLAIMS.md` and the personal tool paths under `~/swebench/`; describe them as configured
+   references to the prior hard-coded ledger and personal tool paths; describe them as configured
    inputs/placeholders instead. Re-run the privacy scan over `git ls-files tools/board` (excluding no tracked file)
    for identities, real hosts, personal/absolute checkout paths, repository/internal URLs, and reviewer names.
 

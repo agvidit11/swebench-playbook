@@ -243,3 +243,13 @@ class StrictRankValuesTest(unittest.TestCase):
     def test_null_allowed(self):
         rows = rank.normalize([{"scope": "S", "win": "W", "acc": "0", "acc_rank": None}])
         self.assertEqual((rows[0]["value"], rows[0]["rank"], rows[0]["of"]), (0, None, None))
+
+
+class RankLabelTest(unittest.TestCase):
+    def test_labels_stripped(self):
+        c = rank.normalize([{"scope": " Org ", "window": " H2 ", "metric": "accepted", "value": 1, "rank": 1, "of": 2}])
+        w = rank.normalize([{"scope": " Org ", "win": " H2 ", "acc": "1", "acc_rank": "1/2"}])
+        self.assertEqual((c[0]["scope"], c[0]["window"]), ("Org", "H2"))
+        self.assertEqual((w[0]["scope"], w[0]["window"]), ("Org", "H2"))
+        with self.assertRaises(ValueError):
+            rank.normalize([{"scope": "Org", "window": "H2", "metric": "accepted", "value": "  x ", "rank": None, "of": None}])

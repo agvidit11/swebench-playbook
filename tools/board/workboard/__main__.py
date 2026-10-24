@@ -781,9 +781,13 @@ def cmd_setup(args, cfg):
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
             if dest.is_symlink():
-                if Path(os.readlink(dest)) == src:
+                target = Path(os.readlink(dest))
+                if not target.is_absolute():
+                    target = dest.parent / target
+                if os.path.realpath(target) == os.path.realpath(src):
                     return
-                dest.unlink()
+                problems.append(f"{what}: {dest} links somewhere else ({os.readlink(dest)}); remove it and re-run setup")
+                return
             elif dest.exists():
                 problems.append(f"{what}: {dest} exists and is not our link; remove it and re-run setup")
                 return
