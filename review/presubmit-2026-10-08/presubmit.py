@@ -283,6 +283,23 @@ def check_configs(cfgs, fmt):
                 ok("MT root config", "root tests/config.json holds only repo/instance_id/base_commit")
         except Exception as e:  # noqa: BLE001
             fail("MT root config", f"unreadable root tests/config.json: {e}")
+    # Every graded id must be defined in the inline test_patch: TBR grades only test_patch, so ids whose
+    # bodies live in an auxiliary file copied by test.sh are never created (typeprof 9490fd1 BAD_GRADING_WRONG).
+    for label, p in step_cfgs:
+        try:
+            c = json.loads(SRC.read(p))
+        except Exception:  # noqa: BLE001
+            continue
+        tp = c.get("test_patch") or ""
+        ids = list(c.get("fail_to_pass") or [])  # pass_to_pass may name existing upstream tests
+        missing = []
+        for tid in ids:
+            tok = re.split(r"::|\s|#|/|\.", str(tid).strip())[-1].strip("()[]")
+            if len(tok) >= 8 and tok not in tp:
+                missing.append(tok)
+        if missing:
+            fail(f"config {label} ids", f"{len(missing)} graded id(s) not defined in inline test_patch "
+                 f"(TBR never creates them): {missing[:4]}")
     per_step = []
     for label, p in cfgs:
         try:
