@@ -1,0 +1,127 @@
+import json
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+
+from workboard import rank, stats
+from workboard.config import load_config
+from workboard.model import Observation
+
+NOW = datetime(2026, 10, 21, 23, 22, tzinfo=timezone.utc)   # Wed 16:22 PT
+
+
+def cm(name, status, reviewed=None, pool=None, created="2026-09-01T00:00:00Z", track="swe-bench-multi-turn", before=None):
+    f = {"codimango.status": status, "codimango.reviewed_at": reviewed, "codimango.entered_pool_at": pool,
+         "codimango.created_at": created, "codimango.track": track, "codimango.updated_at": "u"}
+    if before:
+        f["codimango.status_before_archive"] = before
+    return Observation("codimango", name, NOW, f)
+
+
+class StatsTest(unittest.TestCase):
+    def setUp(self):
+        self.cfg = load_config(Path("/nonexistent"))
+        obs = []
+        # W43 (Mon Oct 19 PT): 8 MT + 2 ST accepted; W42: 12; W41: 19
+        for i in range(8):
+            obs.append(cm(f"a{i}", "accepted", "2026-10-20T18:00:00Z"))
+        for i in range(2):
+            obs.append(cm(f"b{i}", "used_in_training", "2026-10-21T18:00:00Z", track="swe-bench-external-repos"))
+        for i in range(12):
+            obs.append(cm(f"c{i}", "accepted", "2026-10-14T18:00:00Z"))
+        for i in range(19):
+            obs.append(cm(f"d{i}", "accepted", "2026-10-07T18:00:00Z"))
+        obs.append(cm("e", "archived", "2026-10-07T18:00:00Z", before="accepted"))
+        obs.append(cm("f", "needs_revision", "2026-10-20T10:00:00Z", pool="2026-10-15T00:00:00Z"))
+        obs.append(cm("g", "draft", created="2026-10-20T00:00:00Z"))
+        obs.append(Observation("git", "g", NOW, {"git.task_head": "x"}))
+        obs.append(Observation("git", "__repo__:tasks", NOW, {}))
+        self.obs = obs
+
+    def test_weekly_matches_hand_count(self):
+        rows = {r["week"].date().isoformat(): r for r in stats.weekly(self.obs, self.cfg, NOW, 4)}
+        self.assertEqual(rows["2026-10-19"]["accepted"], 10)
+        self.assertEqual((rows["2026-10-19"]["accepted_mt"], rows["2026-10-19"]["accepted_st"]), (8, 2))
+        self.assertEqual(rows["2026-10-12"]["accepted"], 12)
+        self.assertEqual(rows["2026-10-05"]["accepted"], 20)      # 19 + one archived after acceptance
+
+    def test_this_week_vs_same_point_and_median(self):
+        n = stats.week_numbers(self.obs, self.cfg, NOW)
+        self.assertEqual(n["this_week"], 10)
+        self.assertEqual(n["same_point_last_week"], 12)          # Oct 14 18:00Z is before Wed 16:22 PT
+        self.assertEqual(n["median_4wk"], 6)                     # [12, 20, 0, 0] -> median 6
+
+    def test_funnel_uses_codimango_archived(self):
+        f = stats.funnel(self.obs)
+        self.assertEqual(f["archived"], 1)
+        self.assertEqual(f["archived_after_accept"], 1)
+        self.assertEqual(f["built"], 1)                          # __repo__ entity excluded
+        self.assertEqual(f["accepted"], 42)
+
+    def test_first_submission_rate_by_cohort(self):
+        rounds = {"f": 1}
+        obs = self.obs + [cm("h", "accepted", "2026-10-20T00:00:00Z", pool="2026-10-15T00:00:00Z")]
+        rounds["h"] = 0
+        cohorts = stats.first_pass_by_cohort(obs, rounds, self.cfg)
+        self.assertEqual((cohorts[-1]["decided"], cohorts[-1]["first_pass"], cohorts[-1]["rate"]), (2, 1, 50))
+
+    def test_revision_rounds_cached_and_coverage(self):
+        import subprocess
+        calls = []
+
+        def runner(argv, **kw):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, "  REVISION by X\n  REVISION by Y\n", "")
+
+        with tempfile.TemporaryDirectory() as d:
+            r = stats.revision_rounds(self.cfg, self.obs, Path(d), runner=runner)
+            self.assertEqual(r["rounds"]["f"], 2)
+            self.assertEqual((r["covered"], r["eligible"]), (1, 1))
+            stats.revision_rounds(self.cfg, self.obs, Path(d), runner=runner)
+            self.assertEqual(len(calls), 1)                      # second run served from cache
+
+    def test_ascii_chart_fallback(self):
+        self.assertEqual(stats.bar(5, 10, 10, unicode=False), "#####")
+        self.assertTrue(stats.bar(5, 10, 10, unicode=True).startswith("█████"))
+        self.assertEqual(len(stats.spark([1, 2, 3], unicode=False)), 3)
+
+
+class RankTest(unittest.TestCase):
+    MD = '''| scope | win | acc | acc_rank |
+| -----| -----| -----| ----- |
+| "1 SWE multi-turn track" | "Q4 (from Oct 1)" | 27 | "2/209" |
+| "6 Team: SWE multi-turn" | "W-5 2026-09-07" | 0 | *NULL* |
+'''
+
+    def test_rank_import_md_and_csv(self):
+        rows = rank.parse_table(self.MD)
+        self.assertEqual(rows[0]["scope"], "1 SWE multi-turn track")
+        self.assertEqual(rows[0]["acc_rank"], "2/209")
+        self.assertIsNone(rows[1]["acc_rank"])
+        csv_rows = rank.parse_table("scope,win,acc\nSWE MT,Q4,27\n")
+        self.assertEqual(csv_rows[0]["acc"], "27")
+
+    def test_import_file_caches(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "r.md"
+            f.write_text(self.MD)
+            rank.import_file(f, Path(d))
+            self.assertEqual(len(rank.load(Path(d))["rows"]), 2)
+
+    def test_rank_query_denied_prints_manual_step(self):
+        import subprocess
+        cfg = load_config(Path("/nonexistent"))
+        cfg.rank.daiquery_id = "123"
+
+        def runner(argv, **kw):
+            return subprocess.CompletedProcess(argv, 1, "", "AGENT_ROLE_ACCESS denied")
+
+        with tempfile.TemporaryDirectory() as d:
+            data, why = rank.refresh(cfg, Path(d), runner=runner)
+        self.assertIsNone(data)
+        self.assertIn("rank import", why)
+
+    def test_no_query_id(self):
+        data, why = rank.refresh(load_config(Path("/nonexistent")), Path("/tmp"))
+        self.assertIn("daiquery_id", why)

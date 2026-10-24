@@ -45,32 +45,54 @@ def parse_summary(text: str, pattern: str) -> dict | None:
 TAIL_BYTES = 65536
 
 
+class BoundedTail:
+    """Keeps only the last `limit` characters written to it."""
+
+    def __init__(self, limit: int = TAIL_BYTES):
+        self.limit, self.parts, self.size = limit, [], 0
+
+    def add(self, text: str) -> None:
+        self.parts.append(text)
+        self.size += len(text)
+        while self.size > self.limit and len(self.parts) > 1:
+            self.size -= len(self.parts.pop(0))
+        if self.size > self.limit:                 # one huge chunk: trim it
+            self.parts[0] = self.parts[0][-self.limit:]
+            self.size = len(self.parts[0])
+
+    def text(self) -> str:
+        return "".join(self.parts)
+
+
 def _stream(argv, timeout, out, err):
-    """Run argv, copying stdout/stderr to out/err as it arrives; keep a bounded tail for parsing.
-    Returns (exit code, tail text); exit 124 on timeout (whole process group killed)."""
-    import collections
+    """Run argv, copying stdout/stderr to out/err as they arrive (one incremental UTF-8 decoder per stream).
+    Returns (exit code, bounded stdout tail); exit 124 on timeout (whole process group killed)."""
+    import codecs
     import os
     import signal
     import threading
     proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
-    tail = collections.deque()
-    size = [0]
-    lock = threading.Lock()
+    stdout_tail = BoundedTail()
 
-    def pump(src, dest):
-        for chunk in iter(lambda: src.read1(4096) if hasattr(src, "read1") else src.read(4096), b""):
-            text = chunk.decode("utf-8", "replace")
-            dest.write(text)
+    def pump(src, dest, tail):
+        decoder = codecs.getincrementaldecoder("utf-8")("replace")
+        for chunk in iter(lambda: src.read1(4096), b""):
+            text = decoder.decode(chunk)
+            if text:
+                dest.write(text)
+                dest.flush()
+                if tail is not None:
+                    tail.add(text)
+        rest = decoder.decode(b"", final=True)
+        if rest:
+            dest.write(rest)
             dest.flush()
-            with lock:
-                tail.append(text)
-                size[0] += len(text)
-                while size[0] > TAIL_BYTES and len(tail) > 1:
-                    size[0] -= len(tail.popleft())
+            if tail is not None:
+                tail.add(rest)
         src.close()
 
-    threads = [threading.Thread(target=pump, args=(proc.stdout, out), daemon=True),
-               threading.Thread(target=pump, args=(proc.stderr, err), daemon=True)]
+    threads = [threading.Thread(target=pump, args=(proc.stdout, out, stdout_tail), daemon=True),
+               threading.Thread(target=pump, args=(proc.stderr, err, None), daemon=True)]
     for t in threads:
         t.start()
     try:
@@ -84,7 +106,7 @@ def _stream(argv, timeout, out, err):
         code = 124
     for t in threads:
         t.join(5)
-    return code, "".join(tail)
+    return code, stdout_tail.text()
 
 
 def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.stderr) -> int:

@@ -485,6 +485,105 @@ def cmd_review(args, cfg):
     return 0
 
 
+def render_stats(snap, cfg, *, weeks, width, uni, quality=None, rank_data=None) -> str:
+    from zoneinfo import ZoneInfo
+    from . import stats as st
+    rows = st.weekly(snap.observations, cfg, snap.now, weeks)
+    n = st.week_numbers(snap.observations, cfg, snap.now)
+    top = max([r["accepted"] for r in rows] + [1])
+    barw = max(8, min(30, width - 60))
+    out = [f"Weekly output — accepted by acceptance date (last {weeks} weeks)",
+           f"  {'week of':<11} {'accepted':<10} {'':<{barw}}  {'submitted':>9}  {'worked on':>9}"]
+    for r in rows:
+        acc = f"{r['accepted']} ({r['accepted_mt']}/{r['accepted_st']})"
+        out.append(f"  {r['week']:%Y-%m-%d}  {acc:<10} {st.bar(r['accepted'], top, barw, uni):<{barw}}  "
+                   f"{r['submitted']:>9}  {r['worked_on']:>9}")
+    out.append(f"  accepted (MT/ST) · trend {st.spark([r['accepted'] for r in rows], uni)}")
+    out.append(f"  W{n['week']} so far {n['this_week']} · same point last week {n['same_point_last_week']} · "
+               f"4-week median {n['median_4wk']:g} · all-time accepted {n['total']}")
+    f = st.funnel(snap.observations)
+    out += ["", "Funnel (exact sources)",
+            f"  built {f['built']} (task dirs) -> imported {f['imported']} -> submitted {f['submitted']} -> "
+            f"accepted {f['accepted']}",
+            f"  archived {f['archived']} ({f['archived_after_accept']} after acceptance) · open {f['open']}"]
+    ages = st.pipeline_age(snap.views, snap.now)
+    if ages:
+        out += ["", "Pipeline age (open tasks: count · median · max time in state)"]
+        out += [f"  {k:<10} {v['count']:>3} · {v['median_h']:>6}h · {v['max_h']:>6}h" for k, v in ages.items()]
+    if quality is not None:
+        cov = f"{quality['covered']}/{quality['eligible']}"
+        r = quality["rounds"]
+        bounced = sum(1 for x in r.values() if x)
+        out += ["", f"Quality (human review history, coverage {cov} submitted tasks)",
+                f"  tasks sent back at least once {bounced} · total revision rounds {sum(r.values())}"]
+        for c in st.first_pass_by_cohort(snap.observations, r, cfg)[-weeks:]:
+            rate = "-" if c["rate"] is None else f"{c['rate']}%"
+            out.append(f"  submitted week {c['week']:%Y-%m-%d}: {c['first_pass']}/{c['decided']} accepted first time ({rate})")
+    if rank_data:
+        out += ["", f"Rank (from {rank_data['source']}, fetched {rank_data['fetched_at'][:16]} UTC)"]
+        cols = [c for c in ("scope", "win", "acc", "acc_rank", "acc_top", "sub", "sub_rank", "work", "work_rank")
+                if c in rank_data["rows"][0]] or list(rank_data["rows"][0])[:8]
+        widths = {c: min(32, max(len(c), *(len(str(r.get(c) or "")) for r in rank_data["rows"]))) for c in cols}
+        out.append("  " + "  ".join(c.upper().ljust(widths[c]) for c in cols))
+        for r in rank_data["rows"]:
+            out.append("  " + "  ".join(render.middle(str(r.get(c) or ""), widths[c]).ljust(widths[c]) for c in cols))
+    out += ["", "Definitions: " + st.DEFINITIONS.format(tz=cfg.user.timezone)]
+    return "\n".join(l if len(l) <= width else l[:width - 1] + "…" for l in out)
+
+
+def cmd_stats(args, cfg):
+    from . import app, rank, stats as st
+    snap = _gather(args, cfg)
+    quality = st.revision_rounds(cfg, snap.observations, app.cache_dir(), fetch=True) if args.quality else None
+    rank_data = rank.load(app.cache_dir())
+    if args.json:
+        rows = st.weekly(snap.observations, cfg, snap.now, args.weeks)
+        return _emit(args, snap, {"weekly": [dict(r, week=r["week"].isoformat()) for r in rows],
+                                  "week": st.week_numbers(snap.observations, cfg, snap.now),
+                                  "funnel": st.funnel(snap.observations),
+                                  "pipeline_age": st.pipeline_age(snap.views, snap.now),
+                                  "quality": quality, "rank": rank_data})
+    style = _style(args, cfg)
+    return _emit(args, snap, human=render_stats(snap, cfg, weeks=args.weeks, width=_width(args), uni=style.unicode,
+                                                quality=quality, rank_data=rank_data))
+
+
+def cmd_rank(args, cfg):
+    from . import app, rank
+    cache = app.cache_dir()
+    if args.action == "import":
+        if not args.file:
+            print("rank import needs a file", file=sys.stderr)
+            return 2
+        try:
+            data = rank.import_file(Path(args.file), cache)
+        except (OSError, ValueError) as exc:
+            print(f"rank import failed: {exc}", file=sys.stderr)
+            return 2
+        print(f"imported {len(data['rows'])} rank rows")
+        return 0
+    data, why = (rank.refresh(cfg, cache) if args.refresh else (rank.load(cache), "cached"))
+    if data is None and not args.refresh:
+        data, why = rank.refresh(cfg, cache)
+    if data is None:
+        print(why, file=sys.stderr)
+        cached = rank.load(cache)
+        if not cached:
+            return 1
+        data = cached
+        print("(showing the last cached result)", file=sys.stderr)
+    if args.json:
+        print(json.dumps(data))
+        return 0
+    cols = list(data["rows"][0])
+    print(f"Rank from {data['source']} (fetched {data['fetched_at'][:16]} UTC)")
+    widths = {c: min(32, max(len(c), *(len(str(r.get(c) or "")) for r in data["rows"]))) for c in cols}
+    print("  " + "  ".join(c.upper().ljust(widths[c]) for c in cols))
+    for r in data["rows"]:
+        print("  " + "  ".join(render.middle(str(r.get(c) or ""), widths[c]).ljust(widths[c]) for c in cols))
+    return 0
+
+
 def cmd_legend(args, cfg):
     text = render.legend(set(), _style(args, cfg), everything=True, width=_width(args))
     print(json.dumps({"legend": text.splitlines()}) if args.json else text)
@@ -561,6 +660,12 @@ def build_parser():
     cl.add_argument("task")
     cl.add_argument("--to", help="assign to the session whose tab title contains this text")
     cl.add_argument("--steal", action="store_true", help="take over an expired claim")
+    stp = sub.add_parser("stats", parents=[common], help="weekly progress, funnel, pipeline age, quality, rank")
+    stp.add_argument("--weeks", type=int, default=8)
+    stp.add_argument("--quality", action="store_true", help="fetch human review history (cached) for revision stats")
+    rk = sub.add_parser("rank", parents=[common], help="your rank on track/team/org (saved DaiQuery query)")
+    rk.add_argument("action", choices=["show", "import"], nargs="?", default="show")
+    rk.add_argument("file", nargs="?")
     ck = sub.add_parser("check", help="run the pre-submit gate and record its result")
     ck.add_argument("action", choices=["run"])
     ck.add_argument("task")
@@ -591,7 +696,8 @@ def build_parser():
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
             "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release, "hook": cmd_hook,
-            "sync": cmd_sync, "install-hooks": cmd_install_hooks, "check": cmd_check, "review": cmd_review}
+            "sync": cmd_sync, "install-hooks": cmd_install_hooks, "check": cmd_check, "review": cmd_review,
+            "stats": cmd_stats, "rank": cmd_rank}
 
 
 def main(argv=None) -> int:

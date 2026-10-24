@@ -104,6 +104,32 @@ class ChecksTest(unittest.TestCase):
         self.assertTrue(p["parsed"])
         self.assertGreater(len(out), 500000)          # everything passed through
 
+    def test_multibyte_across_chunk_boundary(self):
+        body = 'import sys\ns = "x" * 4095 + "·" + "y" * 10\nsys.stdout.write(s)\nprint("\\n0 FAIL · 0 WARN · 1 PASS")\n'
+        code, out, _, p = self.run_gate(body)
+        self.assertIn("x" * 4095 + "·" + "y" * 10, out)
+        self.assertNotIn("\ufffd", out)
+        self.assertTrue(p["parsed"])
+
+    def test_stderr_flood_does_not_evict_stdout_summary(self):
+        body = 'import sys\nprint("0 FAIL · 1 WARN · 9 PASS", flush=True)\nsys.stderr.write("e" * 200000)\n'
+        code, _, err, p = self.run_gate(body)
+        self.assertTrue(p["parsed"])
+        self.assertEqual((p["warn"], p["pass"]), (1, 9))
+        self.assertGreaterEqual(len(err), 200000)
+
+    def test_parse_input_is_bounded(self):
+        seen = {}
+        orig = checks.parse_summary
+
+        def spy(text, pattern):
+            seen["n"] = len(text)
+            return orig(text, pattern)
+
+        with mock.patch.object(checks, "parse_summary", spy):
+            self.run_gate('print("x" * 500000)\nprint("0 FAIL · 0 WARN · 2 PASS")\n')
+        self.assertLessEqual(seen["n"], checks.TAIL_BYTES)
+
     def test_no_gate_configured(self):
         self.cfg.checks.presubmit = []
         self.assertEqual(checks.run_check(self.cfg, "alpha", state_dir=self.state, err=io.StringIO()), 2)
