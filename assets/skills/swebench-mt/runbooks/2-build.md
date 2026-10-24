@@ -64,6 +64,20 @@ test, that test is over-pinned — report it. Do not edit tests.
 `artifacts = ["/app/<file the solver writes>"]` — suggested default, not a gate.
 Then Codex verifies your files back.
 
+**3d — contract and anti-reward-hack gate.** For the exact current task bytes,
+write a bidirectional atomic requirement ↔ graded-behavior matrix. Require one
+primary behavior per requirement and one explicit requirement per behavior;
+prove the rows are mutually exclusive and collectively exhaustive. Then run a
+positive control and adversarial fake-pass probes covering candidate crash,
+timeout/build failure, missing/extra IDs, forged output/JUnit, harness edits,
+source-hash mismatch, solver/solution-file shortcuts, null output, and relevant
+environment/config manipulation. Every adversarial case must fail closed with
+reward 0. A fresh reviewer must return zero Critical/High/Medium findings.
+
+This gate runs after **every** task edit and before any calibration. Any edit
+invalidates its evidence. Do not use calibration to discover a contract or
+reward-integrity defect; fix the defect, repeat 3d, and only then calibrate.
+
 **4 — preflight.**
 ```bash
 ~/.claude/skills/swebench-mt/preflight.sh <task-dir> --with-oracle
@@ -157,6 +171,21 @@ this fails silently with a success exit code.
 That middle rule is **two-way**: everything in the instruction is graded, and
 nothing is graded that is not in the instruction. Preflight flags both
 directions, advisory-only — the detection is regex-based and can false-positive.
+
+Before calibration, make this contract mechanical rather than prose-only:
+
+- split each step instruction into atomic obligations;
+- assign exactly one primary graded behavior ID to each obligation and exactly
+  one obligation to each graded behavior ID;
+- map cumulative/P2P coverage to an explicit preservation obligation;
+- prove the resulting rows are mutually exclusive and collectively exhaustive;
+- block on any ungraded requirement, unstated assertion, or overlapping row.
+
+The unit is an observable behavior ID, not a test file: one test file may host
+many rows, and one row may have several assertions needed to prove that single
+behavior. Store the fresh matrix and reward-hack evidence outside committed task
+artifacts (for example under `.review/` or `/tmp`) unless the task already has an
+author-side audit convention.
 
 ## 2b / 3b / 3c — Cross-verification (runs alongside 2 and 3)
 

@@ -20,7 +20,7 @@ A dispatched agent reads **one** phase runbook. Do not hand it four files.
 | # | Runbook | Does | Entry condition | Exit condition |
 |---|---|---|---|---|
 | 1 | `1-brainstorm.md` | pick repo, find candidates, **measure** variance | — | a candidate with a MEASURED 0-3/5 split (1-3/5 preferred; 0/5 needs a third-party gradient + legit failures) |
-| 2 | `2-build.md` | instruction, tests, solve/docker/toml, preflight | phase 1 measured the split | `preflight.sh --with-oracle` exit 0 |
+| 2 | `2-build.md` | instruction, tests, solve/docker/toml, contract/anti-hack proof, preflight | phase 1 measured the split | fresh MECE 1:1 contract proof + anti-reward-hack proof + `preflight.sh --with-oracle` exit 0 |
 | 3 | `3-harness.md` | read verdict, tune the harness, salvage | a server verdict exists | in band, or an evidenced kill |
 
 **Phase 1's exit condition is not negotiable.** Eleven candidates scored
@@ -123,6 +123,29 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    pivot, replay, or archive decision. Never begin proper work from stale local
    state, an old report, or remembered calibration numbers.
 1. **End of phase 1** — no measured 0-3/5 split, no build (1-3/5 preferred; see 00-ROUTER §4 acceptable band).
+1b. **After every task creation or edit, before any calibration — prove the
+   contract and reward path again (Vidit 2026-10-24, MUST).** The proof must be
+   fresh for the exact bytes about to be calibrated; an older review or forge
+   run is invalid after any instruction, test, verifier, solution, Dockerfile,
+   or task metadata change.
+   - Build an atomic requirement ↔ graded-behavior matrix for every step.
+     Every instruction obligation has exactly one primary graded behavior and
+     every F2P/P2P/hidden behavior maps back to explicit instruction text.
+     Work at behavior-ID granularity, not physical test-file granularity.
+   - Prove the rows are **mutually exclusive and collectively exhaustive**:
+     no two rows grade the same obligation, no requirement is ungraded, no test
+     grades an unstated behavior, and cumulative/P2P rows map to an explicit
+     preservation requirement. A gap is `BAD_GRADING_WEAK`; an extra assertion
+     is `BAD_GRADING_WRONG`. Either one blocks calibration.
+   - Run a positive control plus current fake-pass probes. Candidate crash,
+     timeout/build failure, missing or extra IDs, forged output/JUnit, modified
+     harness, source-hash mismatch, solver/solution-file shortcuts, null output,
+     and relevant environment/config manipulation must all fail closed and earn
+     zero reward. Record command, outcome, and evidence for each class.
+   - A fresh independent reviewer must report zero Critical/High/Medium
+     spec-test or reward-integrity findings. If anything changes while fixing a
+     finding, invalidate the proof and repeat this stop before calibration.
+   **No green proof, no local K2N, no server calibration, and no push.**
 2. **Before push** — README check first (Vidit 2026-10-16; presubmit FAILs on it): the README has
    **no internal links** (internalmeta.com, workplace.com, fburl.com, internalfb.com), and its
    **Completion Rates / Model Analysis describe the commit being pushed** — no stale "0/5 / not reached /

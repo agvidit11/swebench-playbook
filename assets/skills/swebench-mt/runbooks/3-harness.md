@@ -19,6 +19,16 @@ legitimate `reward 0.0`.
 
 # PART A — THE STAGES
 
+## Contract and reward path first — before calibration
+
+After any task edit, calibration is forbidden until the exact current bytes
+have a fresh green RUNBOOK hard-stop 1b proof: bidirectional 1:1 atomic
+requirement ↔ graded-behavior mapping, mutually exclusive and collectively
+exhaustive rows, and positive-control plus fake-pass evidence showing every
+adversarial path earns zero. A calibration run from before the latest edit is
+historical evidence only, never release evidence. Fixing a finding invalidates
+the proof and requires a new proof before another calibration run.
+
 ## 5 — Read the verdict
 
 ```bash
