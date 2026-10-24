@@ -47,12 +47,12 @@ def _pretty(args, cfg) -> bool:
 
 
 def cmd_watch(args, cfg):
-    from . import tui
+    from . import app_ui, sync as s
     from .app import gather
-    if not sys.stdout.isatty():
-        print("board watch needs an interactive terminal; use `board` for a one-off view", file=sys.stderr)
+    if not (sys.stdout.isatty() and sys.stdin.isatty()):
+        print("board ui needs an interactive terminal; use `board` for a one-off view", file=sys.stderr)
         return 2
-    return tui.watch(lambda: gather(cfg), cfg, interval=args.interval)
+    return app_ui.run(lambda: gather(cfg), cfg, interval=args.interval, host_tag=s.safe_host(s.host_id_for(cfg)))
 
 
 def _gather(args, cfg):
@@ -951,8 +951,14 @@ def build_parser():
     lp.add_argument("--mine", action="store_true", help="only tasks owned on this host, or free")
     lp.add_argument("--group", choices=["attention", "state", "owner"], default="attention")
     lp.add_argument("--classic", action="store_true", help="compact word-based table instead of the pretty view")
-    wt = sub.add_parser("watch", parents=[common], help="live board: refreshes itself, ✦ marks changes (q quits)")
+    wt = sub.add_parser("ui", aliases=["watch"], parents=[common],
+                        help="interactive live board: tabs, filters, search, details (? for keys)")
     wt.add_argument("--interval", type=int, default=120, help="seconds between refreshes")
+    hp = sub.add_parser("html", parents=[common], help="write a self-contained HTML dashboard")
+    hp.add_argument("--out", default="~/.cache/workboard/board.html")
+    sv = sub.add_parser("serve", help="serve the live HTML dashboard on localhost")
+    sv.add_argument("--port", type=int, default=8765)
+    sv.add_argument("--interval", type=int, default=120)
     s = sub.add_parser("show", parents=[common], help="one task in full")
     s.add_argument("task")
     s.add_argument("--no-reviews", action="store_true", help="skip fetching human reviews")
@@ -1020,7 +1026,27 @@ def cmd_completion(args, cfg):
     return 0
 
 
-COMMANDS_EXTRA = {"watch": cmd_watch}
+def cmd_html(args, cfg):
+    from . import html
+    snap = _gather(args, cfg)
+    path = html.write(snap, cfg, Path(args.out))
+    print(f"wrote {path}  (open it in a browser; for a live page use: board serve)")
+    return 0
+
+
+def cmd_serve(args, cfg):
+    from . import html
+    from .app import gather
+    srv = html.serve(lambda: gather(cfg), cfg, port=args.port, interval=args.interval)
+    print(f"🧭 workboard live at http://localhost:{args.port}/  (VS Code forwards the port; Ctrl-C to stop)")
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+COMMANDS_EXTRA = {"watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
             "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release, "hook": cmd_hook,

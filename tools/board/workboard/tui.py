@@ -87,6 +87,27 @@ def clip(text: str, width: int) -> str:
     return head + "…" + tail
 
 
+def flow(items: list[str], width: int, indent: str = "  ", sep: str = "   ") -> list[str]:
+    """Lay styled items out left to right, wrapping by display width; never splits an item."""
+    lines, cur, cur_w = [], indent, dwidth(indent)
+    for it in items:
+        w = dwidth(it)
+        if cur.strip() and cur_w + len(sep) + w > width:
+            lines.append(cur)
+            cur, cur_w = indent, dwidth(indent)
+        if cur.strip():
+            cur += sep
+            cur_w += len(sep)
+        if dwidth(indent) + w > width:                    # a single item wider than the screen: clip it
+            it = clip(ANSI.sub("", it), width - dwidth(indent))
+            w = dwidth(it)
+        cur += it
+        cur_w += w
+    if cur.strip():
+        lines.append(cur)
+    return lines
+
+
 # ------------------------------------------------------------------------------------------- cells
 def _pill(state: str, age: str, level: str) -> str:
     b, f = PILL.get(state, (240, 255))
@@ -188,7 +209,7 @@ def _choose(widths_needed, width):
 
 
 def render(snap, cfg, *, width=None, changed: set | None = None, show_all=False, status_line: str = "",
-           header_extra: str = "") -> str:
+           header_extra: str = "", selected: str | None = None, pulse: bool = True) -> str:
     from .stats import week_numbers
     width = width or shutil.get_terminal_size((140, 40)).columns
     changed = changed or set()
@@ -202,10 +223,11 @@ def render(snap, cfg, *, width=None, changed: set | None = None, show_all=False,
     # header
     n = week_numbers(snap.observations, cfg, snap.now)
     trend = "📈" if n["this_week"] >= n["same_point_last_week"] else "📉"
-    out.append(f"  🧭 {BOLD}{fg(PINK)}workboard{RESET}  {ITALIC}{fg(GREY)}your tasks across every server and session{RESET}"
-               + (f"   {header_extra}" if header_extra else ""))
-    out.append(f"  {trend} {BOLD}W{n['week']}{RESET}: {fg(GREEN)}{BOLD}{n['this_week']}{RESET} accepted"
-               f" {fg(GREY)}· last week at this point {n['same_point_last_week']} · 4-week median {n['median_4wk']:g}{RESET}")
+    out += flow([f"🧭 {BOLD}{fg(PINK)}workboard{RESET}", f"{ITALIC}{fg(GREY)}your tasks across every server and session{RESET}"]
+                + ([header_extra] if header_extra else []), width, sep="  ")
+    out += flow([f"{trend} {BOLD}W{n['week']}{RESET}: {fg(GREEN)}{BOLD}{n['this_week']}{RESET} accepted",
+                 f"{fg(GREY)}last week at this point {n['same_point_last_week']}{RESET}",
+                 f"{fg(GREY)}4-week median {n['median_4wk']:g}{RESET}"], width, sep=f" {fg(GREY)}·{RESET} ")
     # colour bar
     total = max(1, sum(counts.values()))
     bar_w = max(10, width - 4)
@@ -215,9 +237,8 @@ def render(snap, cfg, *, width=None, changed: set | None = None, show_all=False,
         used += w
         segs.append(f"{fg(GROUP[g][0])}{'━' * max(0, w)}{RESET}")
     out.append("  " + "".join(segs))
-    chips = "   ".join(f"{fg(GROUP[g][0])}●{RESET} {GROUP[g][1]} {GROUP[g][2]} {BOLD}{counts[g]}{RESET}"
-                       for g in ("ATTENTION", "READY", "WAITING", "DONE"))
-    out.append("  " + chips)
+    out += flow([f"{fg(GROUP[g][0])}●{RESET} {GROUP[g][1]} {GROUP[g][2]} {BOLD}{counts[g]}{RESET}"
+                 for g in ("ATTENTION", "READY", "WAITING", "DONE")], width)
     health = []
     for name, h in snap.health.items():
         health.append(f"{fg(GREEN)}✔{RESET} {name}" if h.ok else f"{fg(RED)}✘ {name}{RESET}")
@@ -225,14 +246,14 @@ def render(snap, cfg, *, width=None, changed: set | None = None, show_all=False,
     if st is not None:
         ok = st.last_pull_ok and (st.last_push_ok or not st.pending)
         health.append(f"{fg(GREEN)}✔{RESET} ledger" if ok else f"{fg(RED)}✘ ledger ({st.pending} pending){RESET}")
-    out.append("  " + f"{fg(GREY)} · {RESET}".join(health))
+    out += flow(health, width, sep=f" {fg(GREY)}·{RESET} ")
     bad = [f"{k}: {h.detail}" for k, h in snap.health.items() if not h.ok]
     if bad:
-        out.append(f"  {fg(RED)}{BOLD}⚠ showing cached data —{RESET} {fg(RED)}{'; '.join(bad)[:width - 26]}{RESET}")
+        out += flow([f"{fg(RED)}{BOLD}⚠ showing cached data{RESET}", f"{fg(RED)}{'; '.join(bad)}{RESET}"], width, sep=" — ")
     out.append("")
 
     if not shown:
-        out.append(f"  🌈 nothing needs you right now — {len(done)} done")
+        out += flow([f"🌈 nothing needs you right now — {len(done)} done"], width)
         return "\n".join(out)
 
     rows = [(v, _row_cells(v, changed)) for v in shown]
@@ -259,6 +280,8 @@ def render(snap, cfg, *, width=None, changed: set | None = None, show_all=False,
         last_group = g
         stripe = f"{fg(GROUP.get(g, (GREY,))[0])}▌{RESET}"
         star, name = c["task"]
+        if v.entity_id == selected:
+            star = f"{fg(PINK)}{'▶' if pulse else '▷'}{RESET} "
         cells = []
         for k, *_ in cols:
             if k == "task":
@@ -268,16 +291,19 @@ def render(snap, cfg, *, width=None, changed: set | None = None, show_all=False,
                 if dwidth(val) > w[k]:
                     val = clip(ANSI.sub("", val), w[k])
                 cells.append(pad(val, w[k]))
-        line = f"  {fg(238)}│{RESET}{stripe} " + "   ".join(cells) + RESET
+        body = "   ".join(cells)
+        if v.entity_id == selected:
+            body = bg(237) + body.replace(RESET, RESET + bg(237)) + RESET
+        line = f"  {fg(238)}│{RESET}{stripe} " + body + RESET
         out.append(pad(line, inner + 4) + f" {fg(238)}│{RESET}")
     out.append(f"  {fg(238)}╰{'─' * (inner + 2)}╯{RESET}")
     if done and not show_all:
         out.append(f"  🎉 {fg(GREY)}{len(done)} done (board --all){RESET}")
-    out.append(f"  {fg(PINK)}✦{RESET} changed since last look   {fg(GREEN)}✓✓{RESET} two sessions approved   "
-               f"{fg(AMBER)}✓{RESET} one   {fg(GREY)}↻✓{RESET} approved an older commit   ▰▰▰▰▱ confidence   "
-               f"{fg(AMBER)}⚠{RESET} server out of date   🔓 free   👤 owner   📜 from CLAIMS.md")
+    out += flow([f"{fg(PINK)}✦{RESET} changed", f"{fg(GREEN)}✓✓{RESET} 2 sessions approved", f"{fg(AMBER)}✓{RESET} 1 approved",
+                 f"{fg(GREY)}↻✓{RESET} approved older commit", f"{fg(GREEN)}▰▰▰▰▱{RESET} confidence",
+                 f"{fg(AMBER)}⚠{RESET} server out of date", "🔓 free", "👀 active", "👤 owner", "📜 CLAIMS.md"], width)
     if status_line:
-        out.append(status_line)
+        out += flow([status_line.strip()], width)
     return "\n".join(out)
 
 
@@ -382,16 +408,16 @@ def render_stats(snap, cfg, *, width=None, weeks=8, start=None, end=None, rank_d
     width = min(width or shutil.get_terminal_size((120, 40)).columns, 140)
     rows = st.weekly(snap.observations, cfg, snap.now, weeks, start, end)
     n = st.week_numbers(snap.observations, cfg, snap.now)
-    out = [f"  📊 {BOLD}{fg(PINK)}workboard stats{RESET}  {ITALIC}{fg(GREY)}how your work is flowing{RESET}", ""]
+    out = flow([f"📊 {BOLD}{fg(PINK)}workboard stats{RESET}", f"{ITALIC}{fg(GREY)}how your work is flowing{RESET}"], width, sep="  ") + [""]
 
     # headline cards
     delta = n["this_week"] - n["same_point_last_week"]
     arrow = f"{fg(GREEN)}▲ {delta}{RESET}" if delta > 0 else f"{fg(RED)}▼ {-delta}{RESET}" if delta < 0 else f"{fg(GREY)}= 0{RESET}"
-    flow = st.cycle_and_wait(snap.observations, snap.now, start, end)
+    fl = st.cycle_and_wait(snap.observations, snap.now, start, end)
     cards = [f"🏁 {BOLD}{fg(GREEN)}{n['this_week']}{RESET} accepted this week ({arrow} vs last week)",
              f"📅 4-week median {BOLD}{n['median_4wk']:g}{RESET}",
              f"🏆 all-time {BOLD}{n['total']}{RESET}"]
-    out += _panel("this week", ["   ".join(cards)], width, PINK)
+    out += _panel("this week", [l.strip() for l in flow(cards, width - 6, indent="")], width, PINK)
 
     # weekly bars, MT green + ST teal
     top = max([r["accepted"] for r in rows] + [1])
@@ -412,10 +438,10 @@ def render_stats(snap, cfg, *, width=None, weeks=8, start=None, end=None, rank_d
     # flow cards
     fmtd = lambda h: "—" if h is None else (f"{h / 24:.1f}d" if h >= 48 else f"{h:.0f}h")
     out += _panel("⏰ flow", [
-        f"🔄 submit → accepted  {BOLD}{fmtd(flow['latest_round_cycle_p50_h'])}{RESET} typical"
-        f" {fg(GREY)}(p75 {fmtd(flow['latest_round_cycle_p75_h'])}, {flow['latest_round_cycle_coverage']} tasks){RESET}",
-        f"👀 waiting on reviewer  {BOLD}{fmtd(flow['wait_p50_h'])}{RESET} typical"
-        f" {fg(GREY)}(p75 {fmtd(flow['wait_p75_h'])}, {flow['wait_coverage']} decisions){RESET}",
+        f"🔄 submit → accepted  {BOLD}{fmtd(fl['latest_round_cycle_p50_h'])}{RESET} typical"
+        f" {fg(GREY)}(p75 {fmtd(fl['latest_round_cycle_p75_h'])}, {fl['latest_round_cycle_coverage']} tasks){RESET}",
+        f"👀 waiting on reviewer  {BOLD}{fmtd(fl['wait_p50_h'])}{RESET} typical"
+        f" {fg(GREY)}(p75 {fmtd(fl['wait_p75_h'])}, {fl['wait_coverage']} decisions){RESET}",
         f"{fg(GREY)}first-submission cycle: unavailable (codimango keeps only the latest submission){RESET}"], width, BLUE)
 
     # funnel
@@ -467,5 +493,5 @@ def render_stats(snap, cfg, *, width=None, weeks=8, start=None, end=None, rank_d
                          f"✅ {acc}  📤 {row.get('submitted', '')}")
         out += _panel(f"🏆 rank {fg(GREY)}(from {rank_data['source']}, {rank_data['fetched_at'][:10]}){RESET}", lines, width, AMBER)
 
-    out.append(f"  {fg(GREY)}{ITALIC}definitions: board stats --classic shows them in full{RESET}")
+    out += flow([f"{fg(GREY)}{ITALIC}definitions: board stats --classic shows them in full{RESET}"], width)
     return "\n".join(out)
