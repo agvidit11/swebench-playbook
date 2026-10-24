@@ -440,6 +440,38 @@ def cmd_install_hooks(args, cfg):
     return 0
 
 
+def cmd_check(args, cfg):
+    from . import checks, sync as s
+    state = s.default_state_dir()
+    code = checks.run_check(cfg, args.task, state_dir=state)
+    s.sync(cfg, state_dir=state, timeout_seconds=10)
+    return code
+
+
+def cmd_review(args, cfg):
+    from . import checks, sync as s
+    state = s.default_state_dir()
+    if args.action == "list":
+        snap = _gather(args, cfg)
+        task = _find(snap, args.task).entity_id
+        revs = [e for e in snap.events if e["type"] == "review" and (e.get("entity") or {}).get("id") == task]
+        if args.json:
+            return _emit(args, snap, revs)
+        lines = [f"{len(revs)} agent-session review(s) of {task}:"]
+        for e in revs:
+            p = e["payload"]
+            lines.append(f"  {e['occurred_at'][:16]}  {p.get('verdict'):<8} C{p.get('confidence', '-')}  "
+                         f"@{(e.get('commit') or '?')[:8]}  {e['actor'].get('alias', '')}  {p.get('note', '')}")
+        return _emit(args, snap, human="\n".join(lines))
+    if not args.verdict:
+        print("review add needs --verdict ready|changes|comment", file=sys.stderr)
+        return 2
+    ok, detail = checks.add_review(cfg, args.task, args.verdict, args.confidence, args.note or "", state_dir=state)
+    s.sync(cfg, state_dir=state, timeout_seconds=10)
+    print(f"review recorded on {detail[:8]}" if ok else f"review refused: {detail}", file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 2
+
+
 def cmd_legend(args, cfg):
     text = render.legend(set(), _style(args, cfg), everything=True, width=_width(args))
     print(json.dumps({"legend": text.splitlines()}) if args.json else text)
@@ -516,6 +548,15 @@ def build_parser():
     cl.add_argument("task")
     cl.add_argument("--to", help="assign to the session whose tab title contains this text")
     cl.add_argument("--steal", action="store_true", help="take over an expired claim")
+    ck = sub.add_parser("check", help="run the pre-submit gate and record its result")
+    ck.add_argument("action", choices=["run"])
+    ck.add_argument("task")
+    rv = sub.add_parser("review", parents=[common], help="add or list agent-session reviews")
+    rv.add_argument("action", choices=["add", "list"])
+    rv.add_argument("task")
+    rv.add_argument("--verdict", choices=["ready", "changes", "comment"])
+    rv.add_argument("--confidence", type=int, choices=range(1, 6), metavar="1-5")
+    rv.add_argument("--note", default="")
     hk = sub.add_parser("hook", help="(internal) Claude Code hook entry point")
     hk.add_argument("kind", choices=["session-start", "pre-tool", "post-tool"])
     sy = sub.add_parser("sync", parents=[common], help="push queued events and refresh claim data")
@@ -537,7 +578,7 @@ def build_parser():
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
             "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release, "hook": cmd_hook,
-            "sync": cmd_sync, "install-hooks": cmd_install_hooks}
+            "sync": cmd_sync, "install-hooks": cmd_install_hooks, "check": cmd_check, "review": cmd_review}
 
 
 def main(argv=None) -> int:

@@ -35,6 +35,9 @@ remote = "git@github.com:you/your-private-ledger.git"
 mode = "atomic"
 expire_after_hours = 24
 
+[checks]
+presubmit = ["python3", "/path/to/presubmit.py", "{task}"]   # `workboard check run <task>` wraps this, unchanged
+
 [rank]
 daiquery_id = ""     # saved DaiQuery id for `workboard rank` (optional)
 

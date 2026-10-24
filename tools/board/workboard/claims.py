@@ -105,14 +105,7 @@ def _repo(state_dir) -> Path:
 
 
 def _git(repo, *args, input_text=None, timeout=TIMEOUT):
-    import subprocess
-    try:
-        return subprocess.run(["git", *args], cwd=repo, input=input_text, capture_output=True, text=True,
-                              timeout=timeout, env={**gitutil.ENV, **GIT_ID})
-    except subprocess.TimeoutExpired:
-        return subprocess.CompletedProcess(args, 124, "", "timeout")
-    except OSError as exc:
-        return subprocess.CompletedProcess(args, 127, "", str(exc))
+    return gitutil.run(repo, *args, timeout=timeout, input_text=input_text, env={**gitutil.ENV, **GIT_ID})
 
 
 def _commit(repo, payload: dict, parent: str | None) -> str:

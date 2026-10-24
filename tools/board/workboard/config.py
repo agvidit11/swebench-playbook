@@ -75,6 +75,14 @@ class Thresholds:
 
 
 @dataclass
+class Checks:
+    # argv template for the pre-submit gate; "{task}" is replaced. Empty = `check run` disabled.
+    presubmit: list[str] = field(default_factory=list)
+    summary_regex: str = r"(\d+)\s+FAIL\s+·\s+(\d+)\s+WARN\s+·\s+(\d+)\s+PASS"
+    timeout_seconds: int = 900
+
+
+@dataclass
 class Rank:
     daiquery_id: str = ""
     command: str = "meta"
@@ -103,6 +111,7 @@ class Config:
     ledger: Ledger = field(default_factory=Ledger)
     claims: Claims = field(default_factory=Claims)
     thresholds: Thresholds = field(default_factory=Thresholds)
+    checks: Checks = field(default_factory=Checks)
     rank: Rank = field(default_factory=Rank)
     reports: Reports = field(default_factory=Reports)
     plugins: Plugins = field(default_factory=Plugins)
