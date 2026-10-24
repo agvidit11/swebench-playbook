@@ -397,7 +397,7 @@ def cmd_hook(args, cfg):
     """Entry point for Claude Code hooks: reads hook JSON on stdin; prints nothing on stdout."""
     try:
         from . import hooks, sync as s
-        raw = sys.stdin.read()
+        raw = sys.stdin.read(1_000_000)
         try:
             data = json.loads(raw)
         except ValueError:
@@ -418,7 +418,7 @@ def cmd_sync(args, cfg):
         print(json.dumps(asdict(st)) if args.json else
               f"ledger: pull {'ok' if st.last_pull_ok else 'FAILED'}, push {'ok' if st.last_push_ok else 'not ok'}, "
               f"{st.pending} pending {('— ' + st.error) if st.error else ''}")
-    return 0 if st.last_pull_ok else 1
+    return 0 if (st.last_pull_ok and (st.last_push_ok or not st.pending)) else 1
 
 
 def cmd_install_hooks(args, cfg):

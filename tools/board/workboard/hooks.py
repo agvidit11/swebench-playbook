@@ -10,8 +10,11 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import shutil
+import tempfile
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -24,8 +27,10 @@ TOUCH_WINDOW_S = 600
 ALIAS_RECHECK_S = 600
 TITLE_TAIL = 262144
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
-BUILD = re.compile(r"\b(codex|muse)\s+exec\b")
-OUR_COMMAND = re.compile(r"(^|/)(board|workboard) hook (session-start|pre-tool|post-tool)$")
+BUDGET_S = 0.08                                   # hook work budget (process startup comes on top)
+BUILD_TOOLS = {"codex", "muse"}
+BUILD_DIR_FLAGS = {"-C", "--cd", "--workspace", "--cwd"}
+OUR_COMMAND = re.compile(r"(^|[/\s])(board|workboard) hook (session-start|pre-tool|post-tool)$")
 
 
 @dataclass
@@ -43,29 +48,43 @@ def _load(path: Path) -> dict:
         return {}
 
 
-def _locked_update(state_dir: Path, fn):
-    """Read-modify-write hook-state.json under an exclusive lock; fn(state) -> result."""
+def _atomic_write(path: Path, text: str, mode: int = 0o600) -> None:
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fchmod(fh.fileno(), mode)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _locked_update(state_dir: Path, fn, deadline: float):
+    """Read-modify-write hook-state.json under a lock acquired within the deadline; fn(state) -> result."""
     state_dir.mkdir(parents=True, exist_ok=True)
     lock = os.open(state_dir / (HOOK_STATE + ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        events.flock_bounded(lock, max(0.0, deadline - time.monotonic()))
         state = _load(state_dir / HOOK_STATE)
         result = fn(state)
-        tmp = state_dir / (HOOK_STATE + ".tmp")
-        tmp.write_text(json.dumps(state))
-        os.replace(tmp, state_dir / HOOK_STATE)
+        _atomic_write(state_dir / HOOK_STATE, json.dumps(state))
         return result
     finally:
-        fcntl.flock(lock, fcntl.LOCK_UN)
-        os.close(lock)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+        finally:
+            os.close(lock)
 
 
 def save_claims_cache(state_dir: Path, data: dict) -> None:
     state_dir = Path(state_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    tmp = state_dir / (CLAIMS_CACHE + ".tmp")
-    tmp.write_text(json.dumps(data))
-    os.replace(tmp, state_dir / CLAIMS_CACHE)
+    _atomic_write(state_dir / CLAIMS_CACHE, json.dumps(data))
 
 
 # ---------------------------------------------------------------------------------------------- inputs
@@ -95,7 +114,28 @@ def title_from(transcript_path: str) -> str:
     return (custom or ai)[:80]
 
 
+def _build_target(cmd: str) -> tuple[str | None, str | None]:
+    """(model, working dir) for `codex exec -C <dir>` / `muse exec --workspace <dir>`; (None, None) otherwise."""
+    try:
+        toks = shlex.split(cmd, posix=True)
+    except ValueError:
+        return None, None
+    for i, tok in enumerate(toks):
+        name = os.path.basename(tok)
+        if name in BUILD_TOOLS and i + 1 < len(toks) and toks[i + 1] == "exec":
+            for j in range(i + 2, len(toks)):
+                t = toks[j]
+                if t in BUILD_DIR_FLAGS and j + 1 < len(toks):
+                    return name, toks[j + 1]
+                for flag in BUILD_DIR_FLAGS:
+                    if t.startswith(flag + "="):
+                        return name, t.split("=", 1)[1]
+            return name, None
+    return None, None
+
+
 def _candidates(data: dict) -> list[Path]:
+    """Paths the tool call acts on, most specific first; cwd is only a fallback."""
     ti = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
     cwd = Path(data["cwd"]) if isinstance(data.get("cwd"), str) else None
     out = []
@@ -103,12 +143,19 @@ def _candidates(data: dict) -> list[Path]:
         if isinstance(ti.get(key), str):
             out.append(Path(ti[key]))
     if data.get("tool_name") == "Bash":
-        if cwd:
-            out.append(cwd / "_")
         cmd = ti.get("command") if isinstance(ti.get("command"), str) else ""
-        for tok in re.findall(r"[\w./~-]+", cmd)[:200]:
+        _, target = _build_target(cmd)
+        if target:
+            out.append(Path(os.path.expanduser(target)) / "_")
+        try:
+            toks = shlex.split(cmd)[:200]
+        except ValueError:
+            toks = re.findall(r"[\w./~-]+", cmd)[:200]
+        for tok in toks:
             if "/" in tok or tok.startswith("~"):
                 out.append(Path(os.path.expanduser(tok)))
+        if cwd:
+            out.append(cwd / "_")
     resolved = []
     for p in out:
         if not p.is_absolute() and cwd:
@@ -122,8 +169,8 @@ def task_of(data: dict, cfg) -> str | None:
         for repo in cfg.repositories:
             root = Path(repo.path).expanduser()
             try:
-                rel = p.resolve(strict=False).relative_to(root.resolve(strict=False))
-            except (ValueError, OSError):
+                rel = Path(os.path.normpath(p)).relative_to(os.path.normpath(root))
+            except ValueError:
                 continue
             parts = rel.parts
             if len(parts) >= 2 and not parts[0].startswith(".") and (root / parts[0]).is_dir():
@@ -152,12 +199,12 @@ def _refresh_alias(data, host_id, state, now, force=False) -> dict | None:
     return {"session_id": sid, "alias": alias, "kind": "claude", "host": host_id} if changed else None
 
 
-def _post_tool(data, cfg, state_dir, host_id) -> HookResult:
+def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
     now = time.time()
     task = task_of(data, cfg)
     ti = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
     cmd = ti.get("command") if data.get("tool_name") == "Bash" and isinstance(ti.get("command"), str) else ""
-    build = BUILD.search(cmd) if cmd else None
+    build_model = _build_target(cmd)[0] if cmd else None
 
     def update(state):
         out = []
@@ -170,27 +217,27 @@ def _post_tool(data, cfg, state_dir, host_id) -> HookResult:
             if now - state.setdefault("touch", {}).get(key, 0) >= TOUCH_WINDOW_S:
                 state["touch"][key] = now
                 out.append(("touch", task, {"tool": data.get("tool_name")}, actor))
-            if build:
-                out.append(("build_action", task, {"model": build.group(1)}, actor))
+            if build_model:
+                out.append(("build_action", task, {"model": build_model}, actor))
         return out
 
-    for type_, ent, payload, actor in _locked_update(state_dir, update):
-        events.spool_append(state_dir, events.new_event(type_, ent, payload, actor=actor, commit=None, source="hook"))
+    for type_, ent, payload, actor in _locked_update(state_dir, update, deadline):
+        events.spool_append(state_dir, events.new_event(type_, ent, payload, actor=actor, commit=None, source="hook"),
+                            wait_seconds=max(0.0, deadline - time.monotonic()))
     return HookResult(0)
 
 
-def _session_start(data, cfg, state_dir, host_id) -> HookResult:
+def _session_start(data, cfg, state_dir, host_id, deadline) -> HookResult:
     now = time.time()
-    def update(state):
-        return _refresh_alias(data, host_id, state, now, force=True), _actor(data, host_id, state)
-    new_alias, actor = _locked_update(state_dir, update)
+    new_alias = _locked_update(state_dir, lambda state: _refresh_alias(data, host_id, state, now, force=True), deadline)
     if new_alias:
         events.spool_append(state_dir, events.new_event("alias", None, {"alias": new_alias["alias"]},
-                                                        actor=new_alias, commit=None, source="hook"))
+                                                        actor=new_alias, commit=None, source="hook"),
+                            wait_seconds=max(0.0, deadline - time.monotonic()))
     return HookResult(0)
 
 
-def _pre_tool(data, cfg, state_dir, host_id) -> HookResult:
+def _pre_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
     if data.get("tool_name") not in EDIT_TOOLS:
         return HookResult(0)
     task = task_of(data, cfg)
@@ -214,36 +261,59 @@ def _pre_tool(data, cfg, state_dir, host_id) -> HookResult:
         return HookResult(0)
     if claim.get("session_id") == sid:
         return HookResult(0)
-    return HookResult(2, f"workboard: {task} is owned by {claim.get('alias', 'another session')}. "
-                         f"Coordinate first: `workboard show {task}`; the owner can `workboard release {task} --reason ...`.")
+    return HookResult(2, f"owned by {claim.get('alias', 'another session')} — run: workboard show {task}")
 
 
 HANDLERS = {"post-tool": _post_tool, "session-start": _session_start, "pre-tool": _pre_tool}
 
 
-def handle(kind, data, *, cfg, state_dir, host_id) -> HookResult:
+def handle(kind, data, *, cfg, state_dir, host_id, budget: float = BUDGET_S) -> HookResult:
+    deadline = time.monotonic() + budget
     try:
         if not isinstance(data, dict):
             return HookResult(0)
-        return HANDLERS[kind](data, cfg, Path(state_dir), host_id)
-    except Exception:
-        return HookResult(0)                       # fail open, always
+        return HANDLERS[kind](data, cfg, Path(state_dir), host_id, deadline)
+    except events.LockBusy:
+        return HookResult(0)                       # out of budget: skip quietly, never make Claude wait
+    except Exception as exc:                       # fail open, and leave a trace if we still can
+        try:
+            sid = data.get("session_id") if isinstance(data, dict) and isinstance(data.get("session_id"), str) else "unknown"
+            events.spool_append(Path(state_dir), events.new_event(
+                "warning", None, {"source": "hook", "kind": kind, "error": f"{exc.__class__.__name__}: {exc}"[:300]},
+                actor={"session_id": sid or "unknown", "alias": f"{host_id}·hook", "kind": "claude"},
+                commit=None, source="hook"), wait_seconds=0.01)
+        except Exception:
+            pass
+        return HookResult(0)
 
 
 # ---------------------------------------------------------------------------------------------- install
 def _ours(entry) -> bool:
     hooks = entry.get("hooks", []) if isinstance(entry, dict) else []
-    return any(isinstance(h, dict) and OUR_COMMAND.search(str(h.get("command", ""))) for h in hooks)
+    return any(isinstance(h, dict) and OUR_COMMAND.search(str(h.get("command", "")).replace("'", "")) for h in hooks)
 
 
 def _plan(board: str) -> dict:
+    exe = shlex.quote(board)
     return {
-        "SessionStart": [{"hooks": [{"type": "command", "command": f"{board} hook session-start", "timeout": 5}]}],
+        "SessionStart": [{"hooks": [{"type": "command", "command": f"{exe} hook session-start", "timeout": 5}]}],
         "PreToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit",
-                        "hooks": [{"type": "command", "command": f"{board} hook pre-tool", "timeout": 5}]}],
+                        "hooks": [{"type": "command", "command": f"{exe} hook pre-tool", "timeout": 5}]}],
         "PostToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
-                         "hooks": [{"type": "command", "command": f"{board} hook post-tool", "timeout": 5}]}],
+                         "hooks": [{"type": "command", "command": f"{exe} hook post-tool", "timeout": 5}]}],
     }
+
+
+def _backup(settings: Path) -> None:
+    if settings.exists():
+        dest = settings.with_name(f"{settings.name}.workboard-backup-{time.time_ns()}-{uuid.uuid4().hex[:6]}")
+        shutil.copy2(settings, dest)
+        os.chmod(dest, settings.stat().st_mode & 0o777)
+
+
+def _write_settings(settings: Path, data: dict) -> None:
+    mode = (settings.stat().st_mode & 0o777) if settings.exists() else 0o600
+    _atomic_write(settings, json.dumps(data, indent=2) + "\n", mode)
 
 
 def install(settings: Path, board: str, *, dry_run: bool = False) -> str:
@@ -256,11 +326,9 @@ def install(settings: Path, board: str, *, dry_run: bool = False) -> str:
     text = json.dumps(data, indent=2)
     if dry_run:
         return text
-    if settings.exists():
-        shutil.copy2(settings, settings.with_name(f"{settings.name}.workboard-backup-{int(time.time())}"))
-    tmp = settings.with_name(settings.name + ".workboard-tmp")
-    tmp.write_text(text + "\n")
-    os.replace(tmp, settings)
+    settings.parent.mkdir(parents=True, exist_ok=True)
+    _backup(settings)
+    _write_settings(settings, data)
     return text
 
 
@@ -271,5 +339,5 @@ def uninstall(settings: Path) -> None:
         data["hooks"][event] = [e for e in data["hooks"][event] if not _ours(e)]
         if not data["hooks"][event]:
             del data["hooks"][event]
-    shutil.copy2(settings, settings.with_name(f"{settings.name}.workboard-backup-{int(time.time())}"))
-    settings.write_text(json.dumps(data, indent=2) + "\n")
+    _backup(settings)
+    _write_settings(settings, data)

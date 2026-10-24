@@ -80,7 +80,7 @@ class ClaimHardeningTest(unittest.TestCase):
         self.tmp = Path(td.name)
         self.remote = bare_remote(self.tmp)
         self.c1, self.c2 = cfg_for(self.tmp, "h1", self.remote), cfg_for(self.tmp, "h2", self.remote)
-        self.c1.user.id = self.c2.user.id = "vidit"
+        self.c1.user.id = self.c2.user.id = "person-1"
         self.s1, self.s2 = self.tmp / "st1", self.tmp / "st2"
         self.s1.mkdir()
         self.s2.mkdir()
@@ -130,9 +130,9 @@ class ClaimHardeningTest(unittest.TestCase):
             self.assertEqual(len(local), 20)
 
     def test_person_can_release_own_agent_claim(self):
-        agent = dict(A1, person="vidit")
+        agent = dict(A1, person="person-1")
         coord.claim(self.c1, "t", state_dir=self.s1, actor=agent)
-        human = {"session_id": "human:vidit@h1", "alias": "h1·vidit (shell)", "kind": "human", "host": "h1", "person": "vidit"}
+        human = {"session_id": "human:person-1@h1", "alias": "h1·person-1 (shell)", "kind": "human", "host": "h1", "person": "person-1"}
         res = coord.release(self.c1, "t", "handing over", state_dir=self.s1, actor=human)
         self.assertEqual(res.status, "RELEASED", res.detail)
         rel = [json.loads(l) for l in (self.s1 / events.SPOOL_NAME).read_text().splitlines() if '"release"' in l][-1]
@@ -141,7 +141,7 @@ class ClaimHardeningTest(unittest.TestCase):
 
     def test_other_person_cannot_release(self):
         coord.claim(self.c1, "t", state_dir=self.s1, actor=dict(A1, person="someone-else"))
-        human = {"session_id": "human:vidit@h1", "alias": "h1·vidit", "kind": "human", "host": "h1", "person": "vidit"}
+        human = {"session_id": "human:person-1@h1", "alias": "h1·person-1", "kind": "human", "host": "h1", "person": "person-1"}
         self.assertEqual(coord.release(self.c1, "t", "x", state_dir=self.s1, actor=human).status, "REFUSED")
 
     def test_probe_cleanup_after_uncertain_create(self):
@@ -202,3 +202,20 @@ class ClaimRefSourceTest(unittest.TestCase):
         cfg.claims.max_live_claims = 1
         res = ClaimRefSource(cfg, store=self.store([self.good("a"), self.good("b")])).fetch()
         self.assertFalse(res.health.ok)
+
+
+class OwnAgentOverrideTest(ClaimHardeningTest):
+    def test_mismatched_caller_refused(self):
+        coord.claim(self.c1, "t", state_dir=self.s1, actor=dict(A1, person="person-1"))
+        stranger = {"session_id": "human:x@h1", "alias": "h1·x", "kind": "human", "host": "h1", "person": "someone"}
+        self.assertEqual(coord.release_own_agent(self.c1, "t", "x", state_dir=self.s1, actor=stranger).status, "REFUSED")
+
+    def test_override_loses_to_concurrent_renewal(self):
+        agent = dict(A1, person="person-1")
+        a = coord.claim(self.c1, "t", state_dir=self.s1, actor=agent)
+        stale = claims.read(self.c1, "t", state_dir=self.s1)
+        claims.heartbeat(self.c1, "t", agent, expected_oid=a.oid, state_dir=self.s1)    # renewal lands first
+        human = {"session_id": "human:p@h1", "alias": "h1·p", "kind": "human", "host": "h1", "person": "person-1"}
+        res = coord.release_own_agent(self.c1, "t", "x", state_dir=self.s1, actor=human, current=stale)
+        self.assertEqual(res.status, "REFUSED")
+        self.assertEqual(claims.read(self.c1, "t", state_dir=self.s1).status, "HELD")

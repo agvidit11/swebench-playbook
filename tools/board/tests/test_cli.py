@@ -200,3 +200,63 @@ class ClaimCommandTest(unittest.TestCase):
             code, out, _ = self.drive(argv, fresh=(False, "push failed"))
             self.assertEqual(code, 2, argv)
             self.assertIn("refusing", out)
+
+
+class SyncCommandTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        p = mock.patch.dict(os.environ, {"WORKBOARD_STATE": td.name, "WORKBOARD_CACHE": td.name,
+                                         "WORKBOARD_CONFIG": "/nonexistent"})
+        p.start()
+        self.addCleanup(p.stop)
+
+    def code_for(self, state):
+        with mock.patch("workboard.sync.sync", return_value=state), mock.patch("workboard.app.refresh_claims_cache"), \
+             contextlib.redirect_stdout(io.StringIO()):
+            return cli.main(["sync"])
+
+    def test_exit_codes(self):
+        self.assertEqual(self.code_for(SyncState(last_pull_ok=False)), 1)
+        self.assertEqual(self.code_for(SyncState(last_pull_ok=True, last_push_ok=False, pending=3)), 1)
+        self.assertEqual(self.code_for(SyncState(last_pull_ok=True, last_push_ok=False, pending=0)), 0)
+        self.assertEqual(self.code_for(SyncState(last_pull_ok=True, last_push_ok=True)), 0)
+
+
+class StealEvidenceCommandTest(ClaimCommandTest):
+    def test_steal_passes_unhealthy_evidence(self):
+        s = self.snap_with_sessions()
+        s.health["claims"] = SourceHealth("claims", False, NOW, 0, "fetch failed")
+        captured = {}
+        from workboard import coord, claims
+
+        def fake_claim(cfg, task, **kw):
+            captured.update(kw)
+            return claims.ClaimResult("REFUSED", None, "steal needs a healthy claim source and clock")
+
+        with mock.patch.object(cli, "_gather", lambda a, c: s), \
+             mock.patch.object(coord, "ledger_fresh", return_value=(True, "")), \
+             mock.patch.object(coord, "claim", fake_claim), mock.patch("workboard.sync.sync"), \
+             contextlib.redirect_stdout(io.StringIO()):
+            code = cli.main(["claim", "alpha", "--steal"])
+        self.assertEqual(code, 1)
+        self.assertFalse(captured["source_healthy"])
+
+    def test_steal_with_clock_skew_finding(self):
+        s = self.snap_with_sessions()
+        s.health["claims"] = SourceHealth("claims", True, NOW, 0, "ok")
+        s.findings.append(Finding("CLOCK_SKEW", "warn", "future events", "fix clock"))
+        captured = {}
+        from workboard import coord, claims
+
+        def fake_claim(cfg, task, **kw):
+            captured.update(kw)
+            return claims.ClaimResult("REFUSED", None, "x")
+
+        with mock.patch.object(cli, "_gather", lambda a, c: s), \
+             mock.patch.object(coord, "ledger_fresh", return_value=(True, "")), \
+             mock.patch.object(coord, "claim", fake_claim), mock.patch("workboard.sync.sync"), \
+             contextlib.redirect_stdout(io.StringIO()):
+            cli.main(["claim", "alpha", "--steal"])
+        self.assertTrue(captured["source_healthy"])
+        self.assertFalse(captured["clock_healthy"])

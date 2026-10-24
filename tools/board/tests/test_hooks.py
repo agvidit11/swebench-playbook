@@ -143,3 +143,104 @@ class InstallTest(unittest.TestCase):
         data = json.loads(self.settings.read_text())
         self.assertNotIn("/opt/board", json.dumps(data))
         self.assertIn("other-tool check", json.dumps(data))
+
+
+class HookHardeningTest(HookTest):
+    def env(self):
+        cfgfile = self.tmp / "config.toml"
+        cfgfile.write_text(f'config_version = 1\n[[repositories]]\nid = "tasks"\npath = "{self.repo}"\n')
+        return {**os.environ, "PYTHONPATH": str(BOARD), "WORKBOARD_CONFIG": str(cfgfile),
+                "WORKBOARD_STATE": str(self.state)}
+
+    def cli(self, kind, data):
+        t = time.perf_counter()
+        p = subprocess.run([sys.executable, "-m", "workboard", "hook", kind], input=json.dumps(data), text=True,
+                           capture_output=True, env=self.env(), timeout=10)
+        return p, time.perf_counter() - t
+
+    def hold_lock(self, name):
+        import fcntl as f
+        self.state.mkdir(parents=True, exist_ok=True)
+        fd = os.open(self.state / name, os.O_RDWR | os.O_CREAT)
+        f.flock(fd, f.LOCK_EX)
+        self.addCleanup(os.close, fd)
+
+    def test_held_locks_do_not_stall(self):
+        data = self.payload("PostToolUse", file_path=str(self.repo / "alpha-task" / "f"))
+        for lock in (hooks.HOOK_STATE + ".lock", events.SPOOL_LOCK):
+            t = time.perf_counter()
+            self.assertEqual(self.run_hook("post-tool", data).code, 0)
+            self.hold_lock(lock)
+            t = time.perf_counter()
+            self.assertEqual(self.run_hook("post-tool", data).code, 0)
+            self.assertLess(time.perf_counter() - t, 0.1)
+
+    def test_cold_process_latency(self):
+        # Codex asked for <100 ms end to end; bare interpreter start here is ~75-85 ms, so the hook's own
+        # work is held to <100 ms in-process (test_hook_fast_in_process) and a cold process to <250 ms.
+        p, dt = self.cli("post-tool", self.payload("PostToolUse", file_path=str(self.repo / "alpha-task" / "f")))
+        self.assertEqual((p.returncode, p.stdout), (0, ""))
+        self.assertLess(dt, 0.25)
+
+    def test_internal_error_leaves_warning(self):
+        with mock.patch.object(hooks, "task_of", side_effect=RuntimeError("boom")):
+            r = self.run_hook("post-tool", self.payload("PostToolUse", file_path="x"))
+        self.assertEqual(r.code, 0)
+        warn = [e for e in self.spool() if e["type"] == "warning"]
+        self.assertIn("boom", warn[-1]["payload"]["error"])
+
+    def test_build_target_from_repo_root_and_cross_task(self):
+        (self.repo / "beta-task").mkdir()
+        data = self.payload("PostToolUse", tool="Bash", command="codex exec -s workspace-write -C alpha-task 'x'")
+        data["cwd"] = str(self.repo)
+        self.run_hook("post-tool", data)
+        data = self.payload("PostToolUse", tool="Bash", command="muse exec --workspace ../beta-task --prompt-file p")
+        data["cwd"] = str(self.repo / "alpha-task")
+        self.run_hook("post-tool", data)
+        builds = [(e["entity"]["id"], e["payload"]["model"]) for e in self.spool() if e["type"] == "build_action"]
+        self.assertEqual(builds, [("alpha-task", "codex"), ("beta-task", "muse")])
+
+    def test_block_message_through_cli(self):
+        self.write_claims_cache("s9")
+        p, _ = self.cli("pre-tool", self.payload("PreToolUse", file_path=str(self.repo / "alpha-task" / "x.py")))
+        self.assertEqual(p.returncode, 2)
+        self.assertEqual(p.stdout, "")
+        self.assertEqual(p.stderr.strip(), "owned by h2·harness loop — run: workboard show alpha-task")
+
+    def test_concurrent_cache_writers(self):
+        import threading
+        def w(i):
+            hooks.save_claims_cache(self.state, {"fetched_at": "x", "claims": {f"t{i}": {}}})
+        ts = [threading.Thread(target=w, args=(i,)) for i in range(20)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+        path = self.state / hooks.CLAIMS_CACHE
+        json.loads(path.read_text())
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual([p.name for p in self.state.glob(".claims-cache.json.*")], [])
+
+
+class InstallHardeningTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.dir = Path(td.name)
+
+    def test_mode_preserved_and_backups_unique(self):
+        s = self.dir / "settings.json"
+        s.write_text("{}")
+        os.chmod(s, 0o600)
+        hooks.install(s, "/opt/board")
+        hooks.install(s, "/opt/board")
+        self.assertEqual(s.stat().st_mode & 0o777, 0o600)
+        backups = sorted(self.dir.glob("settings.json.workboard-backup-*"))
+        self.assertEqual(len(backups), 2)
+        self.assertEqual(json.loads(backups[0].read_text()), {})       # first backup is the original
+
+    def test_missing_parent_created_and_new_file_private(self):
+        s = self.dir / "nested" / "settings.json"
+        hooks.install(s, "/opt/my board")
+        self.assertEqual(s.stat().st_mode & 0o777, 0o600)
+        self.assertIn("'/opt/my board' hook pre-tool", s.read_text())
+        hooks.install(s, "/opt/my board")
+        self.assertEqual(s.read_text().count("hook pre-tool"), 1)      # quoted form recognised as ours

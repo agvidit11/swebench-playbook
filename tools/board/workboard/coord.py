@@ -113,11 +113,15 @@ def release_own_agent(cfg, task, reason, *, state_dir, actor, current=None) -> c
     The audit event records the human as actor and the released owner separately."""
     if not cfg.user.id:
         return claims.ClaimResult("REFUSED", None, "set [user] id in config to release your agents' claims")
+    if actor.get("person") != cfg.user.id:
+        return claims.ClaimResult("REFUSED", None, "caller is not the configured person")
     cur = current or claims.read(cfg, task, state_dir=state_dir)
     if cur.status != "HELD":
         return claims.ClaimResult(cur.status, None, cur.detail)
     res = claims.release(cfg, task, actor, expected_oid=cur.oid, state_dir=state_dir, override_person=cfg.user.id)
     if res.status == "RELEASED":
+        with local_claims(state_dir) as local:
+            local.pop(task, None)
         record(state_dir, "release", task, actor, {"reason": reason, "override": True,
                                                   "released_owner": {"session_id": cur.owner.get("session_id"),
                                                                      "alias": cur.owner.get("alias", "")}})
