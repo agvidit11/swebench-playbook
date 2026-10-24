@@ -476,6 +476,8 @@ def cmd_hook(args, cfg):
         res = hooks.handle(args.kind, data, cfg=cfg, state_dir=s.default_state_dir(), host_id=s.safe_host(s.host_id_for(cfg)))
         if res.stderr:
             print(res.stderr, file=sys.stderr)
+        if res.stdout:
+            print(res.stdout)
         return res.code
     except Exception:
         return 0
@@ -514,6 +516,12 @@ def cmd_sync(args, cfg):
         print(f"review history refresh skipped: {exc}", file=sys.stderr)
     st = s.sync(cfg, state_dir=s.default_state_dir())
     app.refresh_claims_cache(cfg, s.default_state_dir())
+    try:
+        from . import comms, events as ev_mod
+        evs, _ = ev_mod.read_events(app.ledger_event_files(cfg))
+        comms.write_inbox_cache(s.default_state_dir(), evs + app.pending_spool_events(s.default_state_dir(), host))
+    except Exception as exc:
+        print(f"inbox cache skipped: {exc}", file=sys.stderr)
     if not args.quiet:
         print(json.dumps(asdict(st)) if args.json else
               f"ledger: pull {'ok' if st.last_pull_ok else 'FAILED'}, push {'ok' if st.last_push_ok else 'not ok'}, "
@@ -998,6 +1006,18 @@ def build_parser():
     wt = sub.add_parser("ui", aliases=["watch"], parents=[common],
                         help="interactive live board: tabs, filters, search, details (? for keys)")
     wt.add_argument("--interval", type=int, default=120, help="seconds between refreshes")
+    mp = sub.add_parser("msg", parents=[common], help="message a session, a server, or all (delivered into sessions)")
+    mp.add_argument("to", help="'all', a server id, or part of a session's tab title")
+    mp.add_argument("text", nargs="+")
+    mp.add_argument("--task", help="what the message is about")
+    mp.add_argument("--reply-to", help="message id this answers")
+    ib = sub.add_parser("inbox", parents=[common], help="messages for this session/server")
+    ib.add_argument("--all", action="store_true", help="include acknowledged ones")
+    ak = sub.add_parser("ack", parents=[common], help="mark a message (id prefix) or 'all' as handled")
+    ak.add_argument("id")
+    fd = sub.add_parser("feed", parents=[common], help="servers, sessions and activity across both servers")
+    fd.add_argument("--hours", default="12")
+    fd.add_argument("--limit", type=int, default=60)
     hp = sub.add_parser("html", parents=[common], help="write a self-contained HTML dashboard")
     hp.add_argument("--out", default="~/.cache/workboard/board.html")
     sv = sub.add_parser("serve", help="serve the live HTML dashboard on localhost")
@@ -1089,7 +1109,19 @@ def cmd_serve(args, cfg):
         snap = gather(cfg, do_sync=False)
         return snap
     cfg.codimango.cache_ttl_seconds = min(cfg.codimango.cache_ttl_seconds, 60)   # the page should never lag
-    srv = html.serve(fresh, cfg, port=args.port, interval=args.interval)
+
+    def send(to, text, task):
+        from . import comms, coord, events as ev_mod, sync as s
+        if not text.strip():
+            raise ValueError("empty message")
+        snap = gather(cfg, do_sync=False)
+        target = comms.target_for(to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers])
+        actor = dict(coord.actor_for(cfg), alias=f"{s.safe_host(s.host_id_for(cfg))}·dashboard", kind="human")
+        if not ev_mod.spool_append(s.default_state_dir(), comms.new_message(text, target, actor, task=task)):
+            raise ValueError("could not queue the message")
+        st = s.sync(cfg, state_dir=s.default_state_dir(), timeout_seconds=20)
+        return {"to": target["to_label"], "delivered": bool(st.last_push_ok and not st.pending)}
+    srv = html.serve(fresh, cfg, port=args.port, interval=args.interval, send_fn=send)
     print(f"🧭 workboard live at http://localhost:{args.port}/  (VS Code forwards the port; Ctrl-C to stop)")
     try:
         srv.serve_forever()
@@ -1098,7 +1130,82 @@ def cmd_serve(args, cfg):
     return 0
 
 
-COMMANDS_EXTRA = {"watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}
+def _snap_for_comms(args, cfg):
+    from .app import gather
+    return gather(cfg, do_sync=not getattr(args, "no_sync", False))
+
+
+def cmd_msg(args, cfg):
+    from . import comms, coord, events as ev_mod, sync as s
+    state = s.default_state_dir()
+    snap = _snap_for_comms(args, cfg)
+    try:
+        target = comms.target_for(args.to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers])
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    ev = comms.new_message(" ".join(args.text), target, coord.actor_for(cfg), task=args.task, reply_to=args.reply_to)
+    if not ev_mod.spool_append(state, ev):
+        print("could not queue the message", file=sys.stderr)
+        return 2
+    st = s.sync(cfg, state_dir=state, timeout_seconds=20)
+    ok = st.last_push_ok and not st.pending
+    print(f"💬 sent to {target['to_label']}" + ("" if ok else " (queued locally; delivered after the next sync)"))
+    return 0 if ok else 3
+
+
+def cmd_inbox(args, cfg):
+    from . import comms, coord, render as r, sync as s
+    snap = _snap_for_comms(args, cfg)
+    me = coord.actor_for(cfg)
+    msgs = comms.inbox(snap.events, me["session_id"], s.safe_host(s.host_id_for(cfg)), include_acked=args.all)
+    if args.json:
+        print(json.dumps(msgs))
+        return 0
+    if not msgs:
+        print("📭 no messages for you")
+        return 0
+    for m in msgs:
+        mark = "✓" if me["session_id"] in m["acked_by"] else "•"
+        about = f" [{m['task']}]" if m["task"] else ""
+        print(f"{mark} {m['id'][:8]}  {m['at'][:16]}  {m['from']} → {m['to_label']}{about}\n    {m['text']}")
+    return 0
+
+
+def cmd_ack(args, cfg):
+    from . import comms, coord, events as ev_mod, sync as s
+    state = s.default_state_dir()
+    snap = _snap_for_comms(args, cfg)
+    me = coord.actor_for(cfg)
+    msgs = comms.inbox(snap.events, me["session_id"], s.safe_host(s.host_id_for(cfg)))
+    pick = msgs if args.id == "all" else [m for m in msgs if m["id"].startswith(args.id)]
+    for m in pick:
+        ev_mod.spool_append(state, comms.ack_event(m["id"], me))
+    s.sync(cfg, state_dir=state, timeout_seconds=15)
+    print(f"acked {len(pick)} message(s)")
+    return 0 if pick else 1
+
+
+def cmd_feed(args, cfg):
+    from . import comms
+    snap = _snap_for_comms(args, cfg)
+    hours = float(args.hours)
+    items = comms.feed(snap.events, since_s=hours * 3600)
+    if args.json:
+        print(json.dumps(items))
+        return 0
+    for sv in comms.servers(snap.events, snap.views, cfg):
+        last = render.fmt_age(sv["last_sync_ago_s"]) if sv["last_sync_ago_s"] is not None else "never"
+        print(f"🖥  {sv['id']}: last sync {last} ago · {len(sv['sessions'])} active session(s) · owns {len(sv['owned'])}")
+        for se in sv["sessions"][:6]:
+            print(f"     · {se['alias']} ({render.fmt_age(se['ago_s'])} ago)")
+    print(f"\n🕒 last {hours:g}h across servers:")
+    for it in items[: args.limit]:
+        print(f"  {it['at'][11:16]}  {it['host']:<6} {render.middle(it['who'], 34):<34} {it['task'] or '':<44} {it['what']}")
+    return 0
+
+
+COMMANDS_EXTRA = {"msg": cmd_msg, "inbox": cmd_inbox, "ack": cmd_ack, "feed": cmd_feed, "watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
             "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release, "hook": cmd_hook,

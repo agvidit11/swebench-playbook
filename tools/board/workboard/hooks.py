@@ -37,6 +37,7 @@ OUR_COMMAND = re.compile(r"(^|[/\s])(board|workboard) hook (session-start|pre-to
 class HookResult:
     code: int = 0
     stderr: str = ""
+    stdout: str = ""          # JSON for Claude Code (e.g. additionalContext with delivered messages)
 
 
 # ---------------------------------------------------------------------------------------------- state
@@ -224,7 +225,20 @@ def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
     for type_, ent, payload, actor in _locked_update(state_dir, update, deadline):
         events.spool_append(state_dir, events.new_event(type_, ent, payload, actor=actor, commit=None, source="hook"),
                             wait_seconds=max(0.0, deadline - time.monotonic()))
-    return HookResult(0)
+    return _with_inbox(HookResult(0), data, state_dir, host_id, "PostToolUse")
+
+
+def _with_inbox(res: HookResult, data: dict, state_dir: Path, host_id: str, event: str) -> HookResult:
+    """Attach unread messages for this session as additionalContext (delivered once per message)."""
+    from . import comms
+    sid = data.get("session_id") if isinstance(data.get("session_id"), str) else ""
+    if not sid:
+        return res
+    msgs = comms.pending_for_hook(Path(state_dir), sid, host_id)
+    if msgs:
+        res.stdout = json.dumps({"hookSpecificOutput": {"hookEventName": event,
+                                                        "additionalContext": comms.hook_context(msgs)}})
+    return res
 
 
 def _session_start(data, cfg, state_dir, host_id, deadline) -> HookResult:
@@ -234,7 +248,7 @@ def _session_start(data, cfg, state_dir, host_id, deadline) -> HookResult:
         events.spool_append(state_dir, events.new_event("alias", None, {"alias": new_alias["alias"]},
                                                         actor=new_alias, commit=None, source="hook"),
                             wait_seconds=max(0.0, deadline - time.monotonic()))
-    return HookResult(0)
+    return _with_inbox(HookResult(0), data, state_dir, host_id, "SessionStart")
 
 
 def _pre_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:

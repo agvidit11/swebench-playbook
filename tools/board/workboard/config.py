@@ -37,7 +37,7 @@ class Codimango:
     timeout_seconds: int = 60
     cache_ttl_seconds: int = 120
     max_stale_seconds: int = 900
-    web_task_url: str = ""        # e.g. "https://<codimango-web>/tasks/{task}"; personal config only
+    web_task_url: str = ""        # e.g. "https://<codimango-web>/submissions/{id}" ({id} or {task}); personal config only
 
 
 @dataclass

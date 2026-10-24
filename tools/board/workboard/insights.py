@@ -30,6 +30,8 @@ def short_check(label: str) -> tuple[str, str]:
 def short_detail(detail: str) -> tuple[str, str | None]:
     """(few-word reason, specific fix or None)."""
     d = (detail or "").strip()
+    if re.search(r"infrastructure error|not a task defect|PROCESSED_FAILED|job did not succeed|\d+ errored", d, re.I):
+        return "infra error on codimango's side (not your task)", "codimango task rerun (free); retry later if it repeats"
     m = re.search(r'"(\d+)_[^"]*"\s+too\s+(hard|easy)', d)
     if m:
         step, how = m.group(1), m.group(2)
@@ -57,6 +59,8 @@ def validation_summary(items: list[dict]) -> dict:
             why, specific = short_detail(re.sub(r'"\d+_[^"]*"\s+too\s+(hard|easy)', "", it.get("detail", "")))
             specific = None
         sev = "fail" if st in ("failed", "error") else "warn" if st == "warn" else "pending"
+        if why.startswith("infra error"):
+            sev = "warn"                                   # rerun, not a task fix
         issues.append({"check": name, "why": why, "fix": specific or fix, "severity": sev})
     order = {"fail": 0, "warn": 1, "pending": 2}
     issues.sort(key=lambda i: order[i["severity"]])

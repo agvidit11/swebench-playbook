@@ -61,7 +61,16 @@ td.task{font-weight:700;max-width:360px;overflow:hidden;text-overflow:ellipsis}t
 td[data-tip],th[data-h],td.task{cursor:help}
 aside{position:fixed;top:0;right:0;width:470px;max-width:96vw;height:100%;background:var(--panel);border-left:1px solid var(--line);padding:20px 22px;
  overflow:auto;box-shadow:-14px 0 40px #000a;transform:translateX(105%);transition:transform .38s cubic-bezier(.2,1.1,.3,1)}
-aside.open{transform:none}aside .x{position:absolute;top:14px;right:18px;cursor:pointer;color:var(--dim);font-size:16px;transition:transform .2s}
+aside.open{transform:none}aside.wide{width:min(1180px,92vw)}aside.wide #dbody{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+aside.wide #dbody>.head{grid-column:1/-1}aside{transition:transform .38s cubic-bezier(.2,1.1,.3,1),width .3s ease}
+aside .xx{position:absolute;top:14px;right:46px;cursor:pointer;color:var(--dim);font-size:16px;transition:transform .2s}aside .xx:hover{transform:scale(1.25);color:var(--pink)}
+.team{display:grid;grid-template-columns:minmax(300px,1fr) minmax(360px,1.4fr);gap:14px}.srv{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--panel)}
+.srv h3{margin:0 0 6px;font-size:14px}.srv .live{margin:0}.badge{display:inline-block;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:700;color:#14161c}
+.feed{max-height:70vh;overflow:auto}.fi{display:grid;grid-template-columns:52px 64px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #22252f;animation:rowin .3s ease both}
+.fi .t{color:var(--dim)}.fi .w{color:var(--dim);font-size:12px}.msg{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:#181b22;animation:up .3s ease}
+.msg .meta{color:var(--dim);font-size:12px}.msg.me{border-color:#f78fb355}.compose{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.compose select,.compose input,.compose textarea{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:7px 10px;font:inherit}
+.compose textarea{flex:1 1 100%;min-height:60px}.sent{color:var(--green);animation:fadein .3s}aside .x{position:absolute;top:14px;right:18px;cursor:pointer;color:var(--dim);font-size:16px;transition:transform .2s}
 aside .x:hover{transform:rotate(90deg);color:var(--pink)}
 .card-title{font-size:16px;font-weight:800;word-break:break-all;padding-right:34px;margin:0}
 .kind{color:var(--dim);margin:4px 0 10px}
@@ -92,7 +101,7 @@ code{background:#0e1016;border:1px solid var(--line);border-radius:5px;padding:0
 <span class="live"><span class="dot" id="dot"></span><span id="when"></span></span></header>
 <div class="wrap">
 <div class="week" id="week"></div><div class="bar" id="bar"></div>
-<div class="tabs"><button class="tab on" data-tab="board">📋 Board</button><button class="tab" data-tab="stats">📊 Stats</button></div>
+<div class="tabs"><button class="tab on" data-tab="board">📋 Board</button><button class="tab" data-tab="team">💬 Team</button><button class="tab" data-tab="stats">📊 Stats</button></div>
 <section id="board">
 <div class="controls" id="chips"></div>
 <div class="controls"><div class="seg" id="owner"></div><input type="search" id="q" placeholder="🔍 search tasks  ( / )"><span class="health" id="health"></span></div>
@@ -103,10 +112,11 @@ code{background:#0e1016;border:1px solid var(--line);border-radius:5px;padding:0
 <div class="legend"><span><span class="spark">✦</span> changed</span><span><span class="tk g">✓✓</span> done</span><span><span class="tk d">✓✓</span> not yet</span>
 <span><span class="tk g">✓</span><span class="tk d">✓</span> half-way</span><span>👤 owner · 👀 active · 📜 CLAIMS.md · 🔓 free</span><span class="dim">hover anything for details · click a task for its card</span></div>
 </section>
+<section id="team" hidden></section>
 <section id="stats" hidden></section>
 </div>
 <div id="tip"></div>
-<aside id="drawer"><span class="x" id="close">✕</span><div id="dbody"></div></aside>
+<aside id="drawer"><span class="x" id="close" title="close (esc)">✕</span><span class="xx" id="expand" title="expand (e)">⤢</span><div id="dbody"></div></aside>
 <script id="data" type="application/json">__DATA__</script>
 <script>
 const LIVE = __LIVE__;
@@ -208,9 +218,10 @@ function renderStats(){const w=D.week,f=D.funnel,fl=D.flow,hr=x=>x==null?'—':x
 function openDrawer(name){const t=D.tasks.find(x=>x.task===name);if(!t)return;const Lk=t.links||{};
  const btn=(k,l,p)=>Lk[k]?`<a class="btn ${p?'primary':''}" href="${esc(Lk[k])}" target="_blank" rel="noopener">${l} ↗</a>`:'';
  const v=t.vsum;
- document.getElementById('dbody').innerHTML=`<p class="card-title">${esc(t.task)}</p><div class="kind">${esc(kindLine(t))}</div>
+ document.getElementById('dbody').innerHTML=`<div class="head"><p class="card-title">${esc(t.task)}</p><div class="kind">${esc(kindLine(t))}</div>
  <div>${tag(t)} &nbsp; ${next(t)}</div>
- <div class="btns">${btn('codimango','🥭 Open in codimango',1)}${btn('github','🐙 Files at server commit')}${btn('latest','📂 Latest on main')}</div>
+ <div class="btns">${btn('codimango','🥭 Open in codimango',1)}${btn('github','🐙 Files at server commit')}${btn('latest','📂 Latest on main')}
+ <button class="btn" data-msgtask="${esc(t.task)}">💬 Message the owner</button></div></div>
  <div class="sec next-sec"><h3>🚀 NEXT STEPS</h3>${t.steps.map((s,i)=>`<div class="step"><span class="n">${i+1}</span><span>${esc(s.do)}</span><span class="eta">${esc(s.eta)}</span></div>`).join('')||'<div class="dim">nothing to do 🎉</div>'}
   <div class="who">👤 ${esc(t.assignee)}</div></div>
  ${v.issues.length?`<div class="sec"><h3>⚠️ PROBLEMS · ${v.passed}/${v.total} checks passed</h3><ul class="lst">${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)} <span class="dim">→ ${esc(i.fix)}</span>`)).join('')}</ul></div>`:''}
@@ -219,11 +230,36 @@ function openDrawer(name){const t=D.tasks.find(x=>x.task===name);if(!t)return;co
  ${t.versions.length?`<div class="sec"><h3>🗂 ROUNDS</h3><div class="timeline">${t.versions.map((x,i)=>`${i?'<span class="arrow">→</span>':''}<span class="ver"><b>${x.label}</b> ${x.commits} commit${x.commits===1?'':'s'}${x.ended?` <span class="${x.ended==='accept'?'b-ok':'b-bad'}">${x.ended==='accept'?'✔':'↩'}</span> <span class="dim">${fdate(x.at)}</span>`:' <span class="dim">so far</span>'}</span>`).join('')}</div></div>`:''}
  <div class="sec"><h3>🔗 WHO & SYNC</h3><ul class="lst">${tipOwner(t).replace(/^<h4>.*?<\/h4><ul>|<\/ul>$/g,'')}${tipSync(t).replace(/^<h4>.*?<\/h4><ul>|<\/ul>$/g,'')}</ul></div>
  <div class="dim" style="margin-top:10px">terminal: <code>board show ${esc(t.task)}</code></div>`;
- const d=document.getElementById('drawer');d.classList.remove('open');void d.offsetWidth;d.classList.add('open')}
+ const d=document.getElementById('drawer');d.classList.remove('open');d.classList.toggle('wide',!!localStorage.getItem('wb-wide'));void d.offsetWidth;d.classList.add('open')}
+const HC={};const hostColor=h=>HC[h]||(HC[h]=['#f78fb3','#7ab8ff','#7bd88f','#f5c26b','#b39dff'][Object.keys(HC).length%5]);
+function renderTeam(){const me=localStorage.getItem('wb-to')||'all';
+ const srv=(D.servers||[]).map(s=>`<div class="srv"><h3><span class="badge" style="background:${hostColor(s.id)}">${esc(s.id)}</span> server
+  <span class="dim">· last sync ${s.last_sync_ago_s==null?'never':age(s.last_sync_ago_s)+' ago'}</span>
+  <span class="${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'ok':'bad'}">${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'● online':'● quiet'}</span></h3>
+  <div class="dim">${s.sessions.length} active session(s) · owns/working on ${s.owned.length} task(s)</div>
+  <ul class="lst">${s.sessions.map(x=>L('pend','✍️',`${esc(x.alias.split('·').slice(1).join('·')||x.alias)} <span class="dim">${age(x.ago_s)} ago</span>`)).join('')||L('dim','·','no active sessions in the last 2h')}</ul></div>`).join('');
+ const msgs=(D.messages||[]).slice(-30).reverse().map(m=>`<div class="msg ${m.from.includes('dashboard')?'me':''}"><div class="meta">${esc(m.from)} → <b>${esc(m.to_label)}</b>${m.task?' · '+esc(m.task):''} · ${fdate(m.at)}
+  ${m.acked_by.length?' · <span class="ok">✓ read by '+m.acked_by.length+'</span>':' · <span class="run">unread</span>'}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';
+ const opts=['all',...(D.servers||[]).map(s=>s.id),...(D.sessions||[])];
+ const feed=(D.feed||[]).map((f,i)=>`<div class="fi" style="animation-delay:${Math.min(i*8,300)}ms"><span class="t">${new Date(f.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+  <span><span class="badge" style="background:${hostColor(f.host)}">${esc(f.host)}</span></span><span>${esc(f.what)} ${f.task?'<b>'+esc(f.task)+'</b>':''}<div class="w">${esc(f.who)}</div></span></div>`).join('')||'<div class="dim">quiet</div>';
+ document.getElementById('team').innerHTML=`<div class="team"><div>${srv}
+  <div class="panel"><h3>💬 send a message <span class="dim">(delivered into the session on its next step)</span></h3>
+  <div class="compose"><select id="mto">${opts.map(o=>`<option ${o===me?'selected':''} value="${esc(o)}">${o==='all'?'📣 everyone':/^[0-9a-z]+$/.test(o)&&(D.servers||[]).some(s=>s.id===o)?'🖥 server '+esc(o):'👤 '+esc(o)}</option>`).join('')}</select>
+  <input id="mtask" placeholder="task (optional)" size="28"><textarea id="mtext" placeholder="e.g. please pick up pgmem after you finish, I'm on vobject"></textarea>
+  <button class="btn primary" id="msend">Send 🚀</button><span id="mstatus"></span></div></div>
+  <div class="panel"><h3>📨 messages</h3>${msgs}</div></div>
+  <div class="panel feed"><h3>🕒 activity across servers (24h)</h3>${feed}</div></div>`}
+async function sendMsg(){const to=document.getElementById('mto').value,text=document.getElementById('mtext').value,task=document.getElementById('mtask').value;
+ const st=document.getElementById('mstatus');if(!LIVE){st.innerHTML='<span class="bad">sending needs the live page (board serve)</span>';return}
+ st.textContent='sending…';localStorage.setItem('wb-to',to);
+ try{const r=await fetch('api/msg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,text,task})});const j=await r.json();
+  st.innerHTML=j.ok?`<span class="sent">✓ sent to ${esc(j.to)}${j.delivered?'':' (queued)'}</span>`:`<span class="bad">${esc(j.error)}</span>`;
+  if(j.ok){document.getElementById('mtext').value='';const d=await (await fetch('data.json',{cache:'no-store'})).json();D=d;renderTeam()}}catch(e){st.innerHTML='<span class="bad">failed</span>'}}
 function render(){const W=D.week;document.getElementById('week').innerHTML=`📈 W${W.week}: <b>${W.this_week}</b> accepted · last week at this point ${W.same_point_last_week} · 4-week median ${W.median_4wk}`;
  const ageS=D.codimango_at?Math.max(0,(Date.now()-new Date(D.codimango_at))/1000):null;
  document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+(ageS==null?'?':age(ageS))+' old · page '+new Date(D.generated_at).toLocaleTimeString();
- renderBoard();renderStats()}
+ renderBoard();renderStats();if(!document.getElementById('team').hidden)renderTeam()}
 // ---- interactions
 const tip=document.getElementById('tip');let hideT=null;
 function showTip(html,x,y){clearTimeout(hideT);tip.innerHTML=html+'<div class="hint">select to copy</div>';tip.classList.add('on');const r=tip.getBoundingClientRect();
@@ -240,10 +276,16 @@ document.addEventListener('click',e=>{const g=e.target.closest('[data-g]'),dd=e.
  if(dd){S.done.has(dd.dataset.d)?S.done.delete(dd.dataset.d):S.done.add(dd.dataset.d);renderBoard()}
  if(o){S.owner=o.dataset.o;renderBoard()}if(r)openDrawer(r.dataset.t);
  if(th){const k=th.dataset.k;if(S.sort!==k){S.sort=k;S.dir=1}else if(S.dir>0)S.dir=-1;else S.sort=null;renderBoard()}
- if(tb){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===tb));document.getElementById('board').hidden=tb.dataset.tab!=='board';document.getElementById('stats').hidden=tb.dataset.tab!=='stats';if(tb.dataset.tab==='stats')renderStats()}
+ if(tb){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===tb));['board','team','stats'].forEach(k=>document.getElementById(k).hidden=tb.dataset.tab!==k);
+  if(tb.dataset.tab==='stats')renderStats();if(tb.dataset.tab==='team')renderTeam()}
+ if(e.target.id==='msend')sendMsg();
+ if(e.target.id==='expand'){const d=document.getElementById('drawer');d.classList.toggle('wide');localStorage.setItem('wb-wide',d.classList.contains('wide')?'1':'')}
+ const mt=e.target.closest('[data-msgtask]');if(mt){document.querySelector('[data-tab=team]').click();const t=D.tasks.find(x=>x.task===mt.dataset.msgtask);
+  setTimeout(()=>{document.getElementById('mtask').value=mt.dataset.msgtask;if(t&&t.owner&&t.owner.includes('·')){const sel=document.getElementById('mto');[...sel.options].forEach(o=>{if(o.value===t.owner)o.selected=true})}document.getElementById('mtext').focus()},50)}
  if(e.target.id==='close')document.getElementById('drawer').classList.remove('open')});
 document.getElementById('q').addEventListener('input',e=>{S.q=e.target.value;renderBoard()});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement.id!=='q'){e.preventDefault();document.getElementById('q').focus()}
+ if(e.key==='e'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'&&document.getElementById('drawer').classList.contains('open')){document.getElementById('expand').click()}
  if(e.key==='Escape'){document.getElementById('drawer').classList.remove('open');tip.classList.remove('on');document.getElementById('q').value='';S.q='';renderBoard()}});
 window.addEventListener('beforeunload',()=>localStorage.setItem('wb-prev',JSON.stringify(Object.fromEntries(D.tasks.map(t=>[t.task,{tag:t.tag,valid:t.valid,next:t.next,review:t.review,owner:t.owner}])))));
 render();

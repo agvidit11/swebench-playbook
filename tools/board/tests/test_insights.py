@@ -16,6 +16,12 @@ class InsightsTest(unittest.TestCase):
         self.assertEqual(v["issues"][1]["check"], "agentic review")
         self.assertNotIn("make step", v["issues"][1]["fix"])
 
+    def test_infra_errors_are_not_task_defects(self):
+        v = insights.validation_summary([{"name": "Oracle validation", "status": "failed",
+                                          "detail": "No oracle trials produced a usable result (9 errored). This is an infrastructure error, not a task defect"}])
+        self.assertEqual(v["issues"][0]["severity"], "warn")
+        self.assertIn("rerun", v["issues"][0]["fix"])
+
     def test_next_steps_have_eta(self):
         t = {"next": "WAIT reviewer", "state_age_s": 10 * 3600, "vsum": {"issues": []}}
         steps = insights.next_steps(t, {"wait_p50_h": 40})

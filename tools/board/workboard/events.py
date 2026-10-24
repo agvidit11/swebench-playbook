@@ -24,7 +24,7 @@ MAX_QUEUE = 10000
 ACTOR_KINDS = {"claude", "codex", "muse", "human"}
 EVENT_TYPES = {
     "alias", "touch", "claim", "renew", "steal", "release", "assign", "check", "review",
-    "build_action", "warning", "note", "presence",
+    "build_action", "warning", "note", "presence", "msg", "ack",
 }
 
 

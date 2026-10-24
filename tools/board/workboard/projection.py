@@ -226,8 +226,8 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         state = STATE.get(cm.get("codimango.status"), "NOT_IMPORTED" if not cm else str(cm.get("codimango.status")).upper())
         repo_cfg = next((r for r in cfg.repositories if r.id == (g.get("git.repo") or "tasks")), None)
         links = {}
-        if cfg.codimango.web_task_url:
-            links["codimango"] = cfg.codimango.web_task_url.replace("{task}", task)
+        if cfg.codimango.web_task_url and ("{id}" not in cfg.codimango.web_task_url or cm.get("codimango.id")):
+            links["codimango"] = cfg.codimango.web_task_url.replace("{task}", task).replace("{id}", str(cm.get("codimango.id") or ""))
         if cm.get("codimango.github_url"):
             links["github"] = cm["codimango.github_url"]
         if repo_cfg and repo_cfg.remote_url and "github.com" in repo_cfg.remote_url:

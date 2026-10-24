@@ -5,6 +5,7 @@ Same data as the terminal views (TaskViews + stats). No external assets, no CDN:
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from datetime import datetime
@@ -47,7 +48,7 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
 
 
 def payload(snap, cfg) -> dict:
-    from . import insights, reviews, stats as st
+    from . import comms, insights, reviews, stats as st
     from .app import cache_dir
     obs_by_task = {}
     for ob in snap.observations:
@@ -95,6 +96,10 @@ def payload(snap, cfg) -> dict:
         "funnel": st.funnel(snap.observations), "flow": flow,
         "ages": st.pipeline_age(snap.views, snap.now), "load": load,
         "tasks": views,
+        "servers": comms.servers(snap.events, snap.views, cfg),
+        "feed": comms.feed(snap.events, since_s=24 * 3600, limit=150),
+        "messages": comms.messages(snap.events)[-80:],
+        "sessions": sorted({a for a in __import__("workboard.events", fromlist=["x"]).latest_aliases(snap.events).values()}),
     }
 
 
@@ -113,7 +118,7 @@ def write(snap, cfg, path: Path) -> Path:
     return path
 
 
-def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 60, host: str = "127.0.0.1"):
+def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 60, host: str = "127.0.0.1", send_fn=None):
     """Serve the dashboard; data refreshes in the background every `interval` seconds."""
     state = {"data": payload(gather_fn(), cfg), "at": time.time()}
     lock = threading.Lock()
@@ -133,6 +138,31 @@ def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 60, host: str = "
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
+
+        def do_POST(self):
+            origin = self.headers.get("Origin", "")
+            host_hdr = self.headers.get("Host", "")
+            local = host_hdr.split(":")[0] in ("localhost", "127.0.0.1")
+            if not local or (origin and not re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin)):
+                self.send_error(403, "local only")
+                return
+            if self.path != "/api/msg" or send_fn is None:
+                self.send_error(404)
+                return
+            try:
+                n = min(int(self.headers.get("Content-Length", "0")), 8192)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                result = send_fn(str(body.get("to", "")), str(body.get("text", "")), body.get("task") or None)
+                code, out = 200, {"ok": True, **result}
+            except ValueError as exc:
+                code, out = 400, {"ok": False, "error": str(exc)}
+            except Exception as exc:          # never crash the server
+                code, out = 500, {"ok": False, "error": exc.__class__.__name__}
+            data = json.dumps(out).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(data)
 
         def do_GET(self):
             with lock:
