@@ -5,18 +5,27 @@ from __future__ import annotations
 import re
 
 CHECK_NAMES = [  # (keyword in codimango label, short name, default fix)
+    ("reward_hack", "reward-hack detector", "make sure tests can't be passed without the real fix"),
+    ("test_patch", "test-patch", "fix the test patch so it applies and runs (see harbor output)"),
+    ("deep", "deep review", "address the deep-review findings"),
     ("structur", "structure", "fix the task layout codimango flags"),
     ("oracle", "oracle", "fix the reference solution so it passes 3/3"),
     ("balance", "calibration", "rebalance difficulty (see detail)"),
+    ("solvab", "calibration", "rebalance difficulty (see detail)"),
     ("calibrat", "calibration", "rebalance difficulty (see detail)"),
     ("agentic", "agentic review", "address the agentic reviewer's findings"),
     ("provenance", "provenance", "have Codex re-author the flagged files"),
     ("contamin", "contamination", "re-source or prove novelty"),
-    ("ai ", "AI check", "see codimango"),
     ("tbr", "TBR", "re-run TBR at this commit"),
     ("build", "build", "fix the Docker build"),
     ("evalgt", "eval GT", "fix the eval ground truth"),
+    ("ai ", "AI check", "see codimango"),
 ]
+INFRA = re.compile(r"infrastructure error|not a task defect|PROCESSED_FAILED|job did not succeed|\d+ errored|"
+                   r"without a usable result|click Revalidate", re.I)
+DEPENDENT = re.compile(r"not run because|skipped[:\s].*(gate|failed)|because .* (failed|errored)", re.I)
+ACTION = re.compile(r"ACTION REQUIRED|SUSPECT|review recommended|manual review", re.I)
+CLEAN = re.compile(r"\bCLEAN\b|not third-party|\bpass(ed)?\b(?!.*fail)", re.I)
 
 
 def short_check(label: str) -> tuple[str, str]:
@@ -24,48 +33,70 @@ def short_check(label: str) -> tuple[str, str]:
     for key, name, fix in CHECK_NAMES:
         if key in low:
             return name, fix
-    return (label or "check").split(" (")[0][:28].lower(), "see codimango"
+    return (label or "check").split("::")[-1].split(" (")[0][:28].lower(), "see codimango"
 
 
 def short_detail(detail: str) -> tuple[str, str | None]:
     """(few-word reason, specific fix or None)."""
     d = (detail or "").strip()
-    if re.search(r"infrastructure error|not a task defect|PROCESSED_FAILED|job did not succeed|\d+ errored", d, re.I):
-        return "infra error on codimango's side (not your task)", "codimango task rerun (free); retry later if it repeats"
+    if INFRA.search(d):
+        return "infra error on codimango's side (not your task)", "codimango task rerun {task} (free); retry if it repeats"
     m = re.search(r'"(\d+)_[^"]*"\s+too\s+(hard|easy)', d)
     if m:
         step, how = m.group(1), m.group(2)
         if how == "hard":
             return f"step {step} too hard", f"loosen step {step} or state the hidden rule"
         return f"step {step} too easy", f"make step {step} harder (more unstated work, less spec)"
-    m = re.search(r"(\d+)\s*/\s*(\d+)\s+(?:checks\s+)?(?:failed|passed)", d)
-    if "flagged" in d.lower() or "third-party" in d.lower():
+    if re.search(r"\bBAD_GRADING_(WRONG|WEAK)\b", d):
+        kind = re.search(r"BAD_GRADING_(WRONG|WEAK)", d).group(1).lower()
+        return f"grading {kind} (agentic verdict)", None
+    if re.search(r"suspect", d, re.I) and "provenance" in d.lower():
+        return "provenance SUSPECT — review recommended", "check the flagged files; re-author with Codex if needed"
+    if re.search(r"third-party", d, re.I) and not re.search(r"not third-party|CLEAN", d, re.I):
         return "3rd-party authorship flagged", None
-    if "pending" in d.lower() or "waiting" in d.lower() or "not run" in d.lower():
+    if re.search(r"pending|waiting|still running", d, re.I):
         return "still running", None
     first = re.split(r"[;(—]| - ", d)[0].strip()
     return (first[:60] + ("…" if len(first) > 60 else "")) if first else "failed", None
 
 
-def validation_summary(items: list[dict]) -> dict:
-    issues = []
+def validation_summary(items: list[dict], tbr_status: str | None = None) -> dict:
+    """Problems only. Dependent checks (skipped because another failed) are folded into their root cause; passed
+    checks stay hidden unless their detail asks for reviewer action; canonical passes are never warnings."""
+    issues, skipped, info = [], [], []
     for it in items or []:
-        st = it.get("status", "")
-        if st in ("passed", "pass", "ok"):
-            continue
+        st, detail = it.get("status", ""), it.get("detail", "") or ""
         name, fix = short_check(it.get("name", ""))
-        why, specific = short_detail(it.get("detail", ""))
-        if name != "calibration" and re.match(r"step \d+ too (hard|easy)$", why):
-            why, specific = short_detail(re.sub(r'"\d+_[^"]*"\s+too\s+(hard|easy)', "", it.get("detail", "")))
-            specific = None
-        sev = "fail" if st in ("failed", "error") else "warn" if st == "warn" else "pending"
+        if DEPENDENT.search(detail):
+            skipped.append(name)
+            continue
+        if st in ("passed", "pass", "ok"):
+            if ACTION.search(detail):
+                why = "provenance SUSPECT — review recommended" if "suspect" in detail.lower() else "reviewer action required"
+                issues.append({"check": name, "why": why, "fix": "verify before submit (see codimango)", "severity": "warn"})
+            elif re.search(r"(never ran|errored|did not run)", detail, re.I):
+                info.append({"check": name, "why": short_detail(detail)[0]})
+            continue
+        if st == "warn" and CLEAN.search(detail) and not ACTION.search(detail):
+            continue                                      # e.g. "Canonical TBR review pass", "Provenance CLEAN"
+        why, specific = short_detail(detail)
+        if why.startswith("still running") and st in ("pending", "running", ""):
+            sev = "pending"
+        else:
+            sev = "fail" if st in ("failed", "error") else "warn" if st == "warn" else "pending"
         if why.startswith("infra error"):
             sev = "warn"                                   # rerun, not a task fix
+        if name != "calibration" and re.match(r"step \d+ too (hard|easy)$", why):
+            why, specific = short_detail(re.sub(r'"\d+_[^"]*"\s+too\s+(hard|easy)', "", detail))
+            specific = None
         issues.append({"check": name, "why": why, "fix": specific or fix, "severity": sev})
+    if tbr_status == "fail" and not any(i["check"] == "TBR" for i in issues):
+        issues.append({"check": "TBR", "why": "TBR failed", "fix": "re-run TBR at this commit", "severity": "warn"})
     order = {"fail": 0, "warn": 1, "pending": 2}
     issues.sort(key=lambda i: order[i["severity"]])
     total = len(items or [])
-    return {"issues": issues, "passed": total - len(issues), "total": total}
+    return {"issues": issues, "passed": total - len(issues) - len(skipped), "total": total,
+            "skipped": skipped, "info": info}
 
 
 def _h(hours):
@@ -89,22 +120,32 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
     if n.startswith("RESOLVE"):
         steps.append({"do": "agree who owns it; release the other claim", "eta": "~5m"})
     infra = [i for i in vs["issues"] if i["why"].startswith("infra error")]
-    if n.startswith("FIX validation"):
-        for i in fails[:2]:
-            steps.append({"do": f"{i['check']}: {i['fix']}", "eta": "effort varies"})
+    task = t.get("task", "<task>")
+    if n.startswith("FIX validation") or n.startswith("RERUN validation"):
+        for i in fails:
+            steps.append({"do": f"{i['check']}: {i['fix']}".replace("{task}", task), "eta": "effort varies"})
         if infra:
-            steps.append({"do": f"{infra[0]['check']}: codimango infra error — codimango task rerun (free)", "eta": "~1m"})
+            steps.append({"do": f"{infra[0]['check']}: infra error — codimango task rerun {task} (free)", "eta": "~1m"})
+        if vs.get("skipped"):
+            steps.append({"do": f"then {', '.join(sorted(set(vs['skipped'])))} will run (skipped until then)", "eta": "—"})
         steps.append({"do": "push, then wait for validation" if fails else "wait for the rerun to validate",
                       "eta": "typically ~45m"})
+        if t.get("status_raw") == "needs_revision":
+            steps.append({"do": "once green: resubmit for human review", "eta": "~2m"})
+    if n.startswith("ADDRESS agent"):
+        steps.append({"do": "address the session reviewer's 'changes' note (see card)", "eta": "effort varies"})
     if n.startswith("FIX check"):
         steps.append({"do": "fix the presubmit failures, re-run `board check run`", "eta": "~1h"})
     if n.startswith("RERUN"):
-        steps.append({"do": "codimango task rerun (free)", "eta": "~1m"})
+        steps.append({"do": f"codimango task rerun {t.get('task', '<task>')} (free)", "eta": "~1m"})
         steps.append({"do": "wait for validation", "eta": "~45m"})
     if n.startswith("WAIT import"):
         steps.append({"do": "wait: codimango is importing your latest push", "eta": "~10m"})
     if n.startswith("WAIT validation"):
-        steps.append({"do": "wait for validation to finish", "eta": "~30m"})
+        steps.append({"do": "wait for validation to finish", "eta": "typically ~30m"})
+        if infra:
+            steps.append({"do": f"{infra[0]['check']} hit an infra error — if it isn't retried: codimango task rerun "
+                                f"{t.get('task', '<task>')}", "eta": "~1m"})
     if n.startswith("ADDRESS"):
         steps.append({"do": "address the reviewer's points (see last review)", "eta": "~3h"})
         steps.append({"do": "presubmit + 2 agent reviews, then resubmit", "eta": "~1h"})
@@ -160,13 +201,14 @@ def review_summary(t: dict) -> dict:
             "agent_current": bool(ready), "agent_green": len(ready) >= 2, "human": human, "bullets": bullets}
 
 
-def assignee(t: dict, load: dict[str, int]) -> str:
-    """Keep with the current owner; otherwise suggest the less-loaded server."""
-    if t.get("claim_health") in ("OWNED", "ACTIVE", "LEGACY") and t.get("owner"):
-        return f"keep with {t['owner']}"
+def assignee(t: dict, load: dict[str, int], live_hosts: set[str] | None = None) -> str:
+    """Nobody while it waits on the server/reviewers; keep with a live owner; else the less-loaded *live* server."""
     if t.get("group") in ("REVIEWING", "DONE", "VALIDATING"):
         return "nobody needed right now"
-    if not load:
-        return "any free session (`board claim`)"
-    host = min(load, key=lambda h: load[h])
-    return f"{host} (lighter load: {load[host]} active) · `board claim {t['task']} --to <{host} session>`"
+    if t.get("claim_health") in ("OWNED", "ACTIVE", "LEGACY") and t.get("owner"):
+        return f"keep with {t['owner']}"
+    live = {h: n for h, n in load.items() if live_hosts is None or h in live_hosts}
+    if not live:
+        return f"any free session (`board claim {t['task']}`)"
+    host = min(live, key=lambda h: live[h])
+    return f"a free session on {host} ({live[host]} tasks in progress there) · `board claim {t['task']}` from it"

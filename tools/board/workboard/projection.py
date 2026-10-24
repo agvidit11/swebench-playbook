@@ -46,8 +46,12 @@ DOC_NAMES = ("readme", "changelog", "notes", "license")
 
 
 def _is_doc(path: str) -> bool:
-    name = path.rsplit("/", 1)[-1].lower()
-    return name.endswith(".md") and any(name.startswith(d) for d in DOC_NAMES) or name in ("readme", "readme.txt")
+    low = path.lower()
+    name = low.rsplit("/", 1)[-1]
+    if "/audit/" in f"/{low}" and name.endswith(".md"):
+        return True                                       # audit notes / review ledgers are documentation
+    return name.endswith(".md") and any(name.startswith(d) for d in DOC_NAMES + ("review-ledger",)) or \
+        name in ("readme", "readme.txt")
 
 
 AUTH_RANK = {"derived": 0, "advisory": 1, "authoritative": 2}
@@ -149,13 +153,18 @@ def _age_level(state, age_s, cfg):
 
 
 def _state_since(state, cm):
+    """(timestamp, label): when this state began if knowable, else an honestly-labelled proxy."""
     if state in ("ACCEPTED", "NEEDS_REV"):
-        return ts(cm.get("codimango.reviewed_at"))
-    if state in ("QUEUE", "REVIEW"):
-        return ts(cm.get("codimango.entered_pool_at"))
+        return ts(cm.get("codimango.reviewed_at")), "decided"
+    if state == "QUEUE":
+        return ts(cm.get("codimango.entered_pool_at")), "submitted"
+    if state == "REVIEW":
+        return ts(cm.get("codimango.updated_at")) or ts(cm.get("codimango.entered_pool_at")), "in review since (approx.)"
     if state == "ARCHIVED":
-        return ts(cm.get("codimango.archived_at"))
-    return ts(cm.get("codimango.created_at"))
+        return ts(cm.get("codimango.archived_at")), "archived"
+    if state == "DRAFT" and cm.get("codimango.entered_pool_at"):
+        return ts(cm.get("codimango.updated_at")), "back in draft since (approx.)"
+    return ts(cm.get("codimango.created_at")), "created"
 
 
 def _next(f, findings):
@@ -165,12 +174,12 @@ def _next(f, findings):
         return "DONE", "—"
     if "CONFLICT" in codes:
         return "ATTENTION", "RESOLVE CONFLICT"
-    if valid == "FAIL":
-        return "ATTENTION", "FIX validation"
-    if codes & {"HEAD≠SERVER", "STALE_VALID"}:
+    if codes & {"HEAD≠SERVER", "STALE_VALID"}:            # results are for an older commit: refresh them first
         return "ATTENTION", "RERUN server"
     if f.get("sync") == "IMPORTING":
         return "VALIDATING", "WAIT import"
+    if valid == "FAIL":
+        return "ATTENTION", ("RERUN validation" if f.get("infra_only") else "FIX validation")
     if "NONOWNER_EDIT" in codes:
         return "ATTENTION", "RESOLVE ownership"
     if "CLOCK_SKEW" in codes:
@@ -185,6 +194,8 @@ def _next(f, findings):
         return "READY", "ADDRESS review"
     if state == "NOT_IMPORTED":
         return "READY", "IMPORT task"
+    if f.get("dissent") and state == "DRAFT":
+        return "ATTENTION", "ADDRESS agent review"
     # DRAFT ladder
     if f["check"] == "NONE" or f["check_stale"]:
         return "READY", "RUN check"
@@ -252,8 +263,14 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
              "category": {k: cm.get(f"codimango.{k}") for k in ("category", "subdomain", "usecase", "difficulty",
                                                                  "languages", "domain")},
              "valid": VALID.get(cm.get("codimango.validation_status"), "UNK" if cm else "—")}
-        since = _state_since(state, cm)
+        since, f["age_label"] = _state_since(state, cm)
         f["state_age_s"] = int((now - since).total_seconds()) if since else None
+        f["tbr_status"] = cm.get("codimango.tbr_status")
+        vitems = cm.get("codimango.validation") or []
+        bad = [x for x in vitems if x.get("status") in ("failed", "error")]
+        from .insights import INFRA, DEPENDENT
+        roots = [x for x in bad if not DEPENDENT.search(x.get("detail") or "")]
+        f["infra_only"] = bool(roots) and all(INFRA.search(x.get("detail") or "") for x in roots)
         f["age_level"] = _age_level(state, f["state_age_s"], cfg)
 
         # sync: has the server seen this task's latest commit, and validated it?
@@ -314,10 +331,10 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                 claimants = [{"session": owner_sid, "at": since or now, "alias": owner}]
             else:
                 owner, claim_health, claimants = "", "FREE", []
-            f["claim_source"] = "ref"
+            f["claim_source"] = "claim" if refc else "none"
         else:
             owner, claim_health, claimants = _claims(tev, cfg, now, aliases)
-            f["claim_source"] = "ledger (advisory)"
+            f["claim_source"] = "ledger claim (advisory)"
         if claim_health == "FREE":
             legacy = [e for e in tev if e["type"] == "note" and isinstance(e["payload"].get("legacy_owner"), str)]
             if legacy and legacy[-1]["payload"].get("live") is not False:    # latest row finished -> no owner
@@ -326,7 +343,7 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                 if expires is None:                         # notes from before expires_at: 7 days from the row date
                     upd = ts((last.get("updated") or "")[:10] + "T00:00:00+00:00")
                     expires = upd + timedelta(days=7) if upd else None
-                if expires and now <= expires:
+                if expires and now <= expires and (last.get("status") in __import__("workboard.legacy", fromlist=["x"]).ACTIVE):
                     machine = last["legacy_owner"]
                     short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
                     owner, claim_health = f"{short} (CLAIMS.md)", "LEGACY"
@@ -342,6 +359,8 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         f["active"] = [{"alias": a, "ago_s": int(ago)} for ago, a in active]
         if active and claim_health in ("FREE", "LEGACY", "EXPIRED"):
             owner, claim_health = active[0][1], "ACTIVE"
+        f["claim_source"] = {"ACTIVE": "recent activity", "LEGACY": "CLAIMS.md (advisory)", "OWNED": "claim",
+                             "FREE": "none", "EXPIRED": "expired claim", "CONFLICT": "conflicting claims"}.get(claim_health, f.get("claim_source"))
         if state in ("ACCEPTED", "ARCHIVED"):
             owner, claim_health = "", "DONE"
         f["owner"], f["claim_health"] = owner, claim_health

@@ -174,9 +174,11 @@ def servers(evs: list[dict], views, cfg, now: float | None = None) -> list[dict]
     out = []
     for h in ids:
         mine = [e for e in evs if e.get("host_id") == h]
-        beats = [e for e in mine if e["type"] == "heartbeat"] or mine      # heartbeat = a successful sync from that host
+        beats = [e for e in mine if e["type"] == "heartbeat"]          # heartbeat = a successful sync from that host
         last = max((datetime.fromisoformat(e["recorded_at"]).timestamp() for e in beats if e.get("recorded_at")),
                    default=None)
+        last_act = max((datetime.fromisoformat(e["recorded_at"]).timestamp() for e in mine if e.get("recorded_at")),
+                       default=None)
         sessions = {}
         for e in mine:
             try:
@@ -189,6 +191,7 @@ def servers(evs: list[dict], views, cfg, now: float | None = None) -> list[dict]
         owned = [v.entity_id for v in views if (v.fields.get("owner") or "").startswith(f"{h}·")
                  and v.fields.get("claim_health") in ("OWNED", "ACTIVE")]
         out.append({"id": h, "last_sync_ago_s": int(now - last) if last else None,
+                    "last_activity_ago_s": int(now - last_act) if last_act else None,
                     "sessions": [{"alias": a, "ago_s": int(now - t)} for t, a in sorted(sessions.values(), reverse=True)][:12],
                     "owned": owned})
     return out

@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 
 DEAD = {"RELEASED", "PARKED", "PARKED-TOO-EASY", "EXHAUSTED", "KILLED", "RETIRED", "ARCHIVED", "DONE", "ACCEPTED",
         "SUBMITTED", "HANDED-OFF", "HANDED", "DROPPED", "FAILED", "NOT", "ABANDONED", "CLOSED", "STOOD-DOWN"}
+ACTIVE = {"OWNED", "CLAIMED", "ACTIVE", "ACTIVE-REVISION", "ACTIVE-PIVOT-2STEP", "TAKING", "FIXING", "BUILDING",
+          "PROBING", "WORKING", "IN-PROGRESS", "REWORKING"}      # someone is on it now
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 
@@ -61,7 +63,7 @@ def is_live(row: dict, now: datetime, days: int = 7) -> bool:
         upd = datetime.fromisoformat(row["updated"]).replace(tzinfo=timezone.utc)
     except ValueError:
         return False
-    return row["status"] not in DEAD and bool(row["status"]) and timedelta(0) <= now - upd <= timedelta(days=days)
+    return row["status"] in ACTIVE and timedelta(0) <= now - upd <= timedelta(days=days)
 
 
 def live_rows(rows, known_tasks: set[str], now: datetime, days: int = 7) -> list[dict]:

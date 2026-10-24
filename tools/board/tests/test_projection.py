@@ -302,9 +302,9 @@ class RenewKeepsForeignEditTest(ProjectionTest):
         self.assertIn("NONOWNER_EDIT", [f.code for f in views["t"].findings])
 
     def test_legacy_expiry_from_note(self):
-        long = e("note", "t", {"legacy_owner": "host-b", "updated": "2026-10-01", "expires_at": "2026-11-01T00:00:00+00:00"}, seq=1)
+        long = e("note", "t", {"legacy_owner": "host-b", "status": "ACTIVE", "updated": "2026-10-01", "expires_at": "2026-11-01T00:00:00+00:00"}, seq=1)
         self.assertEqual(self.view([cm("t")], [long]).fields["claim_health"], "LEGACY")
-        short = e("note", "t", {"legacy_owner": "host-b", "updated": "2026-10-23", "expires_at": "2026-10-23T12:00:00+00:00"}, seq=1)
+        short = e("note", "t", {"legacy_owner": "host-b", "status": "ACTIVE", "updated": "2026-10-23", "expires_at": "2026-10-23T12:00:00+00:00"}, seq=1)
         self.assertEqual(self.view([cm("t")], [short]).fields["claim_health"], "FREE")
 
 
@@ -323,3 +323,30 @@ class CodexFindingsTest(ProjectionTest):
         views = {v.entity_id: v for v in project([cm("t")], evs, self.cfg, NOW)}
         self.assertIn("brand-new-slug", views)
         self.assertEqual(views["brand-new-slug"].fields["claim_health"], "OWNED")
+
+
+class AuditFixesTest(ProjectionTest):
+    def test_historical_legacy_status_is_not_ownership(self):
+        n = e("note", "t", {"legacy_owner": "host-b", "status": "PUSHED", "updated": "2026-10-23",
+                            "expires_at": "2026-10-30T00:00:00+00:00"}, seq=1)
+        self.assertEqual(self.view([cm("t")], [n]).fields["claim_health"], "FREE")
+
+    def test_stale_results_rerun_before_fix(self):
+        obs = [cm("t", valid="failed", head_commit_sha=SHA_B), gt("t", head=SHA_A, head_time="2026-10-23T12:00:00+00:00"),
+               repo({SHA_B: "2026-10-22T00:00:00+00:00"})]
+        self.assertEqual(self.view(obs).fields["next"], "RERUN server")
+
+    def test_audit_doc_change_is_doc_only(self):
+        obs = [cm("t", head_commit_sha=SHA_A), gt("t", head=SHA_A, changed=["t/audit/REVIEW-LEDGER.md", "t/README.md"]),
+               repo({SHA_A: "2026-10-21T00:00:00+00:00"})]
+        self.assertEqual(self.view(obs).fields["sync"], "OK·doc")
+
+    def test_current_agent_dissent_comes_first(self):
+        obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
+        evs = [e("review", "t", {"verdict": "changes", "confidence": 4}, commit=SHA_A)]
+        self.assertEqual(self.view(obs, evs).fields["next"], "ADDRESS agent review")
+
+    def test_draft_age_label_honest(self):
+        v = self.view([cm("t", entered_pool_at="2026-10-10T00:00:00Z", updated_at="2026-10-23T10:00:00Z")])
+        self.assertEqual(v.fields["age_label"], "back in draft since (approx.)")
+        self.assertEqual(v.fields["state_age_s"], 10 * 3600)

@@ -41,3 +41,31 @@ class InfraStepTest(unittest.TestCase):
         steps = insights.next_steps({"next": "FIX validation", "vsum": vs}, {})
         self.assertTrue(any("rerun" in s["do"] for s in steps))
         self.assertFalse(any(s["do"].startswith("push") for s in steps))
+
+
+class AuditValidationTest(unittest.TestCase):
+    def test_semantics(self):
+        items = [
+            {"name": "Metacode or Opus pass/fail balance", "status": "failed", "detail": '"2_x" too hard — no model passed it'},
+            {"name": "Agentic trial-output review", "status": "pending", "detail": "Not run because Solvability & difficulty failed"},
+            {"name": "Provenance check", "status": "warn", "detail": "Provenance CLEAN (not third-party authorship)"},
+            {"name": "TBR", "status": "warn", "detail": "Canonical Codimango TBR review pass"},
+            {"name": "Provenance check", "status": "passed", "detail": "Verdict: SUSPECT — review recommended"},
+            {"name": "VALIDATION_ENGINE::test_patch_validation", "status": "error",
+             "detail": "finished without a usable result — click Revalidate"},
+        ]
+        v = insights.validation_summary(items, tbr_status="fail")
+        checks = [(i["check"], i["severity"]) for i in v["issues"]]
+        self.assertIn(("calibration", "fail"), checks)
+        self.assertIn(("provenance", "warn"), checks)               # the SUSPECT one, not the CLEAN one
+        self.assertEqual(sum(1 for c, _ in checks if c == "provenance"), 1)
+        self.assertIn(("test-patch", "warn"), checks)              # infra, not a task failure
+        self.assertIn(("TBR", "warn"), checks)                     # from tbr_status=fail
+        self.assertEqual(v["skipped"], ["agentic review"])
+        self.assertFalse(any("third-party" in i["why"] for i in v["issues"]))
+
+    def test_waiting_tasks_need_nobody_and_dead_hosts_skipped(self):
+        self.assertEqual(insights.assignee({"group": "REVIEWING", "claim_health": "LEGACY", "owner": "x", "task": "t"}, {}),
+                         "nobody needed right now")
+        a = insights.assignee({"group": "ATTENTION", "claim_health": "FREE", "task": "t"}, {"a": 0, "b": 3}, live_hosts={"b"})
+        self.assertIn("on b", a)

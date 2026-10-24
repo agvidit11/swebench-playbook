@@ -110,7 +110,7 @@ code{background:#0e1016;border:1px solid var(--line);border-radius:5px;padding:0
 <div class="controls"><div class="seg" id="owner"></div><input type="search" id="q" placeholder="🔍 search tasks  ( / )"><span class="health" id="health"></span></div>
 <div class="tbl"><table><thead><tr>
 <th data-k="task" data-h="task">Task</th><th data-k="next" data-h="next">Next</th><th data-k="tag" data-h="tag">Status</th>
-<th data-k="owner" data-h="owner">Owner</th><th data-k="valid" data-h="valid">Validation</th><th data-k="review" data-h="review">Review</th>
+<th data-k="owner" data-h="owner">Owner</th><th data-k="valid" data-h="valid">Validation</th><th data-k="review" data-h="review">Human review</th>
 <th data-k="check" data-h="check">Presubmit</th><th data-k="sync" data-h="sync">Server</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="legend"><span><span class="spark">✦</span> changed</span><span><span class="tk g">✓✓</span> done</span><span><span class="tk d">✓✓</span> not yet</span>
 <span><span class="tk g">✓</span><span class="tk d">✓</span> half-way</span><span>👤 owner · 👀 active · 📜 CLAIMS.md · 🔓 free</span><span class="dim">hover anything for details · click a task for its card</span></div>
@@ -151,7 +151,7 @@ function owner(t){const h=t.claim_health,o=esc(t.owner);if(h==='DONE')return'';i
  if(h==='ACTIVE')return`<span class="run">👀 ${o}</span> <span class="dim">${age((t.active||[{}])[0].ago_s)}</span>`;
  if(h==='CONFLICT')return`<span class="bad">🤺 ${o}</span>`;if(h==='EXPIRED')return`<span class="dim">💤 ${o}</span>`;
  if(h==='LEGACY')return`<span class="dim">📜 ${o}</span>`;return`<span style="color:var(--violet)">👤 ${o}</span>`}
-function valid(t){const v=t.vsum;const f=v.issues.filter(i=>i.severity==='fail').length,w=v.issues.filter(i=>i.severity==='warn').length;
+function valid(t){const v=t.vsum;if(t.older_results&&t.valid!=='RUN')return'<span class="run">↻ older commit</span>';const f=v.issues.filter(i=>i.severity==='fail').length,w=v.issues.filter(i=>i.severity==='warn').length;
  if(t.valid==='RUN')return'<span class="run">○ running</span>';if(!v.total)return'<span class="dim">· none yet</span>';
  if(f)return`<span class="bad">✘ ${f} issue${f>1?'s':''}</span>`;if(w)return`<span class="run">▲ ${w} warning${w>1?'s':''}</span>`;return'<span class="ok">✔ clean</span>'}
 function review(t){const raw=t.status_raw,n=t.decisions.filter(d=>d.kind==='revision').length;
@@ -159,7 +159,7 @@ function review(t){const raw=t.status_raw,n=t.decisions.filter(d=>d.kind==='revi
  if(raw==='needs_revision')return`<span class="bad">✘ sent back${n>1?' '+n+'×':''}</span>`;if(raw==='being_reviewed')return'<span style="color:var(--violet)">👀 in review</span>';
  if(raw==='needs_reviewers_assigned')return'<span class="info">⌛ awaiting reviewer</span>';if(raw==='archived')return'<span class="dim">📦 archived</span>';
  return n?`<span class="dim">· draft (↩${n}×)</span>`:'<span class="dim">· not submitted</span>'}
-function check(t){const c=t.last_check;if(!c)return'<span class="dim">· not run</span>';
+function check(t){const c=t.last_check;if(!c)return'<span class="dim">· not recorded</span>';
  if(c.fail)return`<span class="bad">✘ ${c.fail}</span>`;return c.current?`<span class="ok">✔</span>${c.warn?' <span class="run">▲'+c.warn+'</span>':''}`:'<span class="dim">↻ old</span>'}
 function sync(t){if(t.sync==='IMPORTING'||t.valid==='RUN')return'<span class="dim">⏳</span>';
  if(t.sync==='STALE_VALID'||t.sync==='HEAD≠SERVER')return'<span class="run">▲</span>';
@@ -171,22 +171,22 @@ function tag(t){return `<span class="tag" style="background:${TAGC[t.tag]||'#666
 // ---- hover cards: short, only what matters
 function tipTask(t){return `<h4>${esc(t.task)}</h4><ul>${L('info','◆',esc(kindLine(t)||'no category yet'))}${t.category&&t.category.domain?L('dim','·',esc(t.category.domain)):''}${t.category&&t.category.usecase?L('dim','·',esc(t.category.usecase.replace(/_/g,' '))):''}</ul>`}
 function tipNext(t){return `<h4>next · ETA</h4><ul>${t.steps.map(s=>L('pend','→',`${esc(s.do)} <span class="dim">${esc(s.eta)}</span>`)).join('')||L('ok','●','nothing to do')}</ul>`}
-function tipTag(t){let h=`<h4>${esc(t.tag)} for ${age(t.state_age_s)}</h4><ul>`;if(t.entered_pool_at)h+=L('dim','↗','submitted '+fdate(t.entered_pool_at));
+function tipTag(t){let h=`<h4>${esc(t.tag)} · ${esc(t.age_label||'')} ${age(t.state_age_s)} ago</h4><ul>`;if(t.entered_pool_at)h+=L('dim','↗','submitted '+fdate(t.entered_pool_at));
  t.decisions.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',(d.kind==='accept'?'accepted ':'sent back ')+fdate(d.at)));
  if(t.age_level&&t.age_level!=='ok')h+=L(t.age_level==='block'?'bad':'pend','!',t.age_level==='block'?'overdue for this state':'getting old');return h+'</ul>'}
-function tipOwner(t){let h='<h4>who</h4><ul>';(t.active||[]).slice(0,3).forEach(a=>h+=L('pend','👀',`${esc(a.alias)} · ${age(a.ago_s)} ago`));
+function tipOwner(t){let h=`<h4>who · source: ${esc(t.claim_source||'none')}</h4><ul>`;(t.active||[]).slice(0,3).forEach(a=>h+=L('pend','👀',`${esc(a.alias)} · ${age(a.ago_s)} ago`));
  if(t.claim_health==='OWNED')h+=L('ok','👤','claimed by '+esc(t.owner));if(t.legacy&&t.legacy.live!==false)h+=L('info','📜',`${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)} · ${esc(t.legacy.updated)}`);
  if(t.claim_health==='FREE')h+=L('info','🔓','nobody');h+=L('dim','→',esc(t.assignee));return h+'</ul>'}
-function tipValid(t){const v=t.vsum;if(t.valid==='RUN'&&!v.issues.length)return'<h4>validation</h4><ul>'+L('pend','○','running')+'</ul>';
+function tipValid(t){const v=t.vsum;if(t.older_results)return'<h4>validation</h4><ul>'+L('pend','↻','these results are for an older commit — your latest push has not been validated')+L('info','→','codimango task rerun '+esc(t.task))+'</ul>';if(t.valid==='RUN'&&!v.issues.length)return'<h4>validation</h4><ul>'+L('pend','○','running')+'</ul>';
  if(!v.issues.length)return`<h4>validation</h4><ul>${L('ok','●',`all ${v.total} checks passed`)}</ul>`;
- return `<h4>validation · ${v.passed}/${v.total} passed</h4><ul>${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)}<br><span class="dim">→ ${esc(i.fix)}</span>`)).join('')}</ul>`}
+ return `<h4>validation · ${v.passed}/${v.total} passed</h4><ul>${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)}<br><span class="dim">→ ${esc(i.fix.replace('{task}',t.task))}</span>`)).join('')}${v.skipped&&v.skipped.length?L('dim','⤷',esc([...new Set(v.skipped)].join(', '))+' skipped until the above passes'):''}</ul>`}
 function tipReview(t){let h=`<h4>human review · ${esc(t.rsum.human)}</h4><ul>`;
  t.decisions.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',`${d.kind==='accept'?'accepted':'sent back'} ${fdate(d.at)}`));
  const d=t.decisions[t.decisions.length-1];if(d&&d.reason)h+=L('dim','“',esc(d.reason.slice(0,140)));
  if(t.entered_pool_at&&!t.decisions.length)h+=L('info','⌛','submitted '+fdate(t.entered_pool_at)+', no decision yet');
  if(!t.entered_pool_at)h+=L('dim','·','not submitted yet');
  const ar=t.agent_reviews||[];if(ar.length)h+=L('dim','🤖',`${ar.length} agent-session check${ar.length>1?'s':''} (optional second opinion)`);return h+'</ul>'}
-function tipCheck(t){const c=t.last_check;if(!c)return'<h4>presubmit</h4><ul>'+L('pend','○','not run')+L('info','→','board check run '+esc(t.task))+'</ul>';
+function tipCheck(t){const c=t.last_check;if(!c)return'<h4>presubmit</h4><ul>'+L('dim','·','no result recorded on the board (it may have been run elsewhere)')+L('info','→','board check run '+esc(t.task)+'  ·  or board check record')+'</ul>';
  return `<h4>presubmit · ${fdate(c.at)}</h4><ul>${c.fail?L('bad','✘',c.fail+' failure(s)'):L('ok','●','clean')}${c.warn?L('pend','▲',c.warn+' warning(s)'):''}${c.current?'':L('pend','↻','ran on an older commit — re-run')}${c.summary?L('info','💡','suggested: '+esc(c.summary)):''}</ul>`}
 function tipSync(t){const s=t.sync;let h='<h4>server</h4><ul>';
  if(t.valid==='FAIL'){const i=t.vsum.issues.filter(x=>x.severity==='fail');h+=L('bad','✘','validation failed'+(i.length?': '+esc(i.map(x=>x.check).join(', ')):''))}
@@ -257,9 +257,9 @@ function openDrawer(name){const t=D.tasks.find(x=>x.task===name);if(!t)return;co
 const HC={};const hostColor=h=>HC[h]||(HC[h]=['#f78fb3','#7ab8ff','#7bd88f','#f5c26b','#b39dff'][Object.keys(HC).length%5]);
 function renderTeam(){const me=localStorage.getItem('wb-to')||'all';
  const srv=(D.servers||[]).map(s=>`<div class="srv"><h3><span class="badge" style="background:${hostColor(s.id)}">${esc(s.id)}</span> server
-  <span class="dim">· last sync ${s.last_sync_ago_s==null?'never':age(s.last_sync_ago_s)+' ago'}</span>
+  <span class="dim">· heartbeat ${s.last_sync_ago_s==null?'never':age(s.last_sync_ago_s)+' ago'}</span>
   <span class="${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'ok':'bad'}">${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'● online':'● quiet'}</span></h3>
-  <div class="dim">${s.sessions.length} active session(s) · owns/working on ${s.owned.length} task(s)</div>
+  <div class="dim">${s.sessions.length} session(s) seen in the last 2h · working on ${s.owned.length} task(s)${s.last_sync_ago_s==null?' · <span class="bad">no heartbeat yet — run board setup there</span>':''}${s.last_activity_ago_s!=null?' · last activity '+age(s.last_activity_ago_s)+' ago':''}</div>
   <ul class="lst">${s.sessions.map(x=>L('pend','✍️',`${esc(x.alias.split('·').slice(1).join('·')||x.alias)} <span class="dim">${age(x.ago_s)} ago</span>`)).join('')||L('dim','·','no active sessions in the last 2h')}</ul></div>`).join('');
  const msgs=(D.messages||[]).slice(-30).reverse().map(m=>`<div class="msg ${m.from.includes('dashboard')?'me':''}"><div class="meta">${esc(m.from)} → <b>${esc(m.to_label)}</b>${m.task?' · '+esc(m.task):''} · ${fdate(m.at)}
   ${m.acked_by.length?' · <span class="ok">✓ read by '+m.acked_by.length+'</span>':' · <span class="run">unread</span>'}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';
@@ -268,8 +268,8 @@ function renderTeam(){const me=localStorage.getItem('wb-to')||'all';
   <span><span class="badge" style="background:${hostColor(f.host)}">${esc(f.host)}</span></span><span>${esc(f.what)} ${f.task?'<b>'+esc(f.task)+'</b>':''}<div class="w">${esc(f.who)}</div></span></div>`).join('')||'<div class="dim">quiet</div>';
  document.getElementById('team').innerHTML=`<div class="team"><div>${srv}
   <div class="panel"><h3>💬 send a message</h3>
-  <div class="dim" style="margin-bottom:6px">How it travels: saved to the shared private ledger → the target server picks it up on its next sync (≤2 min) →
-  the hook shows it inside the target Claude session on its next step → the session acks/replies with <code>board ack</code> / <code>board msg</code>.
+  <div class="dim" style="margin-bottom:6px">How it travels: saved to the shared private ledger → the target server picks it up on its next sync (normally ≤2 min while it has a heartbeat) →
+  the hook shows it inside the target Claude session on its next step (Codex runs see it only via <code>board inbox</code>) → the session acks/replies with <code>board ack</code> / <code>board msg</code>.
   Pick a server to reach every session there, or "everyone".</div>
   <div class="compose"><select id="mto">${opts.map(o=>`<option ${o===me?'selected':''} value="${esc(o)}">${o==='all'?'📣 everyone':/^[0-9a-z]+$/.test(o)&&(D.servers||[]).some(s=>s.id===o)?'🖥 server '+esc(o):'👤 '+esc(o)}</option>`).join('')}</select>
   <input id="mtask" placeholder="task (optional)" size="28"><textarea id="mtext" placeholder="e.g. please pick up pgmem after you finish, I'm on vobject"></textarea>
@@ -284,7 +284,8 @@ async function sendMsg(){const to=document.getElementById('mto').value,text=docu
   if(j.ok){document.getElementById('mtext').value='';const d=await (await fetch('data.json',{cache:'no-store'})).json();D=d;renderTeam()}}catch(e){st.innerHTML='<span class="bad">failed</span>'}}
 function render(){const W=D.week;document.getElementById('week').innerHTML=`📈 W${W.week}: <b>${W.this_week}</b> accepted · last week at this point ${W.same_point_last_week} · 4-week median ${W.median_4wk}`;
  const ageS=D.codimango_at?Math.max(0,(Date.now()-new Date(D.codimango_at))/1000):null;
- document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+(ageS==null?'?':age(ageS))+' old · page '+new Date(D.generated_at).toLocaleTimeString();
+ const exact=s=>s==null?'?':s<3600?Math.round(s/60)+'m':Math.floor(s/3600)+'h'+String(Math.round(s%3600/60)).padStart(2,'0')+'m';
+ document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+exact(ageS)+' old'+(D.codimango_detail&&!D.health.codimango.ok?' — '+D.codimango_detail:'')+' · page '+new Date(D.generated_at).toLocaleTimeString();
  renderBoard();renderStats();if(!document.getElementById('team').hidden)renderTeam()}
 // ---- interactions
 const tip=document.getElementById('tip');let hideT=null;
@@ -322,6 +323,6 @@ document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement.i
 window.addEventListener('beforeunload',()=>localStorage.setItem('wb-prev',JSON.stringify(Object.fromEntries(D.tasks.map(t=>[t.task,{tag:t.tag,valid:t.valid,next:t.next,review:t.review,owner:t.owner}])))));
 render();
 if(LIVE)setInterval(async()=>{try{const r=await fetch('data.json',{cache:'no-store'});if(r.ok){D=await r.json();render()}}catch(_){document.getElementById('dot').className='dot bad'}},30000);
-setInterval(()=>{if(D.codimango_at){const s=(Date.now()-new Date(D.codimango_at))/1000;document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+age(s)+' old · page '+new Date(D.generated_at).toLocaleTimeString()}},15000);
+setInterval(()=>{if(D.codimango_at)render()},30000);
 </script></body></html>
 """
