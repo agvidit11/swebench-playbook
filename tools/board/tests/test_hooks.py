@@ -265,3 +265,30 @@ class HookToProjectionTest(HookTest):
                                                             "codimango.validation_status": "passing"})]
         v = project(obs, [owner, stamped], self.cfg, now)[0]
         self.assertIn("NONOWNER_EDIT", [f.code for f in v.findings])
+
+
+class PresubmitAutoRecordTest(unittest.TestCase):
+    def test_parses_direct_presubmit_run(self):
+        from workboard import hooks
+        from workboard.config import Config
+        cfg = Config()
+        out = "  PASS  a\n  FAIL  README cites old sha\n  FAIL  step 2 too easy\n\n  2 FAIL · 1 WARN · 9 PASS\n"
+        data = {"tool_name": "Bash", "session_id": "s1",
+                "tool_input": {"command": "python3 ~/x/presubmit.py my-task --repo ~/r --ref origin/main --color never"},
+                "tool_response": {"stdout": out}}
+        r = hooks.presubmit_result(data, cfg)
+        self.assertEqual((r["task"], r["fail"], r["warn"], r["pass"]), ("my-task", 2, 1, 9))
+        self.assertIn("README cites old sha", r["summary"])
+        self.assertIsNone(r["commit"])
+        data["tool_input"]["command"] = "board check run my-task"            # recorded by board itself
+        self.assertIsNone(hooks.presubmit_result(data, cfg))
+        data["tool_input"]["command"] = "python3 presubmit.py --repo ~/r my-task"
+        self.assertEqual(hooks.presubmit_result(data, cfg)["task"], "my-task")
+        data["tool_input"]["command"] = "python3 presubmit.py my-task | tail -3"         # filtered output: skip
+        self.assertIsNone(hooks.presubmit_result(data, cfg))
+        data["tool_input"]["command"] = "python3 presubmit.py a && python3 presubmit.py b"  # two runs: skip
+        self.assertIsNone(hooks.presubmit_result(data, cfg))
+        data["tool_input"]["command"] = "python3 presubmit.py my-task 2>&1 | tee /tmp/x.txt"
+        self.assertEqual(hooks.presubmit_result(data, cfg)["task"], "my-task")
+        data["tool_response"] = {"stdout": "usage: presubmit.py"}
+        self.assertIsNone(hooks.presubmit_result(data, cfg))

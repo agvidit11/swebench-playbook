@@ -109,7 +109,13 @@ def _stream(argv, timeout, out, err):
     return code, stdout_tail.text()
 
 
-def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.stderr) -> int:
+def fail_lines(text: str, n: int = 3) -> str:
+    """The first FAIL lines of a gate's output, as the 'what to fix' summary shown on the board."""
+    rows = [re.sub(r"\s+", " ", l.strip()) for l in text.splitlines() if re.match(r"\s*FAIL\b", l)]
+    return "; ".join(r.removeprefix("FAIL").strip() for r in rows[:n])[:300]
+
+
+def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.stderr, role: str | None = None) -> int:
     """Run the configured gate with live output, keep its exit code, then record the result.
     Anything other than a clean, parsed run is recorded as failing (fail >= 1)."""
     if not cfg.checks.presubmit:
@@ -130,6 +136,10 @@ def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.
     payload = dict(counts or {"pass": 0, "warn": 0, "fail": 0}, exit=code, parsed=bool(counts))
     if note:
         payload["note"] = note
+    if fail_lines(tail):
+        payload["summary"] = fail_lines(tail)
+    if role in ("author", "independent"):
+        payload["role"] = role
     if code != 0 or not counts:
         payload["fail"] = max(1, payload["fail"])      # never a green check without a clean, parsed run
     actor = actor or coord.actor_for(cfg)
@@ -141,18 +151,21 @@ def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.
 
 
 def record_check(cfg, task: str, *, passed: int, warn: int, fail: int, summary: str = "", state_dir,
-                 actor=None, commit: str | None = None, source: str = "manual") -> tuple[bool, str]:
+                 actor=None, commit: str | None = None, source: str = "manual", role: str | None = None) -> tuple[bool, str]:
     """Record a presubmit result run elsewhere (another session, a batch run). Bound to the task's current commit."""
     commit = commit or task_head(cfg, task)
     payload = {"pass": passed, "warn": warn, "fail": max(fail, 0), "parsed": True, "exit": 1 if fail else 0,
                "summary": summary[:300], "imported_from": source}
+    if role in ("author", "independent"):
+        payload["role"] = role
     actor = actor or coord.actor_for(cfg)
     if not coord.record(state_dir, "check", task, actor, payload, commit=commit):
         return False, "could not queue the result"
     return True, commit or "no commit (shows as stale)"
 
 
-def import_dir(cfg, directory: Path, *, state_dir, known: set[str] | None = None, actor=None) -> list[tuple[str, str]]:
+def import_dir(cfg, directory: Path, *, state_dir, known: set[str] | None = None, actor=None,
+               role: str | None = None) -> list[tuple[str, str]]:
     """Import presubmit outputs: one `<task>.txt` per task containing the gate's summary line."""
     out = []
     for f in sorted(Path(directory).expanduser().glob("*.txt")):
@@ -165,14 +178,15 @@ def import_dir(cfg, directory: Path, *, state_dir, known: set[str] | None = None
         if not counts:
             out.append((task, "skipped: no summary line"))
             continue
-        fails = [l.strip() for l in text.splitlines() if "FAIL" in l and "·" not in l][:3]
         ok, detail = record_check(cfg, task, passed=counts["pass"], warn=counts["warn"], fail=counts["fail"],
-                                  summary="; ".join(fails), state_dir=state_dir, actor=actor, source=f"import {f.name}")
+                                  summary=fail_lines(text), state_dir=state_dir, actor=actor, source=f"import {f.name}",
+                                  role=role)
         out.append((task, f"P{counts['pass']} W{counts['warn']} F{counts['fail']}" if ok else detail))
     return out
 
 
-def add_review(cfg, task: str, verdict: str, confidence: int | None, note: str, *, state_dir, actor=None) -> tuple[bool, str]:
+def add_review(cfg, task: str, verdict: str, confidence: int | None, note: str, *, state_dir, actor=None,
+               role: str | None = None) -> tuple[bool, str]:
     if verdict not in VERDICTS:
         return False, f"verdict must be one of {', '.join(VERDICTS)}"
     if confidence is not None and not 1 <= confidence <= 5:
@@ -182,6 +196,8 @@ def add_review(cfg, task: str, verdict: str, confidence: int | None, note: str, 
         return False, "cannot find the task's current commit; a review must be bound to one"
     actor = actor or coord.actor_for(cfg)
     payload = {"verdict": verdict, "note": note[:500]}
+    if role in ("author", "independent"):
+        payload["role"] = role
     if confidence is not None:
         payload["confidence"] = confidence
     if not coord.record(state_dir, "review", task, actor, payload, commit=commit):

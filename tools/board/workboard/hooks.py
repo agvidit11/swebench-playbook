@@ -200,6 +200,75 @@ def _refresh_alias(data, host_id, state, now, force=False) -> dict | None:
     return {"session_id": sid, "alias": alias, "kind": "claude", "host": host_id} if changed else None
 
 
+def presubmit_result(data: dict, cfg) -> dict | None:
+    """A Bash call that ran the presubmit gate directly (not via `board check`) -> {task, pass, warn, fail, summary, commit}."""
+    if data.get("tool_name") != "Bash":
+        return None
+    ti = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
+    cmd = ti.get("command") if isinstance(ti.get("command"), str) else ""
+    if "presubmit.py" not in cmd or re.search(r"\b(board|workboard)\s+check\b", cmd):
+        return None
+    if cmd.count("presubmit.py") > 1:
+        return None                                      # several runs in one command: cannot tell which result is which
+    after = cmd.split("presubmit.py", 1)[1]
+    pipes = [seg.strip() for seg in re.split(r"(?<!\|)\|(?!\|)", after)[1:]]
+    if any(not seg.startswith("tee") for seg in pipes):
+        return None                                      # output filtered (tail/grep/...): counts or fixes would be wrong
+    resp = data.get("tool_response")
+    text = (f"{resp.get('stdout', '')}\n{resp.get('stderr', '')}" if isinstance(resp, dict)
+            else resp if isinstance(resp, str) else "")
+    if not isinstance(text, str) or not text:
+        return None
+    from .checks import parse_summary, fail_lines
+    counts = parse_summary(text, cfg.checks.summary_regex)
+    if not counts:
+        return None
+    try:
+        toks = shlex.split(cmd)
+    except ValueError:
+        toks = cmd.split()
+    task, commit = None, None
+    for i, tok in enumerate(toks):
+        if tok.endswith("presubmit.py"):
+            rest = [x for x in toks[i + 1:]]
+            for j, x in enumerate(rest):
+                if x in ("--repo", "--ref", "--color") and j + 1 < len(rest):
+                    if x == "--ref" and re.fullmatch(r"[0-9a-f]{40}", rest[j + 1]):
+                        commit = rest[j + 1]
+                    continue
+                if x.startswith("-") or (j and rest[j - 1] in ("--repo", "--ref", "--color")):
+                    continue
+                task = x.rstrip("/").rsplit("/", 1)[-1]
+                break
+            break
+    if not task or not re.fullmatch(r"[A-Za-z0-9._-]{3,140}", task):
+        return None
+    code = next((resp.get(k) for k in ("exit_code", "exitCode", "returncode") if isinstance(resp, dict)
+                 and isinstance(resp.get(k), int)), None)
+    if code and not counts["fail"]:
+        counts["fail"] = 1                               # the gate failed even though its summary looked clean
+    return dict(counts, task=task, summary=fail_lines(text), commit=commit)
+
+
+def _record_presubmit_async(res: dict) -> None:
+    """Hand the result to `board check record` in the background (it resolves the commit and pushes)."""
+    import subprocess
+    import sys
+    argv = [sys.executable, "-m", "workboard", "check", "record", res["task"], "--pass", str(res["pass"]),
+            "--warn", str(res["warn"]), "--fail", str(res["fail"]), "--summary", res["summary"] or "presubmit.py",
+            "--source", "hook: presubmit.py"]
+    if res.get("commit"):
+        argv += ["--commit", res["commit"]]
+    env = dict(os.environ)
+    if res.get("session_id"):
+        env["CLAUDE_CODE_SESSION_ID"] = res["session_id"]          # attribute it to the session that ran the gate
+    try:
+        subprocess.Popen(argv, cwd=str(Path(__file__).resolve().parent.parent), stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, env=env)
+    except OSError:
+        pass
+
+
 def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
     now = time.time()
     task = task_of(data, cfg)
@@ -222,6 +291,13 @@ def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
                 out.append(("build_action", task, {"model": build_model}, actor))
         return out
 
+    try:
+        res = presubmit_result(data, cfg)
+    except Exception:                                    # never break the session over bookkeeping
+        res = None
+    if res:
+        res["session_id"] = data.get("session_id") if isinstance(data.get("session_id"), str) else ""
+        _record_presubmit_async(res)
     for type_, ent, payload, actor in _locked_update(state_dir, update, deadline):
         events.spool_append(state_dir, events.new_event(type_, ent, payload, actor=actor, commit=None, source="hook"),
                             wait_seconds=max(0.0, deadline - time.monotonic()))

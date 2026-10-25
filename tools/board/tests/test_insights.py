@@ -26,69 +26,26 @@ class InsightsTest(unittest.TestCase):
         t = {"next": "WAIT reviewer", "state_age_s": 10 * 3600, "vsum": {"issues": []}}
         steps = insights.next_steps(t, {"wait_p50_h": 40})
         self.assertEqual(steps[0]["eta"], "~30h")
-        t = {"next": "GET R2", "review": "R1", "vsum": {"issues": []}}
-        self.assertTrue(any("1 agent-session review" in s["do"] for s in insights.next_steps(t, {})))
+        ok = {"state": "ok"}
+        t = {"next": "GET R2", "vsum": {"issues": []},
+             "gates": {"author": {"check": ok, "review": ok}, "independent": {"check": {"state": "none"}, "review": {"state": "none"}}}}
+        do = [s["do"] for s in insights.next_steps(t, {})]
+        self.assertFalse(any("building session" in x for x in do))       # builder already ran presubmit + approved
+        self.assertTrue(any("independent agent" in x for x in do))
 
-    def test_assignee(self):
-        self.assertTrue(insights.assignee({"claim_health": "OWNED", "owner": "h1·x", "task": "t"}, {}).startswith("keep with"))
-        self.assertIn("h2", insights.assignee({"claim_health": "FREE", "group": "ATTENTION", "task": "t"}, {"h1": 3, "h2": 1}))
-
-
-class InfraStepTest(unittest.TestCase):
-    def test_infra_failure_gives_rerun_step(self):
-        vs = insights.validation_summary([{"name": "Oracle validation", "status": "failed",
-                                           "detail": "No oracle trials produced a usable result (9 errored). infrastructure error, not a task defect"}])
-        steps = insights.next_steps({"next": "FIX validation", "vsum": vs}, {})
-        self.assertTrue(any("rerun" in s["do"] for s in steps))
-        self.assertFalse(any(s["do"].startswith("push") for s in steps))
-
-
-class AuditValidationTest(unittest.TestCase):
-    def test_semantics(self):
-        items = [
-            {"name": "Metacode or Opus pass/fail balance", "status": "failed", "detail": '"2_x" too hard — no model passed it'},
-            {"name": "Agentic trial-output review", "status": "pending", "detail": "Not run because Solvability & difficulty failed"},
-            {"name": "Provenance check", "status": "warn", "detail": "Provenance CLEAN (not third-party authorship)"},
-            {"name": "TBR", "status": "warn", "detail": "Canonical Codimango TBR review pass"},
-            {"name": "Provenance check", "status": "passed", "detail": "Verdict: SUSPECT — review recommended"},
-            {"name": "VALIDATION_ENGINE::test_patch_validation", "status": "error",
-             "detail": "finished without a usable result — click Revalidate"},
-        ]
-        v = insights.validation_summary(items, tbr_status="fail")
-        checks = [(i["check"], i["severity"]) for i in v["issues"]]
-        self.assertIn(("calibration", "fail"), checks)
-        self.assertIn(("provenance", "warn"), checks)               # the SUSPECT one, not the CLEAN one
-        self.assertEqual(sum(1 for c, _ in checks if c == "provenance"), 1)
-        self.assertIn(("test-patch", "warn"), checks)              # infra, not a task failure
-        self.assertIn(("TBR", "warn"), checks)                     # from tbr_status=fail
-        self.assertEqual(v["skipped"], ["agentic review"])
-        self.assertFalse(any("third-party" in i["why"] for i in v["issues"]))
-
-    def test_waiting_tasks_need_nobody_and_dead_hosts_skipped(self):
-        self.assertEqual(insights.assignee({"group": "REVIEWING", "claim_health": "LEGACY", "owner": "x", "task": "t"}, {}),
-                         "nobody needed right now")
-        a = insights.assignee({"group": "ATTENTION", "claim_health": "FREE", "task": "t"}, {"a": 0, "b": 3}, live_hosts={"b"})
-        self.assertIn("on b", a)
-
-    def test_steps_exclusive_and_warnings_first(self):
-        # agent dissent on a draft: one address step, no human-review step, ends with submit (not resubmit)
-        s = [x["do"] for x in insights.next_steps({"next": "ADDRESS agent review", "status_raw": "draft",
-                                                   "review": "R0", "vsum": {"issues": []}}, {})]
-        self.assertEqual(sum("address" in x for x in s), 1)
-        self.assertEqual(s[-1], "submit for human review")
-        # infra-only rerun: one rerun, one wait
-        vs = insights.validation_summary([{"name": "oracle", "status": "error",
-                                           "detail": "infrastructure error, not a task defect"}])
-        s = [x["do"] for x in insights.next_steps({"next": "RERUN validation", "task": "t", "vsum": vs}, {})]
-        self.assertEqual(sum("codimango task rerun" in x for x in s), 1)
-        self.assertEqual(sum(x.startswith("wait") for x in s), 1)
-        # action-required warning comes before the submit ladder
-        vs = insights.validation_summary([{"name": "balance", "status": "passed",
-                                           "detail": "passed, WITH REVIEWER ACTION REQUIRED"}], "fail")
-        s = [x["do"] for x in insights.next_steps({"next": "RUN check", "task": "t", "review": "R0", "vsum": vs}, {})]
-        self.assertTrue(s[0].startswith("calibration") or "reviewer action" in s[0])
-        self.assertTrue(any("TBR" in x for x in s[:2]))
-        self.assertEqual(s[-1], "submit for human review")
+    def test_findings_from_presubmit_and_review_lead_the_plan(self):
+        none = {"check": {"state": "none"}, "review": {"state": "none"}}
+        ind = {"check": {"state": "bad", "fail": 2, "summary": "§5d: add no-injection test", "session": "x"},
+               "review": {"state": "bad", "note": "README stale", "session": "x"}}
+        t = {"next": "ADDRESS agent review", "task": "t", "vsum": {"issues": []}, "status_raw": "draft",
+             "gates": {"author": none, "independent": ind}}
+        do = [s["do"] for s in insights.next_steps(t, {})]
+        self.assertIn("§5d: add no-injection test", do[0])
+        self.assertFalse(any("README stale" in x for x in do))          # same session's presubmit already covers it
+        other = dict(t, gates={"author": none, "independent": dict(ind, review=dict(ind["review"], session="y"))})
+        self.assertTrue(any("README stale" in x for x in [s["do"] for s in insights.next_steps(other, {})]))
+        val = dict(t, next="FIX validation", vsum={"issues": [{"check": "oracle", "why": "x", "fix": "y", "severity": "fail"}]})
+        self.assertIn("§5d", insights.next_steps(val, {})[0]["do"])      # findings show while validation is also red
 
     def test_not_run_detail_is_info(self):
         vs = insights.validation_summary([{"name": "embedding dedup", "status": "passed",

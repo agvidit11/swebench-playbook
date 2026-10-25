@@ -17,15 +17,21 @@ attempts the atomic claim, so there is a short window before ownership is real �
 1. Before picking work: `board available` and `board show <task>` (owner, next steps, last review).
 2. Starting a NEW task: `board claim <slug>` *before* scaffolding, even if it isn't in codimango yet — the slug then
    shows as yours on every server, so no one builds the same idea. Also add your CLAIMS.md row as usual.
-3. Presubmit: `board check run <task>`; if you ran the gate yourself, `board check record <task> --pass N --warn N
-   --fail N --summary "..."`; for a batch, `board check import <dir>` (one `<task>.txt` per task).
+3. Presubmit — every task needs TWO on its current commit, shown as two ticks on the board:
+   - **building session** (you, when the work is done): `board check run <task> --role author`. Running
+     `presubmit.py <task> ...` directly from a Claude session is recorded automatically by the hook.
+   - **independent agent** (a fresh agent with no build context, e.g. the §5d presubmit): when it finishes, record it
+     with `board check record <task> --role independent --pass N --warn N --fail N --summary "<what to fix, one line>"`.
+   The summary is what the board shows as the next step, so make it the fix, not the verdict. A new push greys both
+   ticks (the old result stays visible) until they are re-run on the new commit.
 4. Done or handing over: `board release <task> --reason "..."` and tell the next owner with `board msg`.
 5. Messages to you appear inside your session automatically (📬 workboard: …). Act, reply with `board msg`,
    then `board ack <id>`.
 
-**After reviewing a task (the one manual step):**
-`board review add <task> --verdict ready|changes|comment --confidence 1-5 --note "<one line>"`
-R2 = two different sessions said ready on the same commit. A new push turns reviews into R~.
+**Agent approvals — also two: the building session and one independent agent:**
+`board review add <task> --verdict ready|changes|comment --role author|independent --note "<one line>"`
+R2 = the building session AND an independent agent said ready on the same commit. A new push turns reviews into R~.
+Everything you record is pushed to the shared ledger immediately; the dashboard pulls it every 30 s.
 
 | Want | Command |
 |---|---|

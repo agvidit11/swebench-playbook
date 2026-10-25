@@ -108,23 +108,19 @@ def _claims(task_events, cfg, now, aliases):
     return c["alias"], "OWNED", [c]
 
 
-def _reviews(task_events, current):
+def _reviews(task_events, current, g=None):
+    """R-label from the shared author/independent reducer: R2 = both roles ready on the current commit."""
+    from .roles import gates
+    g = g or gates(task_events, current)
+    cur = set(current) if isinstance(current, (set, list, tuple)) else ({current} if current else set())
     reviews = [e for e in task_events if e["type"] == "review"]
     latest = {}
-    for r in reviews:                                   # a later verdict from the same session replaces its earlier one
+    for r in reviews:
         latest[(r["actor"]["session_id"], r.get("commit"))] = r
-    current = set(current) if isinstance(current, (set, list, tuple)) else ({current} if current else set())
-    at_current = [r for r in latest.values() if r.get("commit") in current]
-    ready = {r["actor"]["session_id"] for r in at_current if r["payload"].get("verdict") == "ready"}
+    at_current = [r for r in latest.values() if r.get("commit") in cur]
     dissent = len({r["actor"]["session_id"] for r in at_current if r["payload"].get("verdict") == "changes"})
-    if len(ready) >= 2:
-        label = "R2"
-    elif len(ready) == 1:
-        label = "R1"
-    elif reviews and not at_current:
-        label = "R~"
-    else:
-        label = "R0"
+    ok = [r for r in ("author", "independent") if g[r]["review"]["state"] == "ok"]
+    label = "R2" if len(ok) == 2 else "R1" if ok else "R~" if reviews and not at_current else "R0"
     pool = at_current or reviews
     conf = next((r["payload"].get("confidence") for r in reversed(pool) if r["payload"].get("confidence")), None)
     return label, conf, bool(conf) and not at_current, dissent
@@ -198,11 +194,11 @@ def _next(f, findings):
         return "READY", "IMPORT task"
     if f.get("dissent") and state == "DRAFT":
         return "ATTENTION", "ADDRESS agent review"
-    # DRAFT ladder
-    if f["check"] == "NONE" or f["check_stale"]:
-        return "READY", "RUN check"
+    # DRAFT ladder: both presubmits (building session + independent agent) clean on this commit
     if f["check_fail"]:
         return "ATTENTION", "FIX check"
+    if f.get("check_need", f["check"] == "NONE" or f["check_stale"]):
+        return "READY", "RUN check"
     if f["review"] in ("R0", "R~"):
         return "READY", "GET R1"
     if f["review"] == "R1":
@@ -325,9 +321,13 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         if f["sync"] == "OK·doc" and server_sha:
             current.add(server_sha)                     # doc-only commits since the server commit keep reviews current
         f["equiv_commits"] = sorted(current)
-        f["review"], f["confidence"], f["confidence_stale"], f["dissent"] = _reviews(tev, current)
+        from .roles import gates as _gates
+        gts = _gates(tev, current)
+        f["gates"] = gts
+        f["review"], f["confidence"], f["confidence_stale"], f["dissent"] = _reviews(tev, current, gts)
         f["check"], f["check_stale"], check_payload = _check(tev, current)
-        f["check_fail"] = bool(check_payload and check_payload.get("fail"))
+        f["check_fail"] = any(gts[r]["check"]["state"] == "bad" for r in gts)
+        f["check_need"] = not all(gts[r]["check"]["state"] == "ok" for r in gts)
 
         refc = {k: v for k, v in fields.items() if k.startswith("claims.")}
         if claims_healthy:
@@ -378,6 +378,7 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             hosts = sorted({e["host_id"] for e in future})
             findings.append(Finding("CLOCK_SKEW", "warn", f"{len(future)} event(s) dated in the future from {', '.join(hosts)}",
                                     "check the clock on that host (timedatectl)"))
+        f["owner_session"] = claimants[0]["session"] if claim_health == "OWNED" and claimants else None
         if claim_health == "OWNED" and claimants:
             owner_sid = claimants[0]["session"]
             since = claimants[0].get("since") or claimants[0]["at"]

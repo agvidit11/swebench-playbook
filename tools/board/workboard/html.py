@@ -8,7 +8,7 @@ import json
 import re
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -20,15 +20,24 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
     tev = ev_by_task.get(v.entity_id, [])
     head = o.get("git.task_head")
     equiv = set(v.fields.get("equiv_commits") or ([head] if head else []))
+    from .roles import role_of
+    tev = sorted(tev, key=lambda e: (e.get("occurred_at") or "", e.get("host_id") or "", e.get("seq") or 0))
+    owner_sid = v.fields.get("owner_session")
     agent_reviews = [{"who": e["actor"].get("alias", ""), "verdict": e["payload"].get("verdict"),
-                      "confidence": e["payload"].get("confidence"), "note": (e["payload"].get("note") or "")[:120],
-                      "current": e.get("commit") in equiv, "at": e["occurred_at"]}
+                      "confidence": e["payload"].get("confidence"), "note": (e["payload"].get("note") or "")[:300],
+                      "current": e.get("commit") in equiv, "at": e["occurred_at"], "role": role_of(e, tev)}
                      for e in tev if e["type"] == "review"]
-    checks = [e for e in tev if e["type"] == "check"]
-    last_check = None
-    if checks:
-        c = checks[-1]
-        last_check = dict(c["payload"], at=c["occurred_at"], current=c.get("commit") in equiv)
+    g = v.fields.get("gates") or {}
+    checks_by_role = {r: g[r]["check"] for r in g if g[r]["check"].get("state") != "none"}
+    last_check = max(checks_by_role.values(), key=lambda c: c.get("at") or "") if checks_by_role else None
+    def _when(e):                                       # presence: when the session was last seen, not when it was logged
+        ls = (e.get("payload") or {}).get("last_seen")
+        if e["type"] == "presence" and isinstance(ls, (int, float)):
+            return datetime.fromtimestamp(ls, timezone.utc).isoformat()
+        return e["occurred_at"]
+    mine = [_when(e) for e in tev if owner_sid and (e.get("actor") or {}).get("session_id") == owner_sid
+            and e["type"] in ("touch", "presence", "claim", "renew", "build_action", "check", "review")]
+    owner_last = max(mine) if mine else None
     legacy = [e["payload"] for e in tev if e["type"] == "note" and e["payload"].get("legacy_owner")]
     rec = decisions.get(v.entity_id, {})
     upd = o.get("codimango.updated_at")
@@ -44,7 +53,11 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
         "server_commit": (o.get("codimango.commit_sha") or "")[:8], "server_head": (o.get("codimango.head_commit_sha") or "")[:8],
         "validated_commit": (o.get("codimango.validation_commit_sha") or "")[:8], "task_head": (head or "")[:8],
         "changed": (o.get("git.changed_since_validated") or [])[:8],
-        "agent_reviews": agent_reviews, "last_check": last_check,
+        "agent_reviews": agent_reviews, "last_check": last_check, "checks": checks_by_role,
+        "owner_last_at": owner_last,
+        "kind": {"swe_bench_multi_turn": "multi-turn", "swe_bench_single_turn": "single-turn"}.get(
+            o.get("codimango.format") or "", "multi-turn" if "multi" in (o.get("codimango.track") or "") else
+            "single-turn" if o.get("codimango.track") else "not imported"),
         "legacy": legacy[-1] if legacy else None,
         "decisions": dec, "review_history_stale": history_stale,
         "versions": versions(o.get("git.commit_times") or [], dec) if (dec or o.get("git.commit_times")) else [],
@@ -81,7 +94,7 @@ def payload(snap, cfg) -> dict:
             "group", "next", "state", "state_age_s", "age_level", "owner", "claim_health", "valid", "review",
             "confidence", "confidence_stale", "sync", "check", "check_stale", "check_fail", "pushes_before_submit",
             "pushes_after_submit", "track", "active", "dissent", "links", "tag", "status_raw", "done_kind",
-            "category", "imported", "validated", "age_label", "claim_source", "tbr_status", "infra_only")},
+            "category", "imported", "validated", "age_label", "claim_source", "tbr_status", "infra_only", "gates", "check_need")},
             "findings": [{"code": x.code, "severity": x.severity, "summary": x.summary, "next": x.next_action}
                          for x in v.findings],
             **_task_extra(v, obs_by_task, ev_by_task, decisions)}

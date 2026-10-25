@@ -177,4 +177,4 @@ class RecordImportTest(unittest.TestCase):
         self.assertIn("unknown", res["ghost"])
         evs = [json.loads(l) for l in (self.dir / "s" / events.SPOOL_NAME).read_text().splitlines()]
         self.assertEqual([e["payload"].get("imported_from", "")[:6] for e in evs], ["manual", "import"])
-        self.assertEqual(evs[-1]["payload"]["summary"], "FAIL stage x: pending")
+        self.assertEqual(evs[-1]["payload"]["summary"], "stage x: pending")

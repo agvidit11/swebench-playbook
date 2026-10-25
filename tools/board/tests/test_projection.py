@@ -56,12 +56,19 @@ class ProjectionTest(unittest.TestCase):
         self.assertEqual(self.view(obs, one).fields["review"], "R1")
         same_session_twice = one + [e("review", "t", {"verdict": "ready", "confidence": 5}, commit=SHA_A, seq=2)]
         self.assertEqual(self.view(obs, same_session_twice).fields["review"], "R1")
-        two = one + [e("review", "t", {"verdict": "ready", "confidence": 5}, session="s2", host="h2", commit=SHA_A)]
+        two_indep = one + [e("review", "t", {"verdict": "ready", "confidence": 5}, session="s2", host="h2", commit=SHA_A)]
+        self.assertEqual(self.view(obs, two_indep).fields["review"], "R1")     # two fresh agents, no author approval
+        two = one + [e("review", "t", {"verdict": "ready", "confidence": 5, "role": "author"}, session="s2", host="h2", commit=SHA_A)]
         v = self.view(obs, two)
         self.assertEqual(v.fields["review"], "R2")
         self.assertEqual(v.fields["next"], "RUN check")        # presubmit is required before submit
-        checked = two + [e("check", "t", {"pass": 20, "warn": 1, "fail": 0}, commit=SHA_A)]
+        one = two + [e("check", "t", {"pass": 20, "warn": 1, "fail": 0}, commit=SHA_A)]
+        self.assertEqual(self.view(obs, one).fields["next"], "RUN check")            # R2 + one presubmit is not enough
+        checked = one + [e("check", "t", {"pass": 20, "warn": 0, "fail": 0, "role": "author"}, session="s3", commit=SHA_A)]
         self.assertEqual(self.view(obs, checked).fields["next"], "SUBMIT")
+        same = one_session_both = [e("review", "t", {"verdict": "ready", "role": "author"}, commit=SHA_A, seq=5),
+                                   e("review", "t", {"verdict": "ready", "role": "independent"}, commit=SHA_A, seq=6)]
+        self.assertNotEqual(self.view(obs, same).fields["review"], "R2")           # one session cannot fill both slots
 
     def test_new_commit_makes_review_stale(self):
         obs = [cm("t"), gt("t", head=SHA_B), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
@@ -72,10 +79,11 @@ class ProjectionTest(unittest.TestCase):
 
     def test_changes_verdict_not_counted_and_visible(self):
         obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
-        evs = [e("review", "t", {"verdict": "ready", "confidence": 4}, commit=SHA_A),
+        evs = [e("review", "t", {"verdict": "ready", "confidence": 4, "role": "author"}, commit=SHA_A),
                e("review", "t", {"verdict": "changes", "confidence": 2}, session="s2", host="h2", commit=SHA_A)]
         v = self.view(obs, evs)
-        self.assertEqual(v.fields["review"], "R1")
+        self.assertEqual(v.fields["review"], "R1")                     # author ready; independent asked for changes
+        self.assertEqual(v.fields["gates"]["independent"]["review"]["state"], "bad")
         self.assertEqual(v.fields["dissent"], 1)
 
     def test_required_keys_present(self):
@@ -98,14 +106,15 @@ class ProjectionTest(unittest.TestCase):
         v = self.view([cm("t", validation_commit_sha=SHA_B)] + base,
                       [e("check", "t", {"pass": 1}, commit=SHA_A),
                        e("review", "t", {"verdict": "ready"}, commit=SHA_A),
-                       e("review", "t", {"verdict": "ready"}, session="s2", host="h2", commit=SHA_A)])
+                       e("review", "t", {"verdict": "ready", "role": "author"}, session="s2", host="h2", commit=SHA_A)])
         self.assertEqual((v.fields["group"], v.fields["next"]), ("ATTENTION", "RERUN server"))
         # full ladder
         ladder = [([], "RUN check"),
-                  ([e("check", "t", {"pass": 1}, commit=SHA_A)], "GET R1"),
-                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("review", "t", {"verdict": "ready"}, commit=SHA_A)], "GET R2"),
-                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("review", "t", {"verdict": "ready"}, commit=SHA_A),
-                    e("review", "t", {"verdict": "ready"}, session="s2", host="h2", commit=SHA_A)], "SUBMIT")]
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A)], "RUN check"),
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A)], "GET R1"),
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A), e("review", "t", {"verdict": "ready"}, commit=SHA_A)], "GET R2"),
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A), e("review", "t", {"verdict": "ready"}, commit=SHA_A),
+                    e("review", "t", {"verdict": "ready", "role": "author"}, session="s2", host="h2", commit=SHA_A)], "SUBMIT")]
         for evs, expected in ladder:
             self.assertEqual(self.view([cm("t")] + base, evs).fields["next"], expected)
 
@@ -249,8 +258,13 @@ class ProjectionTest(unittest.TestCase):
     def test_next_priority_draft_ladder(self):
         obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
         self.assertEqual(self.view(obs).fields["next"], "RUN check")
-        with_check = [e("check", "t", {"pass": 20, "warn": 0, "fail": 0}, commit=SHA_A)]
+        one_check = [e("check", "t", {"pass": 20, "warn": 0, "fail": 0}, commit=SHA_A)]
+        self.assertEqual(self.view(obs, one_check).fields["next"], "RUN check")      # independent only; author missing
+        with_check = one_check + [e("check", "t", {"pass": 20, "warn": 0, "fail": 0, "role": "author"}, session="s3", commit=SHA_A)]
         self.assertEqual(self.view(obs, with_check).fields["next"], "GET R1")
+        failing = with_check + [e("check", "t", {"pass": 1, "fail": 2}, session="s4", commit=SHA_A, seq=9,
+                                  at="2026-10-23T19:30:00+00:00")]
+        self.assertEqual(self.view(obs, failing).fields["next"], "FIX check")        # a later failure is not hidden
 
     def test_waiting_states(self):
         self.assertEqual(self.view([cm("t", "being_reviewed")]).fields["next"], "WAIT reviewer")
@@ -313,7 +327,7 @@ class CodexFindingsTest(ProjectionTest):
         obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
         evs = [e("review", "t", {"verdict": "ready"}, commit=SHA_A, seq=1, at="2026-10-23T18:00:00+00:00"),
                e("review", "t", {"verdict": "changes"}, commit=SHA_A, seq=2, at="2026-10-23T19:00:00+00:00"),
-               e("review", "t", {"verdict": "ready"}, session="s2", host="h2", commit=SHA_A, seq=1)]
+               e("review", "t", {"verdict": "ready", "role": "author"}, session="s2", host="h2", commit=SHA_A, seq=1)]
         v = self.view(obs, evs)
         self.assertEqual(v.fields["review"], "R1")
         self.assertEqual(v.fields["dissent"], 1)

@@ -559,16 +559,20 @@ def cmd_check(args, cfg):
     from . import checks, sync as s
     from .completion import task_names
     state = s.default_state_dir()
+    if args.action != "record" and (args.commit or args.source != "manual"):
+        print("check: --commit only applies to `check record`", file=sys.stderr)
+        return 2
     if args.action == "run":
-        code = checks.run_check(cfg, args.target, state_dir=state)
+        code = checks.run_check(cfg, args.target, state_dir=state, role=args.role)
     elif args.action == "record":
         ok, detail = checks.record_check(cfg, args.target, passed=args.passed, warn=args.warn, fail=args.fail,
-                                         summary=args.summary or "", state_dir=state)
+                                         summary=args.summary or "", state_dir=state, role=args.role,
+                                         commit=args.commit, source=args.source)
         print(f"recorded on {detail[:8]}" if ok else f"not recorded: {detail}")
         code = 0 if ok else 2
     else:
         known = set(task_names())
-        for task, result in checks.import_dir(cfg, Path(args.target), state_dir=state, known=known or None):
+        for task, result in checks.import_dir(cfg, Path(args.target), state_dir=state, known=known or None, role=args.role):
             print(f"  {task:<50} {result}")
         code = 0
     st = s.sync(cfg, state_dir=state, timeout_seconds=15)
@@ -601,7 +605,8 @@ def cmd_review(args, cfg):
     if not fresh:
         print(f"refusing to add review: ledger did not sync ({why})", file=sys.stderr)
         return 2
-    ok, detail = checks.add_review(cfg, args.task, args.verdict, args.confidence, args.note or "", state_dir=state)
+    ok, detail = checks.add_review(cfg, args.task, args.verdict, args.confidence, args.note or "", state_dir=state,
+                                   role=args.role)
     if not ok:
         print(f"review refused: {detail}", file=sys.stderr)
         return 2
@@ -1029,7 +1034,7 @@ def build_parser():
     hp.add_argument("--out", default="~/.cache/workboard/board.html")
     sv = sub.add_parser("serve", help="serve the live HTML dashboard on localhost")
     sv.add_argument("--port", type=int, default=8765)
-    sv.add_argument("--interval", type=int, default=60)
+    sv.add_argument("--interval", type=int, default=30, help="seconds between refreshes (each one pulls the shared ledger)")
     s = sub.add_parser("show", parents=[common], help="one task in full")
     s.add_argument("task")
     s.add_argument("--no-reviews", action="store_true", help="skip fetching human reviews")
@@ -1063,12 +1068,18 @@ def build_parser():
     ck.add_argument("--warn", type=int, default=0)
     ck.add_argument("--fail", type=int, default=0)
     ck.add_argument("--summary", default="")
+    ck.add_argument("--role", choices=["author", "independent"],
+                    help="author = the session building the task; independent = a fresh agent without that context")
+    ck.add_argument("--commit", help="commit the result is for (default: the task's latest commit)")
+    ck.add_argument("--source", default="manual", help=argparse.SUPPRESS)
     rv = sub.add_parser("review", parents=[common], help="add or list agent-session reviews")
     rv.add_argument("action", choices=["add", "list"])
     rv.add_argument("task")
     rv.add_argument("--verdict", choices=["ready", "changes", "comment"])
     rv.add_argument("--confidence", type=int, choices=range(1, 6), metavar="1-5")
     rv.add_argument("--note", default="")
+    rv.add_argument("--role", choices=["author", "independent"],
+                    help="author = the session building the task; independent = a fresh agent without that context")
     ic = sub.add_parser("import-claims", help="one-time: import live CLAIMS.md rows as advisory legacy owners")
     ic.add_argument("--path", help="CLAIMS.md to import (default: [legacy] claims_md in config)")
     ic.add_argument("--days", type=int, default=7)
@@ -1113,8 +1124,12 @@ def cmd_serve(args, cfg):
     from . import html
     from .app import gather
     def fresh():
-        snap = gather(cfg, do_sync=False)
-        return snap
+        from . import sync as s
+        try:                                   # pull other servers' claims / checks / reviews / messages now, not at next cron
+            s.sync(cfg, state_dir=s.default_state_dir(), timeout_seconds=15)
+        except Exception:
+            pass
+        return gather(cfg, do_sync=False)
     cfg.codimango.cache_ttl_seconds = min(cfg.codimango.cache_ttl_seconds, 60)   # the page should never lag
 
     def send(to, text, task):

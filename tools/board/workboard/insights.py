@@ -131,19 +131,48 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
         for i in infra:
             steps.append({"do": f"{i['check']}: infra error — codimango task rerun {task} (free)", "eta": "~1m"})
 
+    g = gates(t)
+
+    def findings():
+        """What the presubmits / agent reviews on this commit asked for. A review note is skipped when the same session
+        already reported it as a failing presubmit (the §5d agents record both)."""
+        seen = set()
+        for role in ("author", "independent"):
+            ck = g[role]["check"]
+            if ck["state"] == "bad" or (ck["state"] == "ok" and ck.get("warn") and ck.get("summary")):
+                text = ck.get("summary") or f"{ck.get('fail')} failure(s) — see the run"
+                key = " ".join(text.lower().split())
+                if key not in seen:
+                    seen.add(key)
+                    kind = "presubmit" if ck["state"] == "bad" else "presubmit warnings"
+                    steps.append({"do": f"{kind} ({ROLE_LABEL[role]}): {text}", "eta": "effort varies"})
+        for role in ("author", "independent"):
+            ck, rv = g[role]["check"], g[role]["review"]
+            if rv["state"] != "bad" or not rv.get("note"):
+                continue
+            if ck["state"] == "bad" and ck.get("session") and ck.get("session") == rv.get("session"):
+                continue
+            key = " ".join(rv["note"].lower().split())
+            if key not in seen:
+                seen.add(key)
+                steps.append({"do": f"review ({ROLE_LABEL[role]}): {rv['note'][:200]}", "eta": "effort varies"})
+
     def ladder(need_check=True):
-        rv = t.get("review")
-        need = 2 if rv in ("R0", "R~", None) else 1 if rv == "R1" else 0
-        if need_check and not (t.get("last_check") or {}).get("current"):
-            steps.append({"do": "`board check run` (presubmit)", "eta": "~10m"})
-        if need:
-            steps.append({"do": f"{need} agent-session review{'s' if need > 1 else ''} (`board review add`)",
-                          "eta": "~15m" if need == 1 else "~30m"})
+        a, i = g["author"], g["independent"]
+        if need_check and a["check"]["state"] != "ok":
+            steps.append({"do": f"building session: run presubmit (`board check run {task}`)", "eta": "~10m"})
+        if a["review"]["state"] != "ok":
+            steps.append({"do": f"building session: approve (`board review add {task} --verdict ready --role author`)",
+                          "eta": "~5m"})
+        if i["check"]["state"] != "ok" or i["review"]["state"] != "ok":
+            steps.append({"do": "independent agent (fresh, no build context): full presubmit + review, recorded with "
+                                "`--role independent`", "eta": "~30m"})
         steps.append({"do": submit, "eta": "~2m"})
 
     if n.startswith("RESOLVE"):
         steps.append({"do": "agree who owns it; release the other claim", "eta": "~5m"})
     elif n.startswith("FIX validation") or n.startswith("RERUN validation"):
+        findings()
         for i in fails:
             if i not in infra:
                 steps.append({"do": f"{i['check']}: {i['fix']}".replace("{task}", task), "eta": "effort varies"})
@@ -156,28 +185,41 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
         if raw == "needs_revision":
             steps.append({"do": "once green: resubmit for human review", "eta": "~2m"})
     elif n.startswith("RERUN"):
+        findings()
         steps.append({"do": f"codimango task rerun {task} (free) — results are for an older commit", "eta": "~1m"})
         steps.append({"do": "wait for validation", "eta": "~45m"})
     elif n.startswith("WAIT import"):
         steps.append({"do": "wait: codimango is importing your latest push", "eta": "~10m"})
+        findings()
     elif n.startswith("WAIT validation"):
         steps.append({"do": "wait for validation to finish", "eta": "typically ~30m"})
+        findings()
         if infra:
             steps.append({"do": f"{infra[0]['check']} hit an infra error — if it isn't retried: codimango task rerun "
                                 f"{task}", "eta": "~1m"})
     elif n.startswith("ADDRESS agent"):
-        steps.append({"do": "address the session reviewer's 'changes' note (see card)", "eta": "effort varies"})
+        before = len(steps)
+        findings()
+        if len(steps) == before:
+            steps.append({"do": "address the session reviewer's 'changes' note (see card)", "eta": "effort varies"})
         warn_steps()
         ladder()
     elif n.startswith("ADDRESS"):
-        steps.append({"do": "address the human reviewer's points (see last review)", "eta": "~3h"})
+        last = next((d for d in reversed(t.get("decisions") or []) if d.get("kind") == "revision" and d.get("reason")), None)
+        steps.append({"do": "address the human reviewer: " + (f"“{last['reason'][:220]}”" if last else "see the last review in codimango"),
+                      "eta": "~3h"})
+        findings()
         warn_steps()
         ladder()
     elif n.startswith("FIX check"):
-        steps.append({"do": "fix the presubmit failures, re-run `board check run`", "eta": "~1h"})
+        before = len(steps)
+        findings()
+        if len(steps) == before:
+            steps.append({"do": "fix the presubmit failures, re-run `board check run`", "eta": "~1h"})
         warn_steps()
         ladder(need_check=False)
     elif n.startswith("RUN check") or n.startswith("GET R1") or n.startswith("GET R2") or n.startswith("SUBMIT"):
+        findings()
         warn_steps()
         ladder()
     elif n.startswith("WAIT reviewer"):
@@ -186,41 +228,44 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
         steps.append({"do": what + (" (past the typical wait)" if left == 0 else ""),
                       "eta": _h(left) if left else "any time now"})
     elif n.startswith("IMPORT"):
+        findings()
         steps.append({"do": "import the task into codimango", "eta": "~10m"})
     return steps
 
 
+ROLE_LABEL = {"author": "building session", "independent": "independent agent"}
+
+
+def gates(t: dict) -> dict:
+    """The shared author/independent reducer result (computed once in the projection, see roles.gates)."""
+    empty = {"check": {"state": "none"}, "review": {"state": "none"}}
+    g = t.get("gates") or {}
+    return {r: g.get(r) or empty for r in ("author", "independent")}
+
+
 def review_summary(t: dict) -> dict:
-    """{agent: '✓✓'|'✓'|'', agent_on_current: bool, human: tag-ish text, bullets: [(kind, text)]}"""
-    latest = {}
-    for r in t.get("agent_reviews") or []:              # latest verdict per session wins
-        latest[(r.get("who"), r.get("current"))] = r
-    cur = [r for r in latest.values() if r.get("current")]
-    ready = {r["who"] for r in cur if r.get("verdict") == "ready"}
-    changes = [r for r in cur if r.get("verdict") == "changes"]
-    older_ready = {r["who"] for r in t.get("agent_reviews") or [] if r.get("verdict") == "ready" and not r.get("current")}
+    """{agent: '✓✓'|'✓'|'', human: text, bullets: [(kind, text)]}. Two agent approvals = the building session + one
+    independent agent, both on the current commit."""
+    g = gates(t)
     rounds = sum(1 for d in t.get("decisions") or [] if d["kind"] == "revision")
     bullets = []
-    bullets.append(("ok" if len(ready) >= 2 else "pend", f"agent approvals {min(len(ready), 2)}/2 on this commit"))
-    if changes:
-        bullets.append(("bad", f"{len(changes)} session asked for changes"))
-    if older_ready and len(ready) < 2:
-        bullets.append(("dim", f"{len(older_ready)} approval(s) on an older commit"))
-    c = t.get("last_check")
-    if not c:
-        bullets.append(("pend", "presubmit not run"))
-    elif c.get("fail"):
-        bullets.append(("bad", f"presubmit {c['fail']} failure(s)"))
-    else:
-        bullets.append(("ok" if c.get("current") else "dim", "presubmit clean" + ("" if c.get("current") else " (older commit)")))
+    for role in ("author", "independent"):
+        rv, ck = g[role]["review"], g[role]["check"]
+        word = {"ok": "approved", "bad": "asked for changes", "old": "reviewed an older commit", "none": "no review yet"}[rv["state"]]
+        bullets.append(({"ok": "ok", "bad": "bad", "old": "dim", "none": "pend"}[rv["state"]],
+                        f"{ROLE_LABEL[role]}: {word}" + (f" — {rv['note'][:160]}" if rv["state"] in ("bad", "old") and rv.get("note") else "")))
+        cword = {"ok": "presubmit clean", "bad": f"presubmit {ck.get('fail')} failure(s)", "old": "presubmit on an older commit",
+                 "none": "presubmit not recorded"}[ck["state"]]
+        bullets.append(({"ok": "ok", "bad": "bad", "old": "dim", "none": "pend"}[ck["state"]], f"{ROLE_LABEL[role]}: {cword}"))
     raw = t.get("status_raw")
     human = {"needs_reviewers_assigned": "waiting for a reviewer", "being_reviewed": "being reviewed",
              "needs_revision": f"sent back ({rounds}×)", "accepted": "accepted", "used_in_training": "accepted · in training",
              "draft": "not submitted"}.get(raw, raw or "—")
     bullets.append(("ok" if raw in ("accepted", "used_in_training") else "bad" if raw == "needs_revision" else "info",
                     f"human: {human}"))
-    return {"agent": "✓✓" if len(ready) >= 2 else "✓" if ready else ("✓" if older_ready else ""),
-            "agent_current": bool(ready), "agent_green": len(ready) >= 2, "human": human, "bullets": bullets}
+    ok = [r for r in g if g[r]["review"]["state"] == "ok"]
+    return {"agent": "✓✓" if len(ok) == 2 else "✓" if ok else "", "agent_current": bool(ok), "agent_green": len(ok) == 2,
+            "human": human, "bullets": bullets, "gates": g}
 
 
 def assignee(t: dict, load: dict[str, int], live_hosts: set[str] | None = None) -> str:
