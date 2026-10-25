@@ -67,3 +67,17 @@ class CommsTest(unittest.TestCase):
         s = comms.servers(evs, [], cfg, now=now.timestamp())
         self.assertEqual(s[0]["id"], "h1")
         self.assertEqual(len(s[0]["sessions"]), 1)
+
+
+class CheckinTest(unittest.TestCase):
+    def test_checkin_view_and_feed(self):
+        from workboard import comms
+        now = 1_800_000_000.0
+        from datetime import datetime, timezone
+        at = datetime.fromtimestamp(now - 120, timezone.utc).isoformat()
+        e = {"type": "checkin", "occurred_at": at, "payload": {"status": "working", "tasks": ["t1"]},
+             "actor": {"session_id": "s", "alias": "h·x", "kind": "claude"}, "host_id": "h", "entity": None}
+        v = comms._checkin_view(e, now)
+        self.assertEqual((v["status"], v["tasks"], v["checkin_ago_s"]), ("working", ["t1"], 120))
+        f = comms.feed([e], now=now)
+        self.assertIn("checked in: t1", f[0]["what"])

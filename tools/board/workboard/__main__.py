@@ -1018,6 +1018,12 @@ def build_parser():
     wt = sub.add_parser("ui", aliases=["watch"], parents=[common],
                         help="interactive live board: tabs, filters, search, details (? for keys)")
     wt.add_argument("--interval", type=int, default=120, help="seconds between refreshes")
+    hp = sub.add_parser("here", parents=[common], help="check in: claim/renew the tasks this session works on (or --idle)")
+    hp.add_argument("tasks", nargs="*")
+    hp.add_argument("--idle", action="store_true", help="not working on any task right now")
+    hp.add_argument("--note", default="", help="one line about what you are doing")
+    rcp = sub.add_parser("rollcall", parents=[common], help="ask every session to check in (`board here`)")
+    rcp.add_argument("--server", help="only sessions on this server")
     mp = sub.add_parser("msg", parents=[common], help="message a session, a server, or all (delivered into sessions)")
     mp.add_argument("to", help="'all', a server id, or part of a session's tab title")
     mp.add_argument("text", nargs="+")
@@ -1177,6 +1183,83 @@ def cmd_msg(args, cfg):
     return 0 if ok else 3
 
 
+ROLLCALL = ("📋 roll call from the workboard: run `board here <task> [<task> ...]` with the tasks you are working on "
+            "(or `board here --idle` if none), check that `board here` then lists them, and `board ack` this message.")
+
+
+def cmd_here(args, cfg):
+    """A session checks in: claims (or renews) the tasks it is working on and says working / idle."""
+    import re as _re
+    from . import claims as cl, coord, events as ev_mod, sync as s
+    state = s.default_state_dir()
+    me = coord.actor_for(cfg)
+    snap = _gather(args, cfg)
+    if not args.tasks and not args.idle:
+        mine = [v for v in snap.views if v.fields.get("owner_session") == me["session_id"]]
+        last = next((e for e in reversed(snap.events) if e["type"] == "checkin"
+                     and e["actor"].get("session_id") == me["session_id"]), None)
+        print(f"🧭 {me['alias']}")
+        print("  owns: " + (", ".join(v.entity_id for v in mine) or "nothing"))
+        print("  last check-in: " + (f"{last['occurred_at'][:16]} · {last['payload'].get('status')} · "
+                                     f"{', '.join(last['payload'].get('tasks') or []) or '—'}" if last else "never"))
+        print("  check in: board here <task> [<task> ...]   ·   nothing to do: board here --idle")
+        return 0
+    ok, err = coord.ledger_fresh(cfg, state)
+    if not ok:
+        print(f"refusing to check in: ledger did not sync ({err})", file=sys.stderr)
+        return 2
+    tasks, lines, others = [], [], {}
+    for name in args.tasks:
+        exact = [v.entity_id for v in snap.views if v.entity_id == name]
+        near = [v.entity_id for v in snap.views if name in v.entity_id]
+        task = exact[0] if exact else near[0] if len(near) == 1 else name
+        if not exact and len(near) != 1 and not _re.fullmatch(r"[a-z0-9][a-z0-9._-]{5,140}", name):
+            lines.append(f"  ✘ {name}: no such task ({len(near)} partial matches)")
+            continue
+        tasks.append(task)
+        res = coord.claim(cfg, task, state_dir=state)
+        if res.status == "ACQUIRED":
+            lines.append(f"  👤 {task}: claimed")
+        elif res.status == "LOST" and (res.owner or {}).get("session_id") == me["session_id"]:
+            hb = cl.heartbeat(cfg, task, me, expected_oid=res.oid, state_dir=state)
+            lines.append(f"  ✓ {task}: already yours" + ("" if hb.status in ("RENEWED", "ACQUIRED") else f" ({hb.status})"))
+        elif res.status == "LOST":
+            others[task] = (res.owner or {}).get("alias", "?")
+            lines.append(f"  ⚠ {task}: owned by {others[task]} — coordinate with `board msg`")
+        else:
+            lines.append(f"  … {task}: {res.status} {res.detail}")
+    payload = {"tasks": tasks, "status": "idle" if args.idle else "working"}
+    if args.note:
+        payload["note"] = args.note[:300]
+    if others:
+        payload["owned_by_others"] = others
+    ev_mod.spool_append(state, ev_mod.new_event("checkin", None, payload, actor=me, commit=None, source="checkin"))
+    for task in tasks:                                   # counts as activity on each task (owner shows as working)
+        ev_mod.spool_append(state, ev_mod.new_event("presence", task, {"last_seen": time.time(), "checkin": True},
+                                                    actor=me, commit=None, source="checkin"))
+    st = s.sync(cfg, state_dir=state, timeout_seconds=20)
+    print(f"🧭 {me['alias']} checked in — {'idle 💤' if args.idle else 'working on ' + str(len(tasks)) + ' task(s)'}"
+          + ("" if st.last_push_ok and not st.pending else " (queued; publishes on next sync)"))
+    for line in lines:
+        print(line)
+    return 0
+
+
+def cmd_rollcall(args, cfg):
+    """Ask every session (or one server's) to check in; they see it at their next step."""
+    from . import comms, coord, events as ev_mod, sync as s
+    state = s.default_state_dir()
+    target = {"to": f"host:{args.server}", "to_label": f"server {args.server}"} if args.server else \
+        {"to": "all", "to_label": "everyone"}
+    if not ev_mod.spool_append(state, comms.new_message(ROLLCALL, target, coord.actor_for(cfg))):
+        print("could not queue the roll call", file=sys.stderr)
+        return 2
+    st = s.sync(cfg, state_dir=state, timeout_seconds=20)
+    print(f"📋 roll call sent to {target['to_label']}" + ("" if st.last_push_ok else " (queued)") +
+          " — sessions answer at their next step; idle ones when you next use them. Watch the Team tab.")
+    return 0
+
+
 def cmd_inbox(args, cfg):
     from . import comms, coord, render as r, sync as s
     snap = _snap_for_comms(args, cfg)
@@ -1228,7 +1311,7 @@ def cmd_feed(args, cfg):
     return 0
 
 
-COMMANDS_EXTRA = {"msg": cmd_msg, "inbox": cmd_inbox, "ack": cmd_ack, "feed": cmd_feed, "watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}
+COMMANDS_EXTRA = {"here": cmd_here, "rollcall": cmd_rollcall, "msg": cmd_msg, "inbox": cmd_inbox, "ack": cmd_ack, "feed": cmd_feed, "watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
             "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release, "hook": cmd_hook,

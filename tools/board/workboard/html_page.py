@@ -299,13 +299,16 @@ function renderTeam(){const me=localStorage.getItem('wb-to')||'all';
   <span class="dim">· heartbeat ${s.last_sync_ago_s==null?'never':age(s.last_sync_ago_s)+' ago'}</span>
   <span class="${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'ok':'bad'}">${s.last_sync_ago_s==null?'● never synced':s.last_sync_ago_s<600?'● sync fresh':'● sync stale'}</span></h3>
   <div class="dim">${s.sessions.length} session(s) seen in the last 2h · working on ${s.owned.length} task(s)${s.last_sync_ago_s==null?' · <span class="bad">no heartbeat yet — run board setup there</span>':''}${s.last_activity_ago_s!=null?' · last activity '+age(s.last_activity_ago_s)+' ago':''}</div>
-  <ul class="lst">${s.sessions.map(x=>L('pend','✍️',`${esc(x.alias.split('·').slice(1).join('·')||x.alias)} <span class="dim">${age(x.ago_s)} ago</span>`)).join('')||L('dim','·','no active sessions in the last 2h')}</ul></div>`).join('');
+  <ul class="lst">${s.sessions.map(x=>L(x.status==='idle'?'dim':x.status?'ok':'pend',x.status==='idle'?'💤':x.status?'📋':'✍️',`${esc(x.alias.split('·').slice(1).join('·')||x.alias)} <span class="dim">active ${age(x.ago_s)} ago</span>`+
+   (x.status?`<div class="dim">${x.status==='idle'?'idle':'working on '+esc((x.tasks||[]).join(', ')||'—')} · checked in ${age(x.checkin_ago_s)} ago</div>`:'<div class="dim">not checked in — answers the next roll call</div>'))).join('')||L('dim','·','no active sessions in the last 2h')}</ul></div>`).join('');
  const msgs=(D.messages||[]).slice(-30).reverse().map(m=>`<div class="msg ${m.from.includes('dashboard')?'me':''}"><div class="meta">${esc(m.from)} → <b>${esc(m.to_label)}</b>${m.task?' · '+esc(m.task):''} · ${fdate(m.at)}
   ${m.acked_by.length?' · <span class="ok">✓ acked by '+m.acked_by.length+'</span>':' · <span class="run">not acked yet</span>'}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';
  const opts=['all',...(D.servers||[]).map(s=>s.id),...(D.sessions||[])];
  const feed=(D.feed||[]).map((f,i)=>`<div class="fi" style="animation-delay:${Math.min(i*8,300)}ms"><span class="t">${new Date(f.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
   <span><span class="badge" style="background:${hostColor(f.host)}">${esc(f.host)}</span></span><span>${esc(f.what)} ${f.task?'<b>'+esc(f.task)+'</b>':''}<div class="w">${esc(f.who)}</div></span></div>`).join('')||'<div class="dim">quiet</div>';
  document.getElementById('team').innerHTML=`<div class="team"><div>${srv}
+  <div class="panel"><h3>📋 roll call</h3><div class="dim">Run <code>board rollcall</code> (or ask any session to): every session gets a note at its next step to check in with
+  <code>board here &lt;tasks&gt;</code> or <code>board here --idle</code>. Idle sessions answer when you next use them. New sessions are told automatically when they start.</div></div>
   <div class="panel"><h3>💬 send a message</h3>
   <div class="dim" style="margin-bottom:6px">How it travels: saved to the shared private ledger → the target server picks it up on its next sync (normally ≤2 min while it has a heartbeat) →
   the hook shows it inside the target Claude session on its next step (Codex runs see it only via <code>board inbox</code>) → the session acks/replies with <code>board ack</code> / <code>board msg</code>.

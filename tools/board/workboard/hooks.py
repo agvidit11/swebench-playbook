@@ -155,10 +155,15 @@ def _candidates(data: dict) -> list[Path]:
         for tok in toks:
             if "/" in tok or tok.startswith("~"):
                 out.append(Path(os.path.expanduser(tok)))
+            elif re.fullmatch(r"[a-z0-9][a-z0-9._-]{9,140}", tok):
+                out.append(Path("@name") / tok)           # a bare task name (presubmit.py <task>, codex exec ... <task>)
         if cwd:
             out.append(cwd / "_")
     resolved = []
     for p in out:
+        if p.parts[:1] == ("@name",):
+            resolved.append(p)
+            continue
         if not p.is_absolute() and cwd:
             p = cwd / p
         resolved.append(p)
@@ -166,7 +171,10 @@ def _candidates(data: dict) -> list[Path]:
 
 
 def task_of(data: dict, cfg) -> str | None:
-    for p in _candidates(data):
+    cands = _candidates(data)
+    for p in cands:
+        if p.parts[:1] == ("@name",):
+            continue
         for repo in cfg.repositories:
             root = Path(repo.path).expanduser()
             try:
@@ -176,6 +184,11 @@ def task_of(data: dict, cfg) -> str | None:
             parts = rel.parts
             if len(parts) >= 2 and not parts[0].startswith(".") and (root / parts[0]).is_dir():
                 return parts[0]
+    for p in cands:                                      # then bare names, only when <repo>/<name>/ really exists
+        if p.parts[:1] == ("@name",):
+            for repo in cfg.repositories:
+                if (Path(repo.path).expanduser() / p.name).is_dir():
+                    return p.name
     return None
 
 
@@ -304,16 +317,22 @@ def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
     return _with_inbox(HookResult(0), data, state_dir, host_id, "PostToolUse")
 
 
-def _with_inbox(res: HookResult, data: dict, state_dir: Path, host_id: str, event: str) -> HookResult:
+BOARD_INTRO = ("🧭 This machine runs the workboard (shared task board across servers and sessions). When you start or "
+               "switch to a codimango task, run `board here <task>` (claims it so other sessions see you); when you are "
+               "not working on any task, `board here --idle`. Before touching a task: `board show <task>`. Messages and "
+               "roll calls from the board appear in your context like this one — answer roll calls with `board here`.")
+
+
+def _with_inbox(res: HookResult, data: dict, state_dir: Path, host_id: str, event: str, intro: bool = False) -> HookResult:
     """Attach unread messages for this session as additionalContext (delivered once per message)."""
     from . import comms
     sid = data.get("session_id") if isinstance(data.get("session_id"), str) else ""
     if not sid:
         return res
     msgs = comms.pending_for_hook(Path(state_dir), sid, host_id)
-    if msgs:
-        res.stdout = json.dumps({"hookSpecificOutput": {"hookEventName": event,
-                                                        "additionalContext": comms.hook_context(msgs)}})
+    parts = ([BOARD_INTRO] if intro else []) + ([comms.hook_context(msgs)] if msgs else [])
+    if parts:
+        res.stdout = json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": "\n\n".join(parts)}})
     return res
 
 
@@ -324,7 +343,8 @@ def _session_start(data, cfg, state_dir, host_id, deadline) -> HookResult:
         events.spool_append(state_dir, events.new_event("alias", None, {"alias": new_alias["alias"]},
                                                         actor=new_alias, commit=None, source="hook"),
                             wait_seconds=max(0.0, deadline - time.monotonic()))
-    return _with_inbox(HookResult(0), data, state_dir, host_id, "SessionStart")
+    return _with_inbox(HookResult(0), data, state_dir, host_id, "SessionStart",
+                       intro=data.get("source") in (None, "startup", "clear", "compact"))
 
 
 def _pre_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:

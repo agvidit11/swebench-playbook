@@ -19,7 +19,7 @@ from . import events
 
 INBOX_CACHE = "inbox-cache.json"
 DELIVERED = "inbox-delivered.json"
-FEED_TYPES = {"msg", "claim", "release", "steal", "assign", "check", "review", "presence", "note"}   # not heartbeat
+FEED_TYPES = {"msg", "claim", "release", "steal", "assign", "check", "review", "presence", "note", "checkin"}   # not heartbeat
 
 
 def target_for(spec: str, aliases: dict[str, str], servers: list[str]) -> dict:
@@ -157,14 +157,25 @@ def feed(evs: list[dict], since_s: float = 24 * 3600, now: float | None = None, 
                 "steal": "🤺 took over an expired claim", "assign": f"➡️ assigned to {p.get('to_alias', '')}",
                 "check": f"🧪 presubmit P{p.get('pass', 0)} W{p.get('warn', 0)} F{p.get('fail', 0)}",
                 "review": f"👀 review: {p.get('verdict', '')}" + (f" C{p['confidence']}" if p.get("confidence") else ""),
-                "presence": "✍️ started working", "note": f"📜 CLAIMS.md: {p.get('legacy_owner', '')} {p.get('status', '')}"
-                }[e["type"]]
+                "presence": "✍️ started working", "note": f"📜 CLAIMS.md: {p.get('legacy_owner', '')} {p.get('status', '')}",
+                "checkin": ("💤 checked in: idle" if p.get("status") == "idle" else
+                            "📋 checked in: " + (", ".join(p.get("tasks") or []) or "working"))}[e["type"]]
         if e["type"] == "note" and not p.get("legacy_owner"):
             continue
         out.append({"at": e["occurred_at"], "ts": at, "host": e.get("host_id", ""), "who": e["actor"].get("alias", ""),
                     "type": e["type"], "task": task, "what": what})
     out.sort(key=lambda x: -x["ts"])
     return out[:limit]
+
+
+def _checkin_view(e: dict | None, now: float) -> dict:
+    if not e:
+        return {"status": None}
+    try:
+        ago = int(now - datetime.fromisoformat(e["occurred_at"]).timestamp())
+    except ValueError:
+        return {"status": None}
+    return {"status": e["payload"].get("status"), "tasks": e["payload"].get("tasks") or [], "checkin_ago_s": ago}
 
 
 def servers(evs: list[dict], views, cfg, now: float | None = None) -> list[dict]:
@@ -179,6 +190,10 @@ def servers(evs: list[dict], views, cfg, now: float | None = None) -> list[dict]
                    default=None)
         last_act = max((datetime.fromisoformat(e["recorded_at"]).timestamp() for e in mine if e.get("recorded_at")),
                        default=None)
+        checkins = {}
+        for e in mine:
+            if e["type"] == "checkin":
+                checkins[e["actor"].get("session_id", "")] = e
         sessions = {}
         for e in mine:
             try:
@@ -192,6 +207,7 @@ def servers(evs: list[dict], views, cfg, now: float | None = None) -> list[dict]
                  and v.fields.get("claim_health") in ("OWNED", "ACTIVE")]
         out.append({"id": h, "last_sync_ago_s": int(now - last) if last else None,
                     "last_activity_ago_s": int(now - last_act) if last_act else None,
-                    "sessions": [{"alias": a, "ago_s": int(now - t)} for t, a in sorted(sessions.values(), reverse=True)][:12],
+                    "sessions": [dict({"alias": a, "ago_s": int(now - t)}, **_checkin_view(checkins.get(sid), now))
+                                 for sid, (t, a) in sorted(sessions.items(), key=lambda kv: -kv[1][0])][:12],
                     "owned": owned})
     return out

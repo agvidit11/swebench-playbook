@@ -292,3 +292,20 @@ class PresubmitAutoRecordTest(unittest.TestCase):
         self.assertEqual(hooks.presubmit_result(data, cfg)["task"], "my-task")
         data["tool_response"] = {"stdout": "usage: presubmit.py"}
         self.assertIsNone(hooks.presubmit_result(data, cfg))
+
+
+class BareTaskNameTest(unittest.TestCase):
+    def test_bare_name_counts_only_if_task_dir_exists(self):
+        import tempfile
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "pgmem-null-aggregate").mkdir()
+            cfg = SimpleNamespace(repositories=[SimpleNamespace(path=d)])
+            data = {"tool_name": "Bash", "cwd": "/tmp", "tool_input": {"command": "codex exec --x pgmem-null-aggregate fix it"}}
+            self.assertEqual(hooks.task_of(data, cfg), "pgmem-null-aggregate")
+            data["tool_input"]["command"] = "echo some-other-long-name"
+            self.assertIsNone(hooks.task_of(data, cfg))
+
+    def test_session_start_intro(self):
+        res = hooks._with_inbox(hooks.HookResult(0), {"session_id": "s"}, Path(tempfile.mkdtemp()), "h", "SessionStart", intro=True)
+        self.assertIn("board here", json.loads(res.stdout)["hookSpecificOutput"]["additionalContext"])

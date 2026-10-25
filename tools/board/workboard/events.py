@@ -24,7 +24,7 @@ MAX_QUEUE = 10000
 ACTOR_KINDS = {"claude", "codex", "muse", "human"}
 EVENT_TYPES = {
     "alias", "touch", "claim", "renew", "steal", "release", "assign", "check", "review",
-    "build_action", "warning", "note", "presence", "msg", "ack", "heartbeat",
+    "build_action", "warning", "note", "presence", "msg", "ack", "heartbeat", "checkin",
 }
 
 
@@ -248,6 +248,8 @@ def read_events(paths: list[Path]) -> tuple[list[dict], list[Finding]]:
                     bad.append(f"{path.name}:{lineno} unparseable")
                     continue
                 why = validate_committed(ev)
+                if why == "type":
+                    continue                              # written by a newer workboard: skip quietly
                 if why:
                     bad.append(f"{path.name}:{lineno} bad {why}")
                     continue

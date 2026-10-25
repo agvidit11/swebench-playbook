@@ -13,6 +13,11 @@ attempts the atomic claim, so there is a short window before ownership is real �
 `board claim <task>` when it matters. Edits to a task another live session owns are blocked
 ("owned by … — run: workboard show <task>").
 
+**Check in (keeps owners correct on the board):** when you start or switch to a task, `board here <task>`
+(claims it, or renews your claim); when you have no task, `board here --idle`. A roll call from the board
+("📋 roll call …" in your context) means: run `board here` with your current tasks now, then `board ack`.
+`board here` with no arguments shows what the board thinks you own.
+
 **Shared routine for every session (this keeps both servers in sync and avoids overlap):**
 1. Before picking work: `board available` and `board show <task>` (owner, next steps, last review).
 2. Starting a NEW task: `board claim <slug>` *before* scaffolding, even if it isn't in codimango yet — the slug then
@@ -38,6 +43,8 @@ Everything you record is pushed to the shared ledger immediately; the dashboard 
 | What to do next / who owns what | `board` (`--wide`, `--all`, `--group owner`) |
 | Free tasks | `board available` |
 | One task in full / why NEXT says that | `board show <task>` / `board explain <task>` |
+| Check in / show what you own | `board here <task>…` · `board here --idle` · `board here` |
+| Ask every session to check in | `board rollcall` (`--server ID`) |
 | Claim, hand to another session, give up | `board claim <task>` / `--to "<tab title words>"` / `board release <task> --reason ...` |
 | Run presubmit and log it | `board check run <task>` |
 | What changed | `board changes` |
