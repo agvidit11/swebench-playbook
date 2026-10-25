@@ -220,6 +220,11 @@ def _ref_claim(g_claims: dict, cfg, now):
 
 def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> list[TaskView]:
     by_task, repos = _merge(observations)
+    observed = {}
+    for ob in observations:
+        if not ob.entity_id.startswith(REPO_ENTITY_PREFIX):
+            observed.setdefault(ob.entity_id, {})[ob.source] = max(
+                ob.observed_at, observed.get(ob.entity_id, {}).get(ob.source, ob.observed_at))
     aliases = ev_mod.latest_aliases(evs)
     per_task_events: dict[str, list] = {}
     for e in evs:
@@ -358,18 +363,94 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                 seen_at = e["payload"].get("last_seen")
                 if isinstance(seen_at, (int, float)):
                     sid = e["actor"]["session_id"]
-                    pres[sid] = max(pres.get(sid, (0, ""))[0], seen_at), e["actor"].get("alias", "")
+                    old = pres.get(sid, {"at": 0})
+                    if seen_at >= old["at"]:
+                        pres[sid] = {"at": seen_at, "alias": e["actor"].get("alias", ""),
+                                     "checkin": bool(e["payload"].get("checkin"))}
         window = cfg.claims.active_window_minutes * 60
-        active = sorted(((now.timestamp() - t, a) for t, a in pres.values() if 0 <= now.timestamp() - t <= window))
-        f["active"] = [{"alias": a, "ago_s": int(ago)} for ago, a in active]
-        if active and claim_health in ("FREE", "LEGACY", "EXPIRED"):
-            owner, claim_health = active[0][1], "ACTIVE"
+        active = sorted(((now.timestamp() - x["at"], sid, x) for sid, x in pres.items()
+                         if 0 <= now.timestamp() - x["at"] <= window))
+        f["active"] = [{"alias": x["alias"], "ago_s": int(ago), "session_key": sid,
+                        "evidence": "explicit here" if x["checkin"] else "transcript path"}
+                       for ago, sid, x in active]
+
+        assignment_state = {"OWNED": "claimed", "LEGACY": "legacy", "CONFLICT": "conflict",
+                            "EXPIRED": "expired"}.get(claim_health, "unassigned")
+        assignment = {"state": assignment_state, "owner": owner or None,
+                      "session_key": claimants[0]["session"] if assignment_state == "claimed" and claimants else None,
+                      "source": f.get("claim_source"),
+                      "reason": {"claimed": "atomic claim is live", "legacy": "advisory CLAIMS.md row is live",
+                                 "conflict": "multiple live claims", "expired": "the last claim expired",
+                                 "unassigned": "no live assignment"}[assignment_state]}
+        activity = {"state": "active" if active else "inactive",
+                    "last_at": datetime.fromtimestamp(now.timestamp() - active[0][0], now.tzinfo).isoformat() if active else None,
+                    "session_keys": [sid for _, sid, _ in active],
+                    "aliases": [x["alias"] for _, _, x in active],
+                    "confidence": "high" if any(x["checkin"] for _, _, x in active) else "medium" if active else "unknown",
+                    "evidence": sorted({"explicit here" if x["checkin"] else "transcript path" for _, _, x in active}),
+                    "reason": ("explicit check-in" if any(x["checkin"] for _, _, x in active)
+                               else "recent task-path activity" if active else "no recent task activity")}
+        recent_build = [e for e in tev if e["type"] == "build_action" and
+                        0 <= (now - (ts(e["occurred_at"]) or now)).total_seconds() <= window]
+        if f["sync"] in ("IMPORTING", "HEAD≠SERVER"):
+            pipeline = {"state": "importing", "since": head_time.isoformat() if head_time else None,
+                        "reason": "latest remote change is awaiting server import", "source": "git+codimango"}
+        elif f["valid"] == "RUN":
+            pipeline = {"state": "validating", "since": cm.get("codimango.updated_at"),
+                        "reason": "server validation is running", "source": "codimango"}
+        elif state in ("QUEUE", "REVIEW"):
+            pipeline = {"state": "review", "since": cm.get("codimango.entered_pool_at"),
+                        "reason": "submitted and waiting for human review", "source": "codimango"}
+        elif recent_build:
+            pipeline = {"state": "building", "since": recent_build[-1]["occurred_at"],
+                        "reason": "a recent build run is recorded", "source": "ledger"}
+        else:
+            pipeline = {"state": "none", "since": None, "reason": "no active pipeline transition", "source": None}
+        work_events = [e for e in tev if e.get("type") in
+                       ("touch", "presence", "claim", "renew", "steal", "build_action", "check", "review")
+                       and ts(e.get("occurred_at"))]
+        last_worker = max(work_events, key=lambda e: ts(e["occurred_at"])) if work_events else None
+        last_change = {"commit": head, "at": head_time.isoformat() if head_time else None,
+                       "time_kind": "commit",
+                       "session_key": (last_worker.get("actor") or {}).get("session_id") if last_worker else None,
+                       "session_alias": (last_worker.get("actor") or {}).get("alias") if last_worker else None,
+                       "confidence": "inferred" if last_worker else "ambiguous",
+                       "reason": "remote commit date; exact push time is unavailable" if head_time else "no remote change observed"}
+        source_times = observed.get(task, {})
+        source_at = source_times.get("codimango") if cm else source_times.get("git")
+        max_stale = cfg.codimango.max_stale_seconds if cm else max(900, cfg.codimango.cache_ttl_seconds * 3)
+        sources_fresh = bool(source_at and 0 <= (now - source_at).total_seconds() <= max_stale)
+        from .ownership import reduce_ownership
+        axes = reduce_ownership(assignment, activity, pipeline, last_change,
+                                done=state in ("ACCEPTED", "ARCHIVED"),
+                                actionable=state not in ("QUEUE", "REVIEW", "ACCEPTED", "ARCHIVED"),
+                                sources_fresh=sources_fresh, now=now.timestamp(),
+                                activity_window_s=window)
+        f.update(axes)
+        display_state = axes["availability"]["state"]
+        if display_state == "done":
+            owner, compat = "", "DONE"
+        elif display_state == "conflict":
+            compat = "CONFLICT"
+        elif display_state == "actively_working":
+            owner = active[0][2]["alias"] if active and assignment_state not in ("claimed", "conflict") else owner
+            compat = "OWNED" if assignment_state == "claimed" else "ACTIVE"
+        elif display_state == "assigned_idle":
+            compat = {"claimed": "OWNED", "legacy": "LEGACY"}.get(assignment_state, claim_health)
+        elif display_state == "in_pipeline":
+            compat = "PIPELINE"
+        elif display_state == "worked_recently":
+            compat = "RECENT"
+        elif display_state == "never_seen":
+            compat = "UNSEEN"
+        else:
+            compat = "EXPIRED" if assignment_state == "expired" else "FREE"
         f["claim_source"] = {"ACTIVE": "recent activity", "LEGACY": "CLAIMS.md (advisory)", "OWNED": "claim",
-                             "FREE": "none", "EXPIRED": "expired claim", "CONFLICT": "conflicting claims"}.get(claim_health, f.get("claim_source"))
-        if state in ("ACCEPTED", "ARCHIVED"):
-            owner, claim_health = "", "DONE"
-        f["owner"], f["claim_health"] = owner, claim_health
-        if claim_health == "CONFLICT":
+                             "FREE": "none", "EXPIRED": "expired claim", "CONFLICT": "conflicting claims",
+                             "PIPELINE": "pipeline", "RECENT": "recent remote change", "UNSEEN": "insufficient evidence"}.get(compat, f.get("claim_source"))
+        f["owner"], f["claim_health"] = owner, compat
+        f["ownership_state"], f["ownership_reason"] = display_state, axes["availability"]["reason"]
+        if compat == "CONFLICT":
             findings.append(Finding("CONFLICT", "block", f"claimed by more than one live session: {owner}",
                                     "workboard release <task> on one of them"))
         skew = timedelta(seconds=cfg.claims.clock_skew_warn_seconds)
@@ -378,8 +459,8 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             hosts = sorted({e["host_id"] for e in future})
             findings.append(Finding("CLOCK_SKEW", "warn", f"{len(future)} event(s) dated in the future from {', '.join(hosts)}",
                                     "check the clock on that host (timedatectl)"))
-        f["owner_session"] = claimants[0]["session"] if claim_health == "OWNED" and claimants else None
-        if claim_health == "OWNED" and claimants:
+        f["owner_session"] = claimants[0]["session"] if assignment_state == "claimed" and claimants else None
+        if assignment_state == "claimed" and claimants:
             owner_sid = claimants[0]["session"]
             since = claimants[0].get("since") or claimants[0]["at"]
             foreign = [e for e in tev if e["type"] == "touch" and e["payload"].get("tool") in EDIT_TOOLS

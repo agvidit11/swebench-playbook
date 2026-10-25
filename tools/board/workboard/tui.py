@@ -163,6 +163,15 @@ def _sync(s: str) -> str:
 
 def _owner(f) -> str:
     h, o = f.get("claim_health"), f.get("owner") or ""
+    state = f.get("ownership_state")
+    if state == "available":
+        return f"{fg(BLUE)}🔓 free{RESET}"
+    if state == "in_pipeline":
+        return f"{fg(BLUE)}⏳ pipeline{RESET}" + (f" {fg(GREY)}{o}{RESET}" if o else "")
+    if state == "worked_recently":
+        return f"{fg(AMBER)}🟠 pushed recently{RESET}"
+    if state == "never_seen":
+        return f"{fg(GREY)}❔ never seen{RESET}"
     if h in ("FREE", None) or (not o and h != "DONE"):
         return f"{fg(BLUE)}🔓 free{RESET}"
     if h == "DONE":
@@ -171,7 +180,7 @@ def _owner(f) -> str:
         return f"{fg(RED)}🤺 {o}{RESET}"
     if h == "ACTIVE":
         ago = (f.get("active") or [{}])[0].get("ago_s")
-        return f"{fg(AMBER)}👀 {o}{RESET}" + (f" {fg(GREY)}{fmt_age(ago)}{RESET}" if ago is not None else "")
+        return f"{fg(AMBER)}✍ working ({o}){RESET}" + (f" {fg(GREY)}{fmt_age(ago)}{RESET}" if ago is not None else "")
     if h in ("EXPIRED", "LEGACY"):
         return f"{fg(GREY)}💤 {o}{RESET}" if h == "EXPIRED" else f"{fg(GREY)}📜 {o}{RESET}"
     return f"{fg(VIOLET)}👤 {o}{RESET}"
@@ -307,7 +316,8 @@ def render(snap, cfg, *, width=None, changed: set | None = None, show_all=False,
         out.append(f"  🎉 {fg(GREY)}{len(done)} done (board --all){RESET}")
     out += flow([f"{fg(PINK)}✦{RESET} changed", f"{fg(GREEN)}✓✓{RESET} 2 sessions approved", f"{fg(AMBER)}✓{RESET} 1 approved",
                  f"{fg(GREY)}↻✓{RESET} approved older commit", f"{fg(GREEN)}▰▰▰▰▱{RESET} confidence",
-                 f"{fg(AMBER)}⚠{RESET} server out of date", "🔓 free", "👀 active", "👤 owner", "📜 CLAIMS.md"], width)
+                 f"{fg(AMBER)}⚠{RESET} server out of date", "🔓 free", "✍ working", "💤 assigned idle",
+                 "⏳ pipeline", "🟠 pushed recently", "❔ never seen", "📜 CLAIMS.md"], width)
     if status_line:
         out += flow([status_line.strip()], width)
     return "\n".join(out)

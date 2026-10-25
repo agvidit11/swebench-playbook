@@ -33,6 +33,17 @@ attempts the atomic claim, so there is a short window before ownership is real �
 5. Messages to you appear inside your session automatically (📬 workboard: …). Act, reply with `board msg`,
    then `board ack <id>`.
 
+**Messaging:** `board msg <task> "text"` resolves and pins the task's current owner. `task:<slug>` is explicit;
+you may also target a stable session/name fragment, server ID, or `all`. States mean exactly queued locally,
+published in the private ledger, delivered by courier/hook, and explicitly acked. Never call published “delivered.”
+Codex/Muse jobs route to their parent Claude session when known.
+
+**Courier session:** keep one dedicated normal Claude session open and run `/board courier`. It repeatedly runs
+`board courier-wait --json --timeout 3600` (the blocking wait costs zero model turns), delivers each returned item
+with native SendMessage, then runs `board receipt <message_id> '<recipient>' delivered`. If SendMessage rejects it,
+record `failed --reason "<short error>"`. Re-run the wait after every batch. Never edit a transcript/socket or claim
+delivery without a positive tool result.
+
 **Agent approvals — also two: the building session and one independent agent:**
 `board review add <task> --verdict ready|changes|comment --role author|independent --note "<one line>"`
 R2 = the building session AND an independent agent said ready on the same commit. A new push turns reviews into R~.
@@ -49,10 +60,11 @@ Everything you record is pushed to the shared ledger immediately; the dashboard 
 | Run presubmit and log it | `board check run <task>` |
 | What changed | `board changes` |
 | Progress, flow, funnel, rank | `board stats` (`--quality`, `--from/--to`), `board rank` |
-| Message a session / server / everyone | `board msg <tab words|server|all> "text" [--task T]` |
+| Message a task owner / session / server / everyone | `board msg <task|task:slug|session|server|all> "text" [--task T]` |
 | Your messages (also shown to you automatically) | `board inbox` · `board ack <id|all>` |
+| Operate the delivery courier | `board courier` · `board courier-wait --json` · `board receipt …` |
 | What is happening on both servers | `board feed` · web Team tab (`board serve`) |
 | Health | `board status` |
 | One-time import of an old CLAIMS.md | `board import-claims --dry-run`, then without `--dry-run` |
 
-Rules: never edit a task another live session owns; never fake a review; `--json` on any read for scripts.
+Rules: never edit a task another live session owns; never fake a review or delivery receipt; `--json` on any read for scripts.

@@ -1,5 +1,6 @@
 import json, subprocess, tempfile, threading, unittest
 from pathlib import Path
+from unittest.mock import patch
 from workboard import events, sync
 from tests.helpers import bare_remote, cfg_for, git
 
@@ -33,6 +34,8 @@ class SyncTest(unittest.TestCase):
         evs, f = events.read_events([Path(cfg.ledger.path) / "events" / "h1.jsonl"])
         self.assertEqual([e["seq"] for e in evs], [1, 2, 3])
         self.assertEqual(f, [])
+        host = json.loads((Path(cfg.ledger.path) / "hosts" / "h1.json").read_text())
+        self.assertEqual(host["queues"]["spool_pending"], 0)
 
     def test_seq_monotonic_across_syncs(self):
         cfg, state = self.host("h1")
@@ -178,6 +181,26 @@ class SyncTest(unittest.TestCase):
         st = sync.load_state(state)
         self.assertTrue(st.last_pull_ok)
         self.assertIsNotNone(st.at)
+
+    def test_snapshot_source_exception_does_not_abort_event_sync_and_is_recorded(self):
+        cfg, state = self.host("h1")
+        spool_some(state, 1)
+        with patch("workboard.host_snapshots.publish", side_effect=RuntimeError("synthetic snapshot failure")):
+            st = sync.sync(cfg, host_id="h1", state_dir=state)
+        self.assertTrue(st.last_push_ok)
+        self.assertIn("host snapshot skipped: RuntimeError", st.error)
+        self.assertEqual(sync.load_state(state).error, st.error)
+        evs, _ = events.read_events([Path(cfg.ledger.path) / "events" / "h1.jsonl"])
+        self.assertEqual(len(evs), 1)
+
+    def test_unexpected_sync_exception_leaves_durable_reason(self):
+        cfg, state = self.host("h1")
+        spool_some(state, 1)
+        with patch("workboard.sync._sync_locked", side_effect=RuntimeError("synthetic source failure")):
+            st = sync.sync(cfg, host_id="h1", state_dir=state)
+        self.assertIn("sync exception: RuntimeError", st.error)
+        self.assertEqual(st.pending, 1)
+        self.assertEqual(sync.load_state(state).error, st.error)
 
     def test_lines_appended_during_sync_kept(self):
         cfg, state = self.host("h1")

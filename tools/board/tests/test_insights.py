@@ -3,6 +3,21 @@ from workboard import insights
 
 
 class InsightsTest(unittest.TestCase):
+    def test_assignee_follows_availability_without_claim_contradictions(self):
+        from datetime import datetime, timedelta, timezone
+        task = {"task": "alpha", "group": "READY", "ownership_state": "available"}
+        self.assertIn("board claim alpha", insights.assignee(task, {"h1": 0}, {"h1"}))
+        pushed = dict(task, ownership_state="worked_recently",
+                      last_push={"at": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+                                 "session_alias": "h1·lane"})
+        self.assertEqual(insights.assignee(pushed, {"h1": 0}, {"h1"}),
+                         "check with h1·lane first (pushed 2h ago)")
+        self.assertEqual(insights.assignee(dict(task, ownership_state="in_pipeline"), {}, set()),
+                         "nobody needed right now")
+        idle = dict(task, ownership_state="assigned_idle", owner="h1·lane",
+                    owner_last_at=(datetime.now(timezone.utc) - timedelta(hours=3)).isoformat())
+        self.assertEqual(insights.assignee(idle, {}, set()), "h1·lane (idle 3h) — message or take over")
+
     def test_only_problems_summarized(self):
         items = [{"name": "Structural checks", "status": "passed", "detail": "All 21/21 checks pass/warn"},
                  {"name": "Metacode or Opus pass/fail balance", "status": "failed",

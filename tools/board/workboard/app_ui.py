@@ -22,6 +22,14 @@ GROUP_KEYS = {"a": "ATTENTION", "r": "READY", "v": "VALIDATING", "e": "REVIEWING
 OWNER_FILTERS = ["all", "free", "active", "mine"]
 
 
+def _ownership(f):
+    if f.get("ownership_state"):
+        return f["ownership_state"]
+    return "available" if f.get("claim_health") in ("FREE", "EXPIRED") else \
+        "actively_working" if f.get("claim_health") == "ACTIVE" else \
+        "assigned_idle" if f.get("claim_health") in ("OWNED", "LEGACY") else f.get("claim_health", "").lower()
+
+
 @dataclass
 class UIState:
     tab: str = "board"
@@ -41,11 +49,13 @@ def visible(views, st: UIState, host_tag: str = "") -> list:
         if f.get("group") not in st.groups:
             continue
         h = f.get("claim_health")
-        if st.owner == "free" and h not in ("FREE", "EXPIRED"):
+        ownership = _ownership(f)
+        if st.owner == "free" and ownership != "available":
             continue
-        if st.owner == "active" and h not in ("ACTIVE", "OWNED"):
+        if st.owner == "active" and ownership != "actively_working":
             continue
-        if st.owner == "mine" and not (h in ("OWNED", "ACTIVE") and (f.get("owner") or "").startswith(host_tag + "·")):
+        if st.owner == "mine" and not (ownership in ("assigned_idle", "actively_working") and
+                                        (f.get("owner") or "").startswith(host_tag + "·")):
             continue
         if st.query and st.query.lower() not in v.entity_id.lower():
             continue
@@ -102,7 +112,7 @@ HELP = [
     f"{BOLD}search{RESET}     / then type part of a task name · enter keeps it · esc clears",
     f"{BOLD}live{RESET}       refreshes on its own (countdown at the bottom) · r refreshes now · ✦ marks rows that changed",
     f"{BOLD}ticks{RESET}      {fg(GREEN)}✓✓{RESET} two agent sessions approved · {fg(AMBER)}✓{RESET} one · {fg(GREY)}↻✓{RESET} approval on an older commit · ▰▰▰▰▱ confidence",
-    f"{BOLD}owners{RESET}     👤 claimed · 👀 a session touched it recently · 📜 from CLAIMS.md · 💤 claim expired · 🔓 free",
+    f"{BOLD}owners{RESET}     ✍ working · 💤 assigned idle · ⏳ pipeline · 🟠 pushed recently · ❔ never seen · 🔓 truly free",
     f"{BOLD}quit{RESET}       q or ctrl-c",
 ]
 

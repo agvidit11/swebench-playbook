@@ -68,6 +68,21 @@ class CommsTest(unittest.TestCase):
         self.assertEqual(s[0]["id"], "h1")
         self.assertEqual(len(s[0]["sessions"]), 1)
 
+    def test_local_server_card_carries_sync_reason_queue_and_counts(self):
+        from datetime import datetime, timezone
+        from workboard.sync import SyncState
+        now = datetime.now(timezone.utc)
+        cfg = load_config(Path("/nonexistent"))
+        native = [{"session_key": "claude:h1:1:d:s", "native_id": "s", "host": "h1", "name": "lane",
+                   "kind": "claude", "kind_icon": "🟣", "status": "waiting", "status_since": now.isoformat(),
+                   "live": True, "classification": "local-live", "tasks": [], "child_runs": []}]
+        state = SyncState(last_pull_ok=False, last_push_ok=False, pending=4, error="pull failed: synthetic",
+                          at=now.isoformat())
+        server = next(x for x in comms.servers([], [], cfg, native, [], now=now.timestamp(),
+                                               sync_state=state, local_host="h1") if x["id"] == "h1")
+        self.assertEqual(server["status_counts"]["waiting"], 1)
+        self.assertEqual((server["queue"], server["sync_error"]), (4, "pull failed: synthetic"))
+
 
 class CheckinTest(unittest.TestCase):
     def test_checkin_view_and_feed(self):
@@ -81,3 +96,20 @@ class CheckinTest(unittest.TestCase):
         self.assertEqual((v["status"], v["tasks"], v["checkin_ago_s"]), ("working", ["t1"], 120))
         f = comms.feed([e], now=now)
         self.assertIn("checked in: t1", f[0]["what"])
+
+    def test_shell_checkin_is_a_human_actor_without_resume(self):
+        from datetime import datetime, timezone
+        from workboard.config import load_config
+        now = 1_800_000_000.0
+        e = {"type": "checkin", "occurred_at": datetime.fromtimestamp(now - 60, timezone.utc).isoformat(),
+             "recorded_at": datetime.fromtimestamp(now - 60, timezone.utc).isoformat(),
+             "payload": {"status": "working", "tasks": ["alpha"]},
+             "actor": {"session_id": "human:agvidit@h1", "alias": "h1·agvidit (shell)", "kind": "human"},
+             "host_id": "h1", "entity": None}
+        server = next(x for x in comms.servers([e], [], load_config(Path("/nonexistent")), now=now)
+                      if x["id"] == "h1")
+        actor = next(x for x in server["sessions"] if x.get("is_actor"))
+        self.assertEqual((actor["kind_icon"], actor["classification"], actor["tasks"]),
+                         ("👤", "human-shell", ["alpha"]))
+        self.assertEqual(actor["restart"]["state"], "not-applicable")
+        self.assertIsNone(actor["restart"]["command"])

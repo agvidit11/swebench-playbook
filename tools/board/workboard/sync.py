@@ -14,6 +14,7 @@ import socket
 import tempfile
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from . import events, gitutil
@@ -157,7 +158,17 @@ def sync(cfg, *, host_id: str | None = None, state_dir: Path | None = None, time
             st = load_state(state_dir)
             st.busy = True
             return st
-        st = _sync_locked(cfg, host_id, state_dir, Deadline(timeout_seconds), retries)
+        try:
+            st = _sync_locked(cfg, host_id, state_dir, Deadline(timeout_seconds), retries)
+        except Exception as exc:
+            # Cron must always leave a durable explanation.  In particular, optional
+            # inventory/snapshot sources must never turn a sync attempt into a silent
+            # traceback with an old heartbeat.
+            st = SyncState(at=events.utcnow(), error=f"sync exception: {exc.__class__.__name__}: {exc}"[:300])
+            try:
+                st.pending = len(_spool_lines(state_dir))
+            except Exception:
+                st.pending = 0
         _save_state(state_dir, st)
         return st
     finally:
@@ -217,10 +228,8 @@ def _sync_locked(cfg, host_id, state_dir, dl: Deadline, retries) -> SyncState:
         return st
     lines = _spool_lines(state_dir)
     st.pending = len(lines)
-    if not lines:
-        st.last_push_ok = True
-        return st
     rel = Path("events") / f"{host_id}.jsonl"
+    host_rel = Path("hosts") / f"{host_id}.json"
     backoff = 0.5
     for attempt in range(retries):
         if dl.expired():
@@ -228,14 +237,31 @@ def _sync_locked(cfg, host_id, state_dir, dl: Deadline, retries) -> SyncState:
             break
         path = led / rel
         path.parent.mkdir(exist_ok=True)
-        with open(path, "a", encoding="utf-8") as fh:
-            fh.write("".join(l + "\n" for l in _stamp_lines(lines, host_id, _last_seq(path))))
-        a = gitutil.run(led, "add", str(rel), timeout=dl.left())
+        if lines:
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write("".join(l + "\n" for l in _stamp_lines(lines, host_id, _last_seq(path))))
+        from . import host_snapshots
+        host_at = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        queued_after_batch = max(0, len(_spool_lines(state_dir)) - len(lines))
+        snapshot_error = ""
+        try:
+            host_snapshots.publish(led, state_dir, host_id, at=host_at, spool_pending=queued_after_batch,
+                                   sync_error="", sync_at=st.at)
+            add_paths = [str(host_rel)] + ([str(rel)] if lines else [])
+        except Exception as exc:
+            snapshot_error = f"host snapshot skipped: {exc.__class__.__name__}: {exc}"[:300]
+            add_paths = [str(rel)] if lines else []
+        if not add_paths:
+            st.error = snapshot_error
+            st.pending = len(_spool_lines(state_dir))
+            return st
+        a = gitutil.run(led, "add", *add_paths, timeout=dl.left())
         if a.returncode != 0:
             st.error = f"git add failed: {gitutil.err(a)}"
             _pull(led, branch, dl)
             return st
-        c = gitutil.run(led, "commit", "-q", "-m", f"events: {host_id} +{len(lines)}", timeout=dl.left())
+        subject = f"events: {host_id} +{len(lines)}" if lines else f"host: {host_id} snapshot"
+        c = gitutil.run(led, "commit", "-q", "-m", subject, timeout=dl.left())
         if c.returncode != 0:
             st.error = f"commit failed: {gitutil.err(c)}"
             _pull(led, branch, dl)
@@ -251,7 +277,7 @@ def _sync_locked(cfg, host_id, state_dir, dl: Deadline, retries) -> SyncState:
                 except Exception as exc:          # claims must never break event delivery
                     st.error = f"auto-claim: {exc}"
             st.last_push_ok = True
-            st.error = st.error if st.error.startswith("auto-claim") else ""
+            st.error = st.error if st.error.startswith("auto-claim") else snapshot_error
             st.pending = len(_spool_lines(state_dir))
             return st
         st.error = f"push failed: {gitutil.err(p)}"

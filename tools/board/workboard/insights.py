@@ -3,6 +3,7 @@ sync status, next steps with rough ETAs, and who should take a task. Determinist
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 
 CHECK_NAMES = [  # (keyword in codimango label, short name, default fix)
     ("reward_hack", "reward-hack detector", "make sure tests can't be passed without the real fix"),
@@ -289,11 +290,34 @@ def review_summary(t: dict) -> dict:
 
 
 def assignee(t: dict, load: dict[str, int], live_hosts: set[str] | None = None) -> str:
-    """Nobody while it waits on the server/reviewers; keep with a live owner; else the less-loaded *live* server."""
-    if t.get("group") in ("REVIEWING", "DONE", "VALIDATING"):
+    """Turn the ownership availability state into one non-contradictory recommendation."""
+    state = t.get("ownership_state") or (t.get("availability") or {}).get("state")
+    if state in ("done", "in_pipeline") or (not state and t.get("group") in ("REVIEWING", "DONE", "VALIDATING")):
         return "nobody needed right now"
-    if t.get("claim_health") in ("OWNED", "ACTIVE", "LEGACY") and t.get("owner"):
+    if state == "worked_recently":
+        last = t.get("last_push") or {}
+        who = last.get("session_alias") or t.get("owner") or "the last session"
+        at = last.get("at")
+        try:
+            age_s = max(0, datetime.now(timezone.utc).timestamp() - datetime.fromisoformat(at.replace("Z", "+00:00")).timestamp())
+            pushed = (f"{int(age_s // 60)}m" if age_s < 3600 else
+                      f"{int(age_s // 3600)}h" if age_s < 86400 else f"{int(age_s // 86400)}d")
+        except (AttributeError, TypeError, ValueError):
+            pushed = None
+        return f"check with {who} first ({'pushed ' + pushed + ' ago' if pushed else 'pushed recently'})"
+    if state == "assigned_idle":
+        owner = t.get("owner") or "assigned owner"
+        at = t.get("owner_last_at")
+        try:
+            age_s = max(0, datetime.now(timezone.utc).timestamp() - datetime.fromisoformat(at.replace("Z", "+00:00")).timestamp())
+            idle = f"{int(age_s // 60)}m" if age_s < 3600 else f"{int(age_s // 3600)}h" if age_s < 86400 else f"{int(age_s // 86400)}d"
+        except (AttributeError, TypeError, ValueError):
+            idle = "unknown"
+        return f"{owner} (idle {idle}) — message or take over"
+    if state == "actively_working" and t.get("owner"):
         return f"keep with {t['owner']}"
+    if state != "available":
+        return "ownership unclear — inspect the three axes before assigning"
     live = {h: n for h, n in load.items() if live_hosts is None or h in live_hosts}
     if not live:
         return f"any free session (`board claim {t['task']}`)"

@@ -140,6 +140,7 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
 def payload(snap, cfg) -> dict:
     from . import comms, insights, reviews, stats as st
     from .app import cache_dir
+    from . import sync as sync_mod
     obs_by_task = {}
     for ob in snap.observations:
         obs_by_task.setdefault(ob.entity_id, {}).update(ob.fields)
@@ -157,7 +158,10 @@ def payload(snap, cfg) -> dict:
             load[host] = load.get(host, 0) + 1
     for sv in cfg.servers:
         load.setdefault(sv.id, 0)
-    servers = comms.servers(snap.events, snap.views, cfg)
+    local_host = sync_mod.safe_host(sync_mod.host_id_for(cfg))
+    servers = comms.servers(snap.events, snap.views, cfg, getattr(snap, "sessions", []),
+                            getattr(snap, "session_diagnostics", []), sync_state=snap.sync_state,
+                            local_host=local_host)
     live_hosts = {sv["id"] for sv in servers if sv["last_sync_ago_s"] is not None and sv["last_sync_ago_s"] < 900
                   and sv["sessions"]}
     views = []
@@ -167,7 +171,9 @@ def payload(snap, cfg) -> dict:
             "group", "next", "state", "state_age_s", "age_level", "owner", "claim_health", "valid", "review",
             "confidence", "confidence_stale", "sync", "check", "check_stale", "check_fail", "pushes_before_submit",
             "pushes_after_submit", "track", "active", "dissent", "links", "tag", "status_raw", "done_kind",
-            "category", "imported", "validated", "age_label", "claim_source", "tbr_status", "infra_only", "gates", "check_need", "pushes_since_decision")},
+            "category", "imported", "validated", "age_label", "claim_source", "tbr_status", "infra_only", "gates", "check_need", "pushes_since_decision",
+            "assignment", "activity", "pipeline", "last_push", "availability", "ownership_state",
+            "ownership_reason", "owner_session")},
             "findings": [{"code": x.code, "severity": x.severity, "summary": x.summary, "next": x.next_action}
                          for x in v.findings],
             **_task_extra(v, obs_by_task, ev_by_task, decisions)}
@@ -178,6 +184,27 @@ def payload(snap, cfg) -> dict:
         t["assignee"] = insights.assignee(t, load, live_hosts)
         t["tags"] = task_tags(t)
         views.append(t)
+    # Recipient resolution is computed server-side and pinned when a message is sent.
+    task_targets = {}
+    for view in snap.views:
+        try:
+            target = comms.target_for_task(view.entity_id, snap.views, getattr(snap, "sessions", []))
+            recipient = target["resolved_recipients"][0]
+            task_targets[view.entity_id] = {"state": "resolved", "to": target["to"],
+                                             "label": target["to_label"], "host": recipient.get("host"),
+                                             "session_key": recipient.get("session_key")}
+        except ValueError as exc:
+            task_targets[view.entity_id] = {"state": "nobody", "reason": str(exc)}
+    session_targets = []
+    for server in servers:
+        for session in server["sessions"]:
+            if session.get("is_summary") or session.get("is_actor"):
+                continue
+            session_targets.append({"session_key": session.get("session_key") or session.get("native_id"),
+                                    "native_id": session.get("native_id"), "name": session.get("name") or session.get("alias"),
+                                    "host": server["id"], "kind": session.get("kind"),
+                                    "kind_icon": session.get("kind_icon"), "tasks": session.get("tasks") or [],
+                                    "transport": session.get("transport")})
     weekly = st.weekly(snap.observations, cfg, snap.now, 10)
     cm_at = snap.health.get("codimango").observed_at.isoformat() if snap.health.get("codimango") and \
         snap.health["codimango"].observed_at else None
@@ -197,6 +224,7 @@ def payload(snap, cfg) -> dict:
         "feed": comms.feed(snap.events, since_s=24 * 3600, limit=150),
         "messages": comms.messages(snap.events)[-80:],
         "sessions": sorted({a for a in __import__("workboard.events", fromlist=["x"]).latest_aliases(snap.events).values()}),
+        "session_targets": session_targets, "task_targets": task_targets,
     }
 
 

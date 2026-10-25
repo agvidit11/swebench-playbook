@@ -28,6 +28,8 @@ class Snapshot:
     findings: list = field(default_factory=list)
     sync_state: object = None
     now: datetime = None
+    sessions: list = field(default_factory=list)
+    session_diagnostics: list = field(default_factory=list)
 
 
 def cache_dir() -> Path:
@@ -52,6 +54,7 @@ def pending_spool_events(state_dir: Path, host_id: str) -> list[dict]:
         if isinstance(ev, dict):
             stamped = events.stamp(ev, host_id, 10**9 + i)
             if events.validate_committed(stamped) is None:
+                stamped["_pending_local"] = True
                 out.append(stamped)
     return out
 
@@ -125,4 +128,22 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
             if e["event_id"] not in known]
     findings += ev_findings
     views = project(obs, evs, cfg, now, claims_healthy=claims_healthy)
-    return Snapshot(views, obs, evs, health, findings, sync_state, now)
+    native_sessions, session_diagnostics = [], []
+    try:
+        from . import session_inventory
+        host_id = sync_mod.safe_host(sync_mod.host_id_for(cfg))
+        native_sessions, session_diagnostics = session_inventory.discover(
+            cfg, evs, host_id, now=now.timestamp())
+        from . import host_snapshots
+        host_snapshots.cache_local(state_dir, host_id, [s for s in native_sessions if not s.get("remote")],
+                                   [d for d in session_diagnostics if d.get("host") == host_id], at=now.isoformat())
+        local_count = sum(not s.get("remote") and not s.get("is_summary") for s in native_sessions)
+        peer_count = sum(bool(s.get("remote")) and not s.get("is_summary") for s in native_sessions)
+        health["sessions"] = SourceHealth("sessions", True, now, 30,
+                                          f"{local_count} local, {peer_count} peer; "
+                                          f"{len(session_diagnostics)} diagnostic")
+    except Exception as exc:
+        health["sessions"] = SourceHealth("sessions", False, now, 30,
+                                          f"session discovery: {exc.__class__.__name__}")
+    return Snapshot(views, obs, evs, health, findings, sync_state, now,
+                    native_sessions, session_diagnostics)

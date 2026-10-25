@@ -84,7 +84,16 @@ def _cells(v, style: Style) -> dict[str, tuple[str, str | None]]:
     f = v.fields
     stale = style.g("↻", "~")
     claim_health = f.get("claim_health", "")
-    if claim_health in ("FREE", "DONE") or not f.get("owner"):
+    ownership = f.get("ownership_state")
+    if ownership == "available":
+        owner = ("FREE", "blue")
+    elif ownership == "in_pipeline":
+        owner = ("PIPELINE" + (f" {f['owner']}" if f.get("owner") else ""), "blue")
+    elif ownership == "worked_recently":
+        owner = ("RECENT CHANGE", "amber")
+    elif ownership == "never_seen":
+        owner = ("NEVER SEEN", "dim")
+    elif claim_health in ("FREE", "DONE") or (not f.get("owner") and ownership not in ("in_pipeline", "worked_recently", "never_seen")):
         owner = ("FREE", "blue") if claim_health != "DONE" else ("", None)
     elif claim_health in ("EXPIRED", "CONFLICT"):
         owner = (f"{claim_health} {f['owner']}", WORD_COLOUR[claim_health])
@@ -191,7 +200,8 @@ def legend(symbols: set[str], style: Style, everything: bool = False, width: int
         ("R0", "R0 no agent-session review"), ("R1", "R1 one agent session approved"),
         ("R2", "R2 two agent sessions approved"), ("R~", "R~ agent review on an older commit"),
         ("C", "C4 confidence 4/5"), ("STALE", f"{stale} result from an older commit"),
-        ("FREE", "FREE nobody owns it"), ("ACTIVE", "ACTIVE a session touched it recently (no claim)"), ("LEGACY", "LEGACY owner from CLAIMS.md (advisory, 7 days)"), ("EXPIRED", "EXPIRED owner idle 24h+"), ("CONFLICT", "CONFLICT two owners"),
+        ("FREE", "FREE only when assignment/activity/pipeline/recent-change are clear"), ("ACTIVE", "ACTIVE a session touched it recently (no claim)"), ("LEGACY", "LEGACY owner from CLAIMS.md (advisory, 7 days)"), ("EXPIRED", "EXPIRED claim; availability is reduced separately"), ("CONFLICT", "CONFLICT two owners"),
+        ("PIPELINE", "PIPELINE server/import/review work in progress"), ("RECENT", "RECENT CHANGE in the last 72h"), ("UNSEEN", "NEVER SEEN; evidence is insufficient to call it free"),
         ("HEAD≠SERVER", "HEAD≠SERVER newer push not on server"), ("STALE_VALID", "STALE_VALID validated an older commit"),
         ("OK·doc", "OK·doc only docs changed since validation"), ("UNCHECKED", "UNCHECKED drift not checked"),
         ("PUSHES", "2+1 commits before+after submit"),

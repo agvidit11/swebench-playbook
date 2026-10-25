@@ -330,6 +330,15 @@ def _with_inbox(res: HookResult, data: dict, state_dir: Path, host_id: str, even
     if not sid:
         return res
     msgs = comms.pending_for_hook(Path(state_dir), sid, host_id)
+    if msgs:
+        actor = {"session_id": sid, "alias": f"{host_id}·session {sid[:8]}", "kind": "claude", "host": host_id}
+        for msg in msgs:
+            recipient = next((x.get("session_key") or x.get("native_id")
+                              for x in (msg.get("delivery") or {}).get("recipients", [])
+                              if sid in (x.get("session_key"), x.get("native_id"))), sid)
+            events.spool_append(Path(state_dir), comms.receipt_event(
+                msg["id"], recipient, "delivered", actor, transport="hook"),
+                wait_seconds=max(0.0, 0.02))
     parts = ([BOARD_INTRO] if intro else []) + ([comms.hook_context(msgs)] if msgs else [])
     if parts:
         res.stdout = json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": "\n\n".join(parts)}})

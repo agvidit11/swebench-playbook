@@ -16,8 +16,11 @@ board stats [--quality] [--from D --to D]            board rank [import <file>]
 board status               # sources, ledger, claims, hooks, cron
 board ui                   # interactive terminal app (tabs, filters, search, details)
 board serve                # live web dashboard on localhost:8765 (Board / Team / Stats)
-board msg <who> "text"     # message a session (tab-title words), a server, or all; delivered into sessions
+board msg <who> "text"     # target a task, stable session/name, server, or all
 board inbox · board ack <id> · board feed   # your messages, mark handled, cross-server activity
+board courier              # dedicated Claude courier: block until a delivery is ready (zero tokens while waiting)
+board courier-wait --json  # courier protocol output
+board receipt <msg> <recipient> delivered|failed [--reason "..."]
 board import-claims --dry-run   # one-time: show live rows of an old CLAIMS.md ([legacy] claims_md); drop --dry-run to import
 ```
 
@@ -27,10 +30,34 @@ board import-claims --dry-run   # one-time: show live rows of an old CLAIMS.md (
   **ledger** repo (append-only per-host event files: claims, reviews, checks, session names).
 - **Claims** are create-only git refs (`refs/claims/<hash>`) on the ledger remote: exactly one session wins;
   renew/steal/release are compare-and-swap on the exact commit. Expired after 24h without renewal.
+- **Ownership has three independent axes:** assignment, recent task activity, and server pipeline. The page says
+  `free` only when all three are clear and no remote change was observed in the last 72 hours. Other scan states are
+  actively working, assigned idle, in pipeline, worked recently, never seen, conflict, and done.
+- **Sessions** come from Claude's native registry with a stable kind/host/uid-domain/native-id key. Foreign-uid,
+  foreign-domain, malformed, stale-PID, and PID-reused records never count as live. Codex and Muse executions appear
+  as child runs under the Claude session that launched them when the link is supported by evidence.
 - **Hooks** (Claude Code) record activity, name sessions after their tab title and block edits to a task another
   live session owns. They never touch the network and always fail open; the 2-minute background `board sync`
   then attempts the atomic claim for touched free tasks (so ownership lags activity by up to one sync).
 - Nothing ever writes to codimango or to task files.
+
+## Messaging and the courier
+
+`board msg <task> "..."` resolves the task's current owner and pins that stable session/host into the message.
+Use `task:<slug>` to be explicit; session-name fragments, stable session targets, server IDs, and `all` still work.
+An unowned/ambiguous task is refused with a prompt to choose a server or everyone.
+
+Messages now show honest states: **queued → published → delivered → acked**. Publication in the shared ledger is not
+called delivery. Keep one ordinary Claude session open and run `/board courier` (or `board courier`). The blocking
+wait consumes no model turns; when it returns work, that session uses native SendMessage, records `board receipt`,
+and re-arms. Current hooks remain a fallback and also record a delivered receipt. Codex/Muse jobs route to their
+parent Claude session; unsupported interactive transports stay visibly unavailable.
+
+The Team tab lists each native session and its stable kind icon (🟣 Claude, 🟢 Codex, 🟠 Muse), status/age/focus,
+child runs, transport, last board report/request, restart guidance, and deterministic keep/watch advice. Token and
+context totals say unavailable until increment 3 rather than estimating them.
+Each sync overwrites the private-ledger `hosts/<host>.json` summary, letting the peer host show a bounded, redacted
+session inventory and queue health without reading the other machine's home directory.
 
 ## Setup
 
@@ -50,3 +77,4 @@ probes claim refs and does the first sync; it exits non-zero if any of these fai
 Undo: `board install-hooks --uninstall` and remove the cron line.
 
 Tests: `python3 -m unittest discover -s tests` (stdlib only, Python ≥ 3.11).
+Increment-1 stress: `python3 -m tests.stress_increment1` (synthetic data only).

@@ -121,7 +121,9 @@ def cmd_list(args, cfg):
     if args.mine:
         from . import sync as s
         me = s.safe_host(s.host_id_for(cfg))
-        views = [v for v in views if v.fields.get("owner", "").startswith(me) or v.fields.get("claim_health") == "FREE"]
+        views = [v for v in views if v.fields.get("owner", "").startswith(me) or
+                 (v.fields.get("availability") or {}).get(
+                     "state", "available" if v.fields.get("claim_health") in ("FREE", "EXPIRED") else "") == "available"]
     if args.json:
         print(json.dumps(_envelope(snap, [_view_json(v) for v in views]), default=str, indent=1))
     elif _pretty(args, cfg):
@@ -254,7 +256,9 @@ def _available_reason(v, snap):
 def cmd_available(args, cfg):
     snap = _gather(args, cfg)
     free = [(v, _available_reason(v, snap)) for v in snap.views
-            if v.fields.get("group") != "DONE" and v.fields.get("claim_health") in ("FREE", "EXPIRED")]   # ACTIVE is not free
+            if v.fields.get("group") != "DONE" and
+            (v.fields.get("availability") or {}).get(
+                "state", "available" if v.fields.get("claim_health") in ("FREE", "EXPIRED") else "") == "available"]
     if args.reason:
         free = [(v, r) for v, r in free if r == args.reason]
     if args.json:
@@ -474,6 +478,13 @@ def cmd_hook(args, cfg):
         except ValueError:
             data = None
         res = hooks.handle(args.kind, data, cfg=cfg, state_dir=s.default_state_dir(), host_id=s.safe_host(s.host_id_for(cfg)))
+        dbg = s.default_state_dir() / "hook-debug.log"         # opt-in diagnostics: `touch` this file to enable
+        if dbg.exists() and dbg.stat().st_size < 2_000_000:
+            with open(dbg, "a") as fh:
+                sid = data.get("session_id", "?") if isinstance(data, dict) else "?"
+                fh.write(f"{time.strftime('%H:%M:%S')} {args.kind} {str(sid)[:8]} "
+                         f"{(data or {}).get('tool_name', '') if isinstance(data, dict) else ''} "
+                         f"delivered={'additionalContext' in (res.stdout or '')}\n")
         if res.stderr:
             print(res.stderr, file=sys.stderr)
         if res.stdout:
@@ -521,6 +532,15 @@ def cmd_sync(args, cfg):
                                                                actor=dict(_c.actor_for(cfg), kind="human"),
                                                                commit=None, source="sync")):
             hb.touch()
+    try:
+        from . import events as ev_mod, host_snapshots, session_inventory
+        current_events, _ = ev_mod.read_events(app.ledger_event_files(cfg))
+        native, diagnostic = session_inventory.discover(cfg, current_events, host, now=time.time())
+        host_snapshots.cache_local(s.default_state_dir(), host, [row for row in native if not row.get("remote")],
+                                   [row for row in diagnostic if row.get("host") == host],
+                                   at=datetime.now(timezone.utc).isoformat())
+    except Exception as exc:
+        print(f"session snapshot skipped: {exc}", file=sys.stderr)
     st = s.sync(cfg, state_dir=s.default_state_dir())
     app.refresh_claims_cache(cfg, s.default_state_dir())
     try:
@@ -1036,6 +1056,18 @@ def build_parser():
     fd = sub.add_parser("feed", parents=[common], help="servers, sessions and activity across both servers")
     fd.add_argument("--hours", default="12")
     fd.add_argument("--limit", type=int, default=60)
+    cr = sub.add_parser("courier", parents=[common], help="wait for messages a courier session should deliver")
+    cr.add_argument("--timeout", type=float, default=3600, help="seconds to wait (0 checks once)")
+    cr.add_argument("--limit", type=int, default=20)
+    cw = sub.add_parser("courier-wait", parents=[common], help="block without model tokens until courier work exists")
+    cw.add_argument("--timeout", type=float, default=3600, help="seconds to wait (0 checks once)")
+    cw.add_argument("--limit", type=int, default=20)
+    rc = sub.add_parser("receipt", parents=[common], help="record courier delivery for one message recipient")
+    rc.add_argument("message", help="message id or unique prefix")
+    rc.add_argument("recipient", help="stable session target from courier-wait")
+    rc.add_argument("state", choices=["delivered", "failed"])
+    rc.add_argument("--reason", default="")
+    rc.add_argument("--transport", default="courier", choices=["courier", "hook"])
     hp = sub.add_parser("html", parents=[common], help="write a self-contained HTML dashboard")
     hp.add_argument("--out", default="~/.cache/workboard/board.html")
     sv = sub.add_parser("serve", help="serve the live HTML dashboard on localhost")
@@ -1143,12 +1175,14 @@ def cmd_serve(args, cfg):
         if not text.strip():
             raise ValueError("empty message")
         snap = gather(cfg, do_sync=False)
-        target = comms.target_for(to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers])
+        target = comms.target_for(to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers],
+                                  views=snap.views, sessions=getattr(snap, "sessions", []))
         actor = dict(coord.actor_for(cfg), alias=f"{s.safe_host(s.host_id_for(cfg))}·dashboard", kind="human")
         if not ev_mod.spool_append(s.default_state_dir(), comms.new_message(text, target, actor, task=task)):
             raise ValueError("could not queue the message")
         st = s.sync(cfg, state_dir=s.default_state_dir(), timeout_seconds=20)
-        return {"to": target["to_label"], "synced": bool(st.last_push_ok and not st.pending)}
+        return {"to": target["to_label"], "state": "published" if st.last_push_ok and not st.pending else "queued",
+                "synced": bool(st.last_push_ok and not st.pending)}
     srv = html.serve(fresh, cfg, port=args.port, interval=args.interval, send_fn=send)
     print(f"🧭 workboard live at http://localhost:{args.port}/  (VS Code forwards the port; Ctrl-C to stop)")
     try:
@@ -1168,7 +1202,8 @@ def cmd_msg(args, cfg):
     state = s.default_state_dir()
     snap = _snap_for_comms(args, cfg)
     try:
-        target = comms.target_for(args.to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers])
+        target = comms.target_for(args.to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers],
+                                  views=snap.views, sessions=getattr(snap, "sessions", []))
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return 2
@@ -1178,8 +1213,8 @@ def cmd_msg(args, cfg):
         return 2
     st = s.sync(cfg, state_dir=state, timeout_seconds=20)
     ok = st.last_push_ok and not st.pending
-    print(f"💬 sent to {target['to_label']} — in the shared ledger; the target sees it on its next sync (≤2 min) + next tool call"
-          if ok else f"💬 queued for {target['to_label']} (published on the next sync)")
+    print(f"💬 published for {target['to_label']} — waiting for courier/hook delivery"
+          if ok else f"💬 queued for {target['to_label']} (publishes on the next sync)")
     return 0 if ok else 3
 
 
@@ -1292,6 +1327,97 @@ def cmd_ack(args, cfg):
     return 0 if pick else 1
 
 
+def _courier_data(cfg):
+    """Read only the private ledger, local spool, and Claude registry; no Codimango/Git scan."""
+    from . import app as app_mod, comms, events as ev_mod, sync as s
+    from .sources import claude_sessions
+    host = s.safe_host(s.host_id_for(cfg))
+    evs, _ = ev_mod.read_events(app_mod.ledger_event_files(cfg))
+    known = {e["event_id"] for e in evs}
+    evs += [e for e in app_mod.pending_spool_events(s.default_state_dir(), host) if e["event_id"] not in known]
+    sessions, _ = claude_sessions.discover(host)
+    return evs, sessions, host, comms.courier_jobs(evs, sessions, host)
+
+
+def _courier_fingerprint(cfg):
+    from . import app as app_mod, sync as s
+    from .sources.claude_sessions import REGISTRY
+    paths = app_mod.ledger_event_files(cfg) + [s.default_state_dir() / "spool.jsonl"]
+    try:
+        paths += list(REGISTRY.glob("*.json"))
+    except OSError:
+        pass
+    out = []
+    for path in paths:
+        try:
+            st = path.stat()
+            out.append((str(path), st.st_mtime_ns, st.st_size))
+        except OSError:
+            continue
+    return tuple(out)
+
+
+def cmd_courier_wait(args, cfg):
+    """Block in ordinary Python (zero model turns) until a courier has useful work."""
+    if not getattr(args, "no_sync", False):
+        from . import sync as s
+        try:
+            s.sync(cfg, state_dir=s.default_state_dir(), timeout_seconds=15)
+        except Exception:
+            pass
+    end = time.monotonic() + max(0.0, args.timeout)
+    fingerprint = None
+    jobs = []
+    while True:
+        current = _courier_fingerprint(cfg)
+        if current != fingerprint:
+            fingerprint = current
+            _, _, _, jobs = _courier_data(cfg)
+            if jobs:
+                break
+        if time.monotonic() >= end:
+            break
+        time.sleep(min(1.0, max(0.01, end - time.monotonic())))
+    jobs = jobs[:args.limit]
+    if args.json:
+        print(json.dumps(jobs, ensure_ascii=False))
+    elif not jobs:
+        print("courier wait timed out; no undelivered messages")
+    else:
+        print("📨 courier work — use the native SendMessage tool, then record exactly one receipt per row:")
+        for job in jobs:
+            about = f" [{job['task']}]" if job.get("task") else ""
+            print(f"  {job['message_id'][:8]} → {job['name']}{about}: {job['body']}")
+            print(f"    board receipt {job['message_id']} '{job['recipient']}' delivered")
+    return 0
+
+
+def cmd_receipt(args, cfg):
+    from . import comms, coord, events as ev_mod, sync as s
+    evs, _, _, _ = _courier_data(cfg)
+    matches = [m for m in comms.messages(evs) if m["id"].startswith(args.message)]
+    if len(matches) != 1:
+        print("message id is unknown or ambiguous", file=sys.stderr)
+        return 2
+    msg = matches[0]
+    current = next((r.get("state") for r in (msg.get("delivery") or {}).get("recipients", [])
+                    if args.recipient in (r.get("session_key"), r.get("native_id"))), None)
+    if current == args.state or current == "acked" or (current == "delivered" and args.state == "failed"):
+        print(f"receipt already {current or args.state}; no duplicate event written")
+        return 0
+    event = comms.receipt_event(msg["id"], args.recipient, args.state, coord.actor_for(cfg),
+                                reason=args.reason, transport=args.transport)
+    if not ev_mod.spool_append(s.default_state_dir(), event):
+        print("could not queue receipt", file=sys.stderr)
+        return 2
+    published = False
+    if not getattr(args, "no_sync", False):
+        state = s.sync(cfg, state_dir=s.default_state_dir(), timeout_seconds=15)
+        published = state.last_push_ok and not state.pending
+    print(f"receipt {args.state} queued" + (" and published" if published else ""))
+    return 0
+
+
 def cmd_feed(args, cfg):
     from . import comms
     snap = _snap_for_comms(args, cfg)
@@ -1300,7 +1426,8 @@ def cmd_feed(args, cfg):
     if args.json:
         print(json.dumps(items))
         return 0
-    for sv in comms.servers(snap.events, snap.views, cfg):
+    for sv in comms.servers(snap.events, snap.views, cfg, getattr(snap, "sessions", []),
+                            getattr(snap, "session_diagnostics", [])):
         last = render.fmt_age(sv["last_sync_ago_s"]) if sv["last_sync_ago_s"] is not None else "never"
         print(f"🖥  {sv['id']}: last sync {last} ago · {len(sv['sessions'])} active session(s) · owns {len(sv['owned'])}")
         for se in sv["sessions"][:6]:
@@ -1311,7 +1438,10 @@ def cmd_feed(args, cfg):
     return 0
 
 
-COMMANDS_EXTRA = {"here": cmd_here, "rollcall": cmd_rollcall, "msg": cmd_msg, "inbox": cmd_inbox, "ack": cmd_ack, "feed": cmd_feed, "watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}
+COMMANDS_EXTRA = {"here": cmd_here, "rollcall": cmd_rollcall, "msg": cmd_msg, "inbox": cmd_inbox,
+                  "ack": cmd_ack, "feed": cmd_feed, "courier": cmd_courier_wait,
+                  "courier-wait": cmd_courier_wait, "receipt": cmd_receipt,
+                  "watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}
 COMMANDS = {"list": cmd_list, "show": cmd_show, "explain": cmd_explain, "available": cmd_available,
             "changes": cmd_changes, "status": cmd_status, "legend": cmd_legend, "config": cmd_config,
             "plugins": cmd_plugins, "claim": cmd_claim, "release": cmd_release, "hook": cmd_hook,

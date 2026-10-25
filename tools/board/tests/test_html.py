@@ -43,6 +43,15 @@ class HtmlTest(unittest.TestCase):
         finally:
             srv.shutdown()
 
+    def test_team_and_owner_contract_is_in_the_inline_page(self):
+        from workboard.html_page import PAGE
+        for text in ("server-grid", "session-table", "status · for", "focus tasks", "hooks / transport",
+                     "data-session", "openSession", "MESSAGE THIS SESSION"):
+            self.assertIn(text, PAGE)
+        for text in ("✍ working", "💤 assigned idle", "⏳ in pipeline", "🛠 pushed", "🔓 free", "❔ never seen"):
+            self.assertIn(text, PAGE)
+        self.assertNotIn("predates the current board hooks", PAGE)
+
 
 class LinksTest(unittest.TestCase):
     def test_links_projected_and_rendered(self):

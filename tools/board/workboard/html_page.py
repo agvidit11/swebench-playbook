@@ -70,13 +70,15 @@ aside{position:fixed;top:0;right:0;width:470px;max-width:96vw;height:100%;backgr
 aside.open{transform:none}aside.noanim .sec{animation:none;opacity:1}aside.wide{width:min(1180px,92vw)}aside.wide #dbody{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 aside.wide #dbody>.head{grid-column:1/-1}aside{transition:transform .38s cubic-bezier(.2,1.1,.3,1),width .3s ease}
 aside .xx{position:absolute;top:14px;right:46px;cursor:pointer;color:var(--dim);font-size:16px;transition:transform .2s}aside .xx:hover{transform:scale(1.25);color:var(--pink)}
-.team{display:grid;grid-template-columns:minmax(300px,1fr) minmax(360px,1.4fr);gap:14px}.srv{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--panel)}
+.server-grid{display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:12px;margin-bottom:14px}.srv{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel)}
 .srv h3{margin:0 0 6px;font-size:14px}.srv .live{margin:0}.badge{display:inline-block;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:700;color:#14161c}
-.feed{max-height:70vh;overflow:auto}.fi{display:grid;grid-template-columns:52px 64px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #22252f;animation:rowin .3s ease both}
+.team{display:grid;grid-template-columns:minmax(620px,1.65fr) minmax(340px,1fr);gap:14px;align-items:start}.team-side{position:sticky;top:10px}.feed{max-height:44vh;overflow:auto}.fi{display:grid;grid-template-columns:52px 64px 1fr;gap:8px;padding:6px 4px;border-bottom:1px solid #22252f;animation:rowin .3s ease both}
 .fi .t{color:var(--dim)}.fi .w{color:var(--dim);font-size:12px}.msg{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:#181b22;animation:up .3s ease}
 .msg .meta{color:var(--dim);font-size:12px}.msg.me{border-color:#f78fb355}.compose{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .compose select,.compose input,.compose textarea{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:7px 10px;font:inherit}
 .compose textarea{flex:1 1 100%;min-height:60px}.sent{color:var(--green);animation:fadein .3s}aside .x{position:absolute;top:14px;right:18px;cursor:pointer;color:var(--dim);font-size:16px;transition:transform .2s}
+.session-table{overflow:auto;border:1px solid var(--line);border-radius:10px}.session-table table{font-size:12.5px}.session-table th{padding:7px 8px}.session-table td{padding:6px 8px;white-space:normal;vertical-align:top}.session-table td:first-child{width:30px;text-align:center;font-size:16px}.session-table .srow{cursor:pointer}.session-table .srow:hover td{background:#232735}.session-table .sgroup td{background:#151820;color:var(--dim);font-weight:700}.session-table .focus{max-width:280px}.session-table .advice{max-width:300px}.session-detail .line{margin:5px 0}.session-detail b{color:var(--text)}.route{font-size:11.5px;margin-top:3px}.diag{margin-top:8px}
+@media(max-width:900px){.server-grid,.team{grid-template-columns:1fr}.team-side{position:static}}
 aside .x:hover{transform:rotate(90deg);color:var(--pink)}
 .card-title{font-size:16px;font-weight:800;word-break:break-all;padding-right:34px;margin:0}
 .kind{color:var(--dim);margin:4px 0 10px}
@@ -116,7 +118,7 @@ code{background:#0e1016;border:1px solid var(--line);border-radius:5px;padding:0
 <th data-k="owner" data-h="owner">Owner</th><th data-k="valid" data-h="valid">Validation</th>
 <th data-k="check" data-h="check">Presubmit</th><th data-k="sync" data-h="sync">Server</th><th data-h="tags">Tags</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="legend"><span><span class="spark">✦</span> changed</span><span><span style="color:#ff4d4d">▌</span>red edge = broken, fix first</span><span>Presubmit: <span class="tk g">✓</span><span class="tk d">○</span> building session · independent agent (○ not run)</span>
-<span>Server: <span class="tk g">✓</span><span class="tk r">✘</span> imported · validated</span><span><span class="tk d">✓</span> grey = last outcome, not for your latest commit (hover for why)</span><span>✍️ working · 💤 idle · 👀 active · 📜 CLAIMS.md · 🔓 free</span><span class="dim">hover anything for details · click a task for its card</span></div>
+<span>Server: <span class="tk g">✓</span><span class="tk r">✘</span> imported · validated</span><span><span class="tk d">✓</span> grey = last outcome, not for your latest commit (hover for why)</span><span>✍ working · 💤 assigned idle · ⏳ pipeline · 🛠 pushed recently · 🔓 free · ❔ never seen</span><span class="dim">hover Owner for all three axes + the latest remote change · click a task for its card</span></div>
 </section>
 <section id="team" hidden></section>
 <section id="stats" hidden></section>
@@ -141,7 +143,7 @@ const NEXT = {FIX:'🔧',RESOLVE:'🤺',RERUN:'🔁',SUBMIT:'🚀',RESUBMIT:'�
 const HEAD = {task:'The task folder. Hover a task name for what it is; click for its card with next steps.',
  next:'What to do next, worked out from validation, reviews, sync and ownership. Hover for why.',
  tag:'Status in codimango incl. the human review (Draft, Needs revision, Needs reviewers, In review, Accepted, In training, Archived). Underneath: versions.pushes — 1.2 = revision requested once, 2 pushes since — and "overdue" when it has sat too long. Hover for the review history. The board opens sorted by this.',
- owner:'Who is on it: ✍️ claimed and working now · 💤 claimed but idle · 👀 a session touched it recently (no claim) · 📜 listed in CLAIMS.md · 🔓 nobody.',
+ owner:'Display state derived from three independent axes: assignment, current activity, and pipeline, plus the latest remote change. Free appears only when every blocker is clear.',
  valid:'codimango validation. Hover shows only the problems and how to fix them.',
  review:'Human review in codimango: ✔ accepted · ✘ needs revision (n times) · 👀 in review · ⌛ waiting for a reviewer · · not submitted. Hover for the last decision.',
  check:'Two presubmits: 1st tick = the session building the task, 2nd = an independent fresh agent. Green ✓ clean on this commit · red ✘ failures · grey = last result is from an older commit (re-run) · ○ = not run. Hover shows what each suggested fixing.',
@@ -159,11 +161,15 @@ const tick = (n,green,amber) => n?`<span class="tk ${green?'g':amber?'a':'d'}">$
 function kindLine(t){const c=t.category||{};const track=(t.track||'').includes('multi')?'multi-turn':(t.track?'single-turn':'');
  return [track&&('SWE-bench '+track), (c.category||'').replace(/_/g,' '), (c.subdomain||'').replace(/_/g,' '), (c.languages||[]).join('/'), c.difficulty].filter(Boolean).join(' · ')}
 function ownerIdle(t){return t.owner_last_at?(Date.now()-Date.parse(t.owner_last_at))/1000:null}
-function owner(t){const h=t.claim_health,o=esc(t.owner);if(h==='DONE')return'';if(h==='FREE'||!t.owner)return'<span class="info">🔓 free</span>';
- if(h==='OWNED'){const i=ownerIdle(t);return i!=null&&i<1200?`<span style="color:var(--violet)">✍️ ${o}</span> <span class="dim">now</span>`:`<span class="dim">💤 ${o} · idle ${i==null?'?':age(i)}</span>`}
- if(h==='ACTIVE')return`<span class="run">👀 ${o}</span> <span class="dim">${age((t.active||[{}])[0].ago_s)}</span>`;
- if(h==='CONFLICT')return`<span class="bad">🤺 ${o}</span>`;if(h==='EXPIRED')return`<span class="dim">💤 ${o}</span>`;
- if(h==='LEGACY')return`<span class="dim">📜 ${o}</span>`;return`<span style="color:var(--violet)">👤 ${o}</span>`}
+function ownState(t){return t.ownership_state||(t.claim_health==='DONE'?'done':t.claim_health==='ACTIVE'?'actively_working':t.claim_health==='OWNED'||t.claim_health==='LEGACY'?'assigned_idle':t.claim_health==='CONFLICT'?'conflict':t.claim_health==='PIPELINE'?'in_pipeline':t.claim_health==='RECENT'?'worked_recently':t.claim_health==='UNSEEN'?'never_seen':'available')}
+function owner(t){const s=ownState(t),o=esc(t.owner);if(s==='done')return'';if(s==='available')return'<span class="info">🔓 free</span>';
+ if(s==='actively_working')return`<span style="color:var(--violet)">✍ working (${o||'active session'})</span> <span class="dim">· ${age(((t.active||[])[0]||{}).ago_s)} ago</span>`;
+ if(s==='in_pipeline')return`<span class="info">⏳ in pipeline</span>${o?' <span class="dim">· '+o+'</span>':''}`;
+ if(s==='worked_recently'){const p=(t.last_push||{}).at,pa=p?Math.max(0,(Date.now()-Date.parse(p))/1000):null;return`<span class="run">🛠 pushed ${age(pa)} ago</span>`}
+ if(s==='never_seen')return'<span class="dim">❔ never seen</span>';
+ if(s==='conflict')return`<span class="bad">⚔ conflict (${o})</span>`;
+ if(s==='assigned_idle'){const i=ownerIdle(t);return`<span class="dim">💤 assigned idle (${o||'assigned'}, idle ${i==null?'?':age(i)})</span>`}
+ return`<span style="color:var(--violet)">👤 ${o}</span>`}
 function valid(t){const v=t.vsum;if(t.older_results&&t.valid!=='RUN')return'<span class="run">↻ older commit</span>';const f=v.issues.filter(i=>i.severity==='fail').length,w=v.issues.filter(i=>i.severity==='warn').length;
  if(t.valid==='RUN')return'<span class="run">○ running</span>';if(!v.total)return'<span class="dim">· none yet</span>';
  if(f)return`<span class="bad">✘ ${f} issue${f>1?'s':''}</span>`;if(w)return`<span class="run">▲ ${w} warning${w>1?'s':''}</span>`;return'<span class="ok">✔ clean</span>'+(v.info&&v.info.length?' <span class="dim">ⓘ</span>':'')}
@@ -193,9 +199,13 @@ function tipTag(t){let h=`<h4>${esc(t.tag)} · ${esc(t.age_label||'')} ${age(t.s
  if(t.vp){const [a,b]=t.vp.split('.');h+=L('info','#',`${esc(t.vp)} = ${a==='0'?'never sent back':'revision requested '+a+'×'} · ${b} push${b==='1'?'':'es'} ${a==='0'?'so far':'since the last request'}`)}if(t.entered_pool_at)h+=L('dim','↗','submitted '+fdate(t.entered_pool_at));
  t.decisions.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',(d.kind==='accept'?'accepted ':'revision requested ')+fdate(d.at)));
  if(t.age_level&&t.age_level!=='ok')h+=L(t.age_level==='block'?'bad':'pend','!',t.age_level==='block'?'overdue for this state':'getting old');return h+'</ul>'}
-function tipOwner(t){let h=`<h4>who · source: ${esc(t.claim_source||'none')}</h4><ul>`;if(t.claim_health==='OWNED'){const i=ownerIdle(t);h+=L(i!=null&&i<1200?'ok':'dim',i!=null&&i<1200?'✍️':'💤',i==null?'claimed; no activity recorded':i<1200?'working on it now':'assigned but idle for '+age(i))}(t.active||[]).slice(0,3).forEach(a=>h+=L('pend','👀',`${esc(a.alias)} · ${age(a.ago_s)} ago`));
- if(t.claim_health==='OWNED')h+=L('ok','👤','claimed by '+esc(t.owner));if(t.legacy)h+=t.claim_health==='LEGACY'?L('info','📜',`CLAIMS.md: ${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)} · ${esc(t.legacy.updated)}`):L('dim','📜',`old CLAIMS.md row (not an active owner): ${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)}`);
- if(t.claim_health==='FREE')h+=L('info','🔓','nobody');h+=L('dim','→',esc(t.assignee));return h+'</ul>'}
+function tipOwner(t){const a=t.assignment||{},x=t.activity||{},p=t.pipeline||{},s=ownState(t);let h=`<h4>${esc(s.replace(/_/g,' '))} · ${esc(t.ownership_reason||'')}</h4><ul>`;
+ h+=L(a.state==='claimed'?'ok':'dim','👤',`assignment: ${esc(a.state||t.claim_health||'unknown')}${a.owner?' · '+esc(a.owner):''}`);
+ h+=L(x.state==='active'?'ok':'dim','✍️',`activity: ${esc(x.state||((t.active||[]).length?'active':'inactive'))}${x.reason?' · '+esc(x.reason):''}`);
+ h+=L(p.state&&p.state!=='none'?'pend':'dim','⏳',`pipeline: ${esc(p.state||'none')}${p.reason?' · '+esc(p.reason):''}`);
+ if((t.last_push||{}).at)h+=L('dim','🛠',`latest remote change ${fdate(t.last_push.at)} · ${esc(t.last_push.time_kind||'time')}${t.last_push.session_alias?' · last session '+esc(t.last_push.session_alias):''}`);else h+=L('dim','🛠','latest remote change: none observed');
+ if(t.legacy)h+=t.claim_health==='LEGACY'?L('info','📜',`CLAIMS.md: ${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)} · ${esc(t.legacy.updated)}`):L('dim','📜',`old CLAIMS.md row (not an active owner): ${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)}`);
+ h+=L('dim','→',esc(t.assignee));return h+'</ul>'}
 function tipValid(t){const v=t.vsum;if(t.older_results)return'<h4>validation</h4><ul>'+L('pend','↻','these results are for an older commit — your latest push has not been validated')+L('info','→','codimango task rerun '+esc(t.task))+'</ul>';if(t.valid==='RUN'&&!v.issues.length)return'<h4>validation</h4><ul>'+L('pend','○','running')+'</ul>';
  const inf=(v.info||[]).map(i=>L('dim','ⓘ',`<b>${esc(i.check)}</b> ${esc(i.why)} (informational, not blocking)`)).join('');
  if(!v.issues.length)return`<h4>validation</h4><ul>${L('ok','●',`${v.total-(v.info||[]).length} of ${v.total} checks clear`)}${inf}</ul>`;
@@ -227,12 +237,12 @@ function tipTags(t){return `<h4>tags</h4><ul>${(t.tags||[]).map(x=>L('info','◆
 const TIPS={tags:tipTags,task:tipTask,next:tipNext,tag:t=>tipTag(t)+tipReview(t),owner:tipOwner,valid:tipValid,review:tipReview,check:tipCheck,sync:tipSync};
 function changed(t){const p=S.prev[t.task];return p&&(p.tag!==t.tag||p.valid!==t.valid||p.next!==t.next||p.review!==t.review||p.owner!==t.owner)}
 function visible(){return D.tasks.filter(t=>S.groups.has(dg(t))&&(!S.tags.size||S.tags.has(t.tag))&&(!S.kind||t.kind===S.kind)&&
- (S.owner==='all'||(S.owner==='free'?['FREE','EXPIRED'].includes(t.claim_health):S.owner==='active'?((t.claim_health==='ACTIVE'&&((t.active||[])[0]||{}).ago_s<1200)||(t.claim_health==='OWNED'&&ownerIdle(t)!=null&&ownerIdle(t)<1200)):S.owner==='claimed'?['OWNED','LEGACY'].includes(t.claim_health):true))&&
+ (S.owner==='all'||(S.owner==='free'?ownState(t)==='available':S.owner==='active'?ownState(t)==='actively_working':S.owner==='claimed'?ownState(t)==='assigned_idle':S.owner==='pipeline'?ownState(t)==='in_pipeline':S.owner==='recent'?ownState(t)==='worked_recently':true))&&
  (!S.q||t.task.includes(S.q.toLowerCase())))}
 function setHTML(id,html){if(S.blocks[id]!==html){S.blocks[id]=html;document.getElementById(id).innerHTML=html}}
 function rowHtml(t){return `<tr class="row" data-t="${esc(t.task)}" style="--s:${t.group==='ATTENTION'?'#ff4d4d':G[dg(t)][0]}"><td class="task" data-tip="task">${changed(t)?'<span class="spark">✦</span> ':''}${esc(t.task)}</td>
   <td data-tip="next">${next(t)}</td><td data-tip="tag">${tag(t)}</td><td data-tip="owner" class="own">${owner(t)}</td><td data-tip="valid">${valid(t)}</td><td data-tip="check">${check(t)}</td><td data-tip="sync">${sync(t)}</td><td data-tip="tags">${tagsCell(t)}</td></tr>`}
-function rowSig(t){return [t.next,t.tag,t.valid,t.review,t.owner,t.claim_health,t.sync,check(t),sync(t)].join('|')}   // flash only on real changes, not ticking ages
+function rowSig(t){return [t.next,t.tag,t.valid,t.review,t.owner,t.claim_health,t.ownership_state,t.sync,check(t),sync(t)].join('|')}   // flash only on real changes, not ticking ages
 function renderBoard(){const counts={};D.tasks.forEach(t=>{if(!S.kind||t.kind===S.kind)counts[dg(t)]=(counts[dg(t)]||0)+1});
  let chips=Object.entries(G).map(([g,[c,e,l]])=>`<button class="chip ${S.groups.has(g)?'':'off'}" data-g="${g}" title="${esc(GHELP[g])}"><span class="c" style="background:${c}"></span><span class="e">${e}</span> ${l} <b>${counts[g]||0}</b></button>`).join('');
  const inGroups=D.tasks.filter(t=>S.groups.has(dg(t))&&(!S.kind||t.kind===S.kind));
@@ -240,7 +250,7 @@ function renderBoard(){const counts={};D.tasks.forEach(t=>{if(!S.kind||t.kind===
  chips+=`<span class="sub-chips"><span class="dim">status:</span>${Object.entries(tagc).sort((a,b)=>TAGO.indexOf(a[0])-TAGO.indexOf(b[0])).map(([k,n])=>`<button class="chip ${!S.tags.size||S.tags.has(k)?'':'off'}" data-tagf="${esc(k)}"><span class="c" style="background:${TAGC[k]||'#666'}"></span>${esc(k)} <b>${n}</b></button>`).join('')}${S.tags.size?'<button class="chip" data-tagf="">✕ all</button>':''}</span>`;
  if(!S.gfirst)chips+='<button class="chip" data-greset="1" title="back to the default view">↺ reset</button>';
  setHTML('chips',chips);
- setHTML('owner',['all','free','active','claimed'].map(o=>`<button class="${S.owner===o?'on':''}" data-o="${o}">${{all:'👥 all',free:'🔓 free',active:'✍️ working now',claimed:'👤 claimed'}[o]}</button>`).join(''));
+ setHTML('owner',['all','free','active','claimed','pipeline','recent'].map(o=>`<button class="${S.owner===o?'on':''}" data-o="${o}">${{all:'👥 all',free:'🔓 free',active:'✍ working',claimed:'💤 assigned idle',pipeline:'⏳ pipeline',recent:'🛠 pushed recently'}[o]}</button>`).join(''));
  setHTML('bar',Object.entries(G).map(([g,[c]])=>`<span style="flex:${counts[g]||0};background:${c}"></span>`).join(''));
  let rows=visible();const order=Object.keys(G);
  const val=t=>{const k=S.sort;return k==='tag'?(TAGO.indexOf(t.tag)<0?99:TAGO.indexOf(t.tag))*1e9+(t.group==='ATTENTION'?0:5e8)-Math.min(t.state_age_s||0,4e8)
@@ -292,38 +302,64 @@ function openDrawer(name,refresh){const t=D.tasks.find(x=>x.task===name);if(!t)r
  if(refresh&&S.drawerHtml===html)return;S.drawerHtml=html;document.getElementById('dbody').innerHTML=html;
  const d=document.getElementById('drawer');if(refresh)return;d.classList.remove('noanim');d.classList.remove('open');d.classList.toggle('wide',!!localStorage.getItem('wb-wide'));void d.offsetWidth;d.classList.add('open')}
 function refreshDrawer(){const d=document.getElementById('drawer');if(!S.open||!d.classList.contains('open'))return;
- const top=d.scrollTop;d.classList.add('noanim');openDrawer(S.open,true);d.scrollTop=top}
+ const top=d.scrollTop;d.classList.add('noanim');S.open.startsWith('session:')?openSession(S.open.slice(8),true):openDrawer(S.open,true);d.scrollTop=top}
 const HC={};const hostColor=h=>HC[h]||(HC[h]=['#f78fb3','#7ab8ff','#7bd88f','#f5c26b','#b39dff'][Object.keys(HC).length%5]);
-function renderTeam(){const me=localStorage.getItem('wb-to')||'all';
- const srv=(D.servers||[]).map(s=>`<div class="srv"><h3><span class="badge" style="background:${hostColor(s.id)}">${esc(s.id)}</span> server
+function allSessions(){return (D.servers||[]).flatMap(s=>(s.sessions||[]).map(x=>({...x,host:x.host||s.id})))}
+function sessionKey(x){return x.session_key||x.native_id}
+function sessionByKey(key){return allSessions().find(x=>sessionKey(x)===key||x.native_id===key)}
+function hookTransport(x){if(x.is_actor)return'<span class="dim">human shell</span>';if(x.is_summary)return'<span class="dim">no parent</span>';const r=x.restart||{},tr=x.transport||{};
+ const h=r.state==='loaded'?'<span class="ok">hooks loaded</span>':r.state==='probably-missing'?'<span class="bad">hooks probably missing</span>':r.state==='not-applicable'?'<span class="dim">hooks n/a</span>':'<span class="dim">hooks unknown</span>';
+ return h+' · '+(tr.available?'<span class="ok">'+esc(tr.kind||'transport ready')+'</span>':'<span class="dim">'+esc(tr.kind||'unavailable')+'</span>')}
+function statusText(x){const raw=x.status_group==='waiting'?'waiting for permission':x.status||'unknown',dur=x.status_ago_s==null?(x.ago_s==null?null:x.ago_s):x.status_ago_s;return esc(raw)+(dur==null?'':' · '+age(dur))}
+function childRuns(x){const kids=(x.child_runs||[]).map(r=>`<li>${esc(r.kind_icon||'')} <b>${esc(r.name||r.native_id)}</b> · ${esc(r.status||'unknown')}${r.cwd_task?' · '+esc(r.cwd_task):''} <span class="dim">${r.parent_confidence?'· '+esc(r.parent_confidence)+' parent link':''}</span></li>`).join('');
+ const old=x.older_child_run_count||x.older_run_count||0;return kids+(old?`<li class="dim">${old} older run(s) counted, not shown</li>`:'')}
+function openSession(key,refresh){const x=sessionByKey(key);if(!x)return;S.open='session:'+sessionKey(x);const tr=x.transport||{},r=x.restart||{},f=x.focus||{},tok=x.tokens||{},adv=x.advice||{};
+ const resume=r.needed&&r.command?`<div class="sec"><h3>↻ RESUME TO LOAD HOOKS</h3><div class="bad">${esc(r.reason)}</div><code>${esc(r.command)}</code></div>`:'';
+ const children=childRuns(x),canMessage=!x.is_summary&&!x.is_actor;
+ const compose=canMessage?`<div class="sec"><h3>💬 MESSAGE THIS SESSION</h3><div class="compose"><select id="dmtask">${taskOptions(sessionKey(x),'')}</select><textarea id="dmtext" placeholder="message this session"></textarea><button class="btn primary" data-dsend="${esc(sessionKey(x))}">Send 🚀</button><span id="dmstatus"></span></div></div>`:'';
+ const html=`<div class="head"><p class="card-title">${esc(x.kind_icon||'')} ${esc(x.name||x.alias)}</p><div class="kind">${esc(x.kind||'unknown')} · ${esc(x.host||'unknown host')} · ${esc(sessionKey(x))}</div><div>${statusText(x)}</div></div>
+ <div class="sec"><h3>◎ STATUS & FOCUS</h3><div class="session-detail"><div class="line"><b>status</b> ${statusText(x)} · <b>session age</b> ${age(x.age_s)}</div><div class="line"><b>focus</b> ${esc((x.tasks||[]).join(', ')||'none detected')} · ${esc(f.confidence||'unknown')} confidence${(f.evidence||[]).length?' · '+esc(f.evidence.join(', ')):''}</div><div class="line"><b>liveness</b> ${esc(x.classification||'unknown')} · ${esc(x.liveness_reason||'no native evidence')}</div></div></div>
+ <div class="sec"><h3>⌁ HOOKS, TRANSPORT & TOKENS</h3><div class="session-detail"><div class="line">${hookTransport(x)} · ${esc(tr.reason||'')}</div><div class="line"><b>tokens</b> ${tok.total==null?'—':tok.total+' total · '+tok.last_hour+' last hour'} · <b>context size</b> —</div><div class="line"><b>advice</b> ${esc(adv.state||'unavailable')} · ${esc(adv.reason||'')}</div></div></div>
+ <div class="sec"><h3>↕ BOARD ACTIVITY</h3><div class="session-detail"><div class="line"><b>last report</b> ${x.last_report?esc(x.last_report.kind)+(x.last_report.task?' · '+esc(x.last_report.task):'')+' · '+fdate(x.last_report.at):'none'}</div><div class="line"><b>last request</b> ${x.last_request?fdate(x.last_request.at)+(x.last_request.task?' · '+esc(x.last_request.task):''):'none'}</div>${children?`<div class="line"><b>child runs</b><ul class="lst">${children}</ul></div>`:''}</div></div>${resume}${compose}`;
+ if(refresh&&S.drawerHtml===html)return;S.drawerHtml=html;document.getElementById('dbody').innerHTML=html;const d=document.getElementById('drawer');if(refresh)return;d.classList.remove('noanim');d.classList.remove('open');d.classList.toggle('wide',!!localStorage.getItem('wb-wide'));void d.offsetWidth;d.classList.add('open')}
+function deliveryLabel(m){const d=(m.delivery||{}).state||'published',n=((m.delivery||{}).recipients||[]).length;return d==='acked'?'<span class="ok">✓ acked</span>':d==='delivered'?'<span class="ok">✓ delivered</span>':d==='failed'?'<span class="bad">✘ failed</span>':d==='queued'?'<span class="run">queued locally</span>':`<span class="run">published${n?' · '+n+' recipient(s)':''}</span>`}
+function taskOptions(to,selected){let tasks=[];if(to.startsWith('task:'))tasks=[to.slice(5)];else{const s=(D.session_targets||[]).find(x=>x.session_key===to||x.native_id===to);tasks=(s&&s.tasks)||[]}
+ return `<option value="">no task</option>${tasks.length>1?'<option value="__all__">all this session’s tasks</option>':''}${tasks.map(t=>`<option ${t===selected?'selected':''} value="${esc(t)}">${esc(t)}</option>`).join('')}`}
+function updateComposeTasks(selected){const to=document.getElementById('mto'),task=document.getElementById('mtask');if(to&&task)task.innerHTML=taskOptions(to.value,selected||'')}
+function renderTeam(){let me=localStorage.getItem('wb-to')||'all';
+ const srv=(D.servers||[]).map(s=>{const c=s.status_counts||{};return`<div class="srv"><h3><span class="badge" style="background:${hostColor(s.id)}">${esc(s.id)}</span> server
   <span class="dim">· heartbeat ${s.last_sync_ago_s==null?'never':age(s.last_sync_ago_s)+' ago'}</span>
   <span class="${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'ok':'bad'}">${s.last_sync_ago_s==null?'● never synced':s.last_sync_ago_s<600?'● sync fresh':'● sync stale'}</span></h3>
-  <div class="dim">${s.sessions.length} session(s) seen in the last 2h · working on ${s.owned.length} task(s)${s.last_sync_ago_s==null?' · <span class="bad">no heartbeat yet — run board setup there</span>':''}${s.last_activity_ago_s!=null?' · last activity '+age(s.last_activity_ago_s)+' ago':''}</div>
-  <ul class="lst">${s.sessions.map(x=>L(x.status==='idle'?'dim':x.status?'ok':'pend',x.status==='idle'?'💤':x.status?'📋':'✍️',`${esc(x.alias.split('·').slice(1).join('·')||x.alias)} <span class="dim">active ${age(x.ago_s)} ago</span>`+
-   (x.status?`<div class="dim">${x.status==='idle'?'idle':'working on '+esc((x.tasks||[]).join(', ')||'—')} · checked in ${age(x.checkin_ago_s)} ago</div>`:'<div class="dim">not checked in — answers the next roll call</div>'))).join('')||L('dim','·','no active sessions in the last 2h')}</ul></div>`).join('');
- const msgs=(D.messages||[]).slice(-30).reverse().map(m=>`<div class="msg ${m.from.includes('dashboard')?'me':''}"><div class="meta">${esc(m.from)} → <b>${esc(m.to_label)}</b>${m.task?' · '+esc(m.task):''} · ${fdate(m.at)}
-  ${m.acked_by.length?' · <span class="ok">✓ acked by '+m.acked_by.length+'</span>':' · <span class="run">not acked yet</span>'}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';
- const opts=['all',...(D.servers||[]).map(s=>s.id),...(D.sessions||[])];
+  <div>${s.session_count||0} session(s) · <span class="ok">${c.busy||0} busy</span> · <span class="run">${c.waiting||0} waiting</span> · ${c.idle||0} idle · ${c.unknown||0} unknown</div>
+  <div class="dim">queue ${s.queue||0} · ${s.owned.length} assigned task(s)${s.last_activity_ago_s!=null?' · ledger activity '+age(s.last_activity_ago_s)+' ago':''}${s.human_actor_count?' · '+s.human_actor_count+' human actor(s)':''}</div>
+  ${s.sync_error?`<div class="bad">last sync failed: ${esc(s.sync_error)}</div>`:''}${s.last_sync_ago_s==null?'<div class="bad">no heartbeat yet — run board setup there</div>':''}</div>`}).join('');
+ const msgs=(D.messages||[]).slice(-30).reverse().map(m=>`<div class="msg ${m.from.includes('dashboard')?'me':''}"><div class="meta">${esc(m.from)} → <b>${esc(m.to_label)}</b>${m.task?' · '+esc(m.task):''} · ${fdate(m.at)} · ${deliveryLabel(m)}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';
+ const base=[{v:'all',l:'📣 everyone'},...(D.servers||[]).map(s=>({v:s.id,l:'🖥 server '+s.id}))];
+ const ses=(D.session_targets||[]).map(s=>({v:s.session_key,l:(s.kind_icon||'')+' '+s.name+' · '+s.host}));
+ const tasks=Object.entries(D.task_targets||{}).map(([t,r])=>({v:'task:'+t,l:'◆ '+t+' → '+(r.state==='resolved'?(r.label+' · '+(r.host||'?')):'nobody'),disabled:r.state!=='resolved'}));
+ const allopts=[...base,...ses,...tasks];if(!allopts.some(x=>x.v===me&&!x.disabled))me='all';
+ const opts=allopts.map(o=>`<option ${o.v===me?'selected':''} ${o.disabled?'disabled':''} value="${esc(o.v)}">${esc(o.l)}</option>`).join('');
  const feed=(D.feed||[]).map((f,i)=>`<div class="fi" style="animation-delay:${Math.min(i*8,300)}ms"><span class="t">${new Date(f.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
   <span><span class="badge" style="background:${hostColor(f.host)}">${esc(f.host)}</span></span><span>${esc(f.what)} ${f.task?'<b>'+esc(f.task)+'</b>':''}<div class="w">${esc(f.who)}</div></span></div>`).join('')||'<div class="dim">quiet</div>';
- document.getElementById('team').innerHTML=`<div class="team"><div>${srv}
-  <div class="panel"><h3>📋 roll call</h3><div class="dim">Run <code>board rollcall</code> (or ask any session to): every session gets a note at its next step to check in with
-  <code>board here &lt;tasks&gt;</code> or <code>board here --idle</code>. Idle sessions answer when you next use them. New sessions are told automatically when they start.</div></div>
-  <div class="panel"><h3>💬 send a message</h3>
-  <div class="dim" style="margin-bottom:6px">How it travels: saved to the shared private ledger → the target server picks it up on its next sync (normally ≤2 min while it has a heartbeat) →
-  the hook shows it inside the target Claude session on its next step (Codex runs see it only via <code>board inbox</code>) → the session acks/replies with <code>board ack</code> / <code>board msg</code>.
-  Pick a server to reach every session there, or "everyone".</div>
-  <div class="compose"><select id="mto">${opts.map(o=>`<option ${o===me?'selected':''} value="${esc(o)}">${o==='all'?'📣 everyone':/^[0-9a-z]+$/.test(o)&&(D.servers||[]).some(s=>s.id===o)?'🖥 server '+esc(o):'👤 '+esc(o)}</option>`).join('')}</select>
-  <input id="mtask" placeholder="task (optional)" size="28"><textarea id="mtext" placeholder="e.g. please pick up pgmem after you finish, I'm on vobject"></textarea>
+ const order=['waiting','busy','idle','unknown'],labels={waiting:'waiting for permission',busy:'busy',idle:'idle',unknown:'unknown'};const rows=[];order.forEach(g=>{const xs=allSessions().filter(x=>(x.status_group||'unknown')===g).sort((a,b)=>String(a.name||a.alias).localeCompare(String(b.name||b.alias)));if(!xs.length)return;rows.push(`<tr class="sgroup"><td colspan="7">${esc(labels[g])} · ${xs.length}</td></tr>`);xs.forEach(x=>{const adv=x.advice||{};rows.push(`<tr class="srow" data-session="${esc(sessionKey(x))}"><td>${esc(x.kind_icon||'❔')}</td><td><b>${esc(x.name||x.alias)}</b><div class="dim">${esc(x.host||'')}</div></td><td>${statusText(x)}</td><td class="focus">${esc((x.tasks||[]).join(', ')||'—')}${x.child_runs&&x.child_runs.length?`<div class="dim">${x.child_runs.length} child run(s)${x.older_child_run_count?' · '+x.older_child_run_count+' older':''}</div>`:''}</td><td>—</td><td>${hookTransport(x)}</td><td class="advice">${esc(adv.state||'—')} · ${esc(adv.reason||x.liveness_reason||'')}</td></tr>`)});});
+ const diags=(D.servers||[]).flatMap(s=>(s.session_diagnostics||[]).map(d=>`${s.id}: ${d.classification} · ${d.reason}`));
+ document.getElementById('team').innerHTML=`<div class="server-grid">${srv}</div><div class="team"><div><div class="panel"><h3>sessions & actors</h3><div class="session-table"><table><thead><tr><th>kind</th><th>name</th><th>status · for</th><th>focus tasks</th><th>tokens</th><th>hooks / transport</th><th>advice</th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="7" class="empty">no live sessions discovered</td></tr>'}</tbody></table></div>${diags.length?`<details class="diag"><summary class="dim">${diags.length} excluded/error record(s)</summary><div class="dim">${diags.map(esc).join('<br>')}</div></details>`:''}</div>
+  <div class="panel"><h3>📋 session hygiene</h3><div class="dim">Hook state comes from hook-sourced ledger events in the last seven days. Only a busy/recent session with no evidence while hooks are installed gets a resume command; idle sessions remain unknown.</div></div></div>
+  <div class="team-side"><div class="panel"><h3>💬 send a message</h3>
+  <div class="dim" style="margin-bottom:6px">State is honest: queued locally → published in the private ledger → delivered by the courier or hook → explicitly acked. Start one normal Claude session with <code>board courier</code>; it waits without model tokens. Task targets are pinned to the displayed owner when sent.</div>
+  <div class="compose"><select id="mto">${opts}</select><select id="mtask">${taskOptions(me,'')}</select>
+  <textarea id="mtext" placeholder="e.g. please finish the current check, then acknowledge this message"></textarea>
   <button class="btn primary" id="msend">Send 🚀</button><span id="mstatus"></span></div></div>
-  <div class="panel"><h3>📨 messages</h3>${msgs}</div></div>
-  <div class="panel feed"><h3>🕒 activity across servers (24h)</h3>${feed}</div></div>`}
-async function sendMsg(){const to=document.getElementById('mto').value,text=document.getElementById('mtext').value,task=document.getElementById('mtask').value;
+  <div class="panel feed"><h3>🕒 activity across servers (24h)</h3>${feed}</div><div class="panel"><h3>📨 messages</h3>${msgs}</div></div></div>`}
+async function sendMsg(){const to=document.getElementById('mto').value,text=document.getElementById('mtext').value,rawTask=document.getElementById('mtask').value,task=rawTask==='__all__'?'':rawTask;
  const st=document.getElementById('mstatus');if(!LIVE){st.innerHTML='<span class="bad">sending needs the live page (board serve)</span>';return}
  st.textContent='sending…';localStorage.setItem('wb-to',to);
  try{const r=await fetch('api/msg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,text,task})});const j=await r.json();
-  st.innerHTML=j.ok?`<span class="sent">✓ in the ledger for ${esc(j.to)}${j.synced?' — published; it reaches them after their server\'s next sync and their next tool step':' (queued, publishes on next sync)'}</span>`:`<span class="bad">${esc(j.error)}</span>`;
-  if(j.ok){document.getElementById('mtext').value='';const d=await (await fetch('data.json',{cache:'no-store'})).json();D=d;renderTeam()}}catch(e){st.innerHTML='<span class="bad">failed</span>'}}
+  st.innerHTML=j.ok?`<span class="sent">✓ ${esc(j.state||'queued')} for ${esc(j.to)} — delivery is recorded separately</span>`:`<span class="bad">${esc(j.error)}</span>`;
+  if(j.ok)document.getElementById('mtext').value=''}catch(e){st.innerHTML='<span class="bad">failed</span>'}}
+async function sendDrawerMsg(to){const text=document.getElementById('dmtext').value,rawTask=document.getElementById('dmtask').value,task=rawTask==='__all__'?'':rawTask,st=document.getElementById('dmstatus');
+ if(!LIVE){st.innerHTML='<span class="bad">sending needs the live page (board serve)</span>';return}st.textContent='sending…';
+ try{const r=await fetch('api/msg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,text,task})}),j=await r.json();st.innerHTML=j.ok?`<span class="sent">✓ ${esc(j.state||'queued')}</span>`:`<span class="bad">${esc(j.error)}</span>`;if(j.ok)document.getElementById('dmtext').value=''}catch(e){st.innerHTML='<span class="bad">failed</span>'}}
 function render(){const W=D.week;setHTML('week',`📈 W${W.week}: <b>${W.this_week}</b> accepted · last week at this point ${W.same_point_last_week} · 4-week median ${W.median_4wk}`);
  renderWhen();renderBoard();refreshDrawer();if(!document.getElementById('stats').hidden)renderStats();if(!document.getElementById('team').hidden)renderTeam()}
 function renderWhen(){const ageS=D.codimango_at?Math.max(0,(Date.now()-new Date(D.codimango_at))/1000):null;
@@ -340,20 +376,22 @@ document.addEventListener('mouseover',e=>{if(tip.contains(e.target)){clearTimeou
  if(th){showTip(`<h4>${esc(th.textContent.replace(/ [▲▼]$/,''))}</h4>${esc(HEAD[th.dataset.h])}<div class="hint">click to sort within each group</div>`,e.clientX,e.clientY);return}
  if(!td){hideSoon();return}const t=D.tasks.find(x=>x.task===td.parentElement.dataset.t);if(t)showTip(TIPS[td.dataset.tip](t),e.clientX,e.clientY)});
 tip.addEventListener('mouseleave',hideSoon);
-document.addEventListener('click',e=>{const g=e.target.closest('[data-g]'),dd=e.target.closest('[data-d]'),o=e.target.closest('[data-o]'),r=e.target.closest('tr.row'),tb=e.target.closest('[data-tab]'),th=e.target.closest('th[data-k]');
+document.addEventListener('click',e=>{const g=e.target.closest('[data-g]'),dd=e.target.closest('[data-d]'),o=e.target.closest('[data-o]'),r=e.target.closest('tr.row'),sr=e.target.closest('tr.srow'),tb=e.target.closest('[data-tab]'),th=e.target.closest('th[data-k]');
  if(tip.contains(e.target))return;
  if(g){const k=g.dataset.g;if(S.gfirst){S.groups=new Set([k]);S.gfirst=false}else{S.groups.has(k)?S.groups.delete(k):S.groups.add(k);if(!S.groups.size)S.groups.add(k)}
   renderBoard();const n=document.querySelector(`[data-g="${k}"]`);n&&n.classList.add('pop')}
  if(e.target.closest('[data-greset]')){S.groups=new Set(['MINE','READYSUB','VALIDATING']);S.gfirst=true;S.tags.clear();renderBoard()}
  const tf=e.target.closest('[data-tagf]');if(tf){const k=tf.dataset.tagf;if(!k)S.tags.clear();else S.tags.has(k)?S.tags.delete(k):S.tags.add(k);renderBoard()}
- if(o){S.owner=o.dataset.o;renderBoard()}if(r)openDrawer(r.dataset.t);
+ if(o){S.owner=o.dataset.o;renderBoard()}if(r)openDrawer(r.dataset.t);if(sr)openSession(sr.dataset.session);
  if(th){const k=th.dataset.k;if(S.sort!==k){S.sort=k;S.dir=1}else if(S.dir>0)S.dir=-1;else S.sort=null;renderBoard()}
  if(tb){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===tb));['board','team','stats'].forEach(k=>document.getElementById(k).hidden=tb.dataset.tab!==k);
   if(tb.dataset.tab==='stats')renderStats();if(tb.dataset.tab==='team')renderTeam()}
  if(e.target.id==='msend')sendMsg();
+ const ds=e.target.closest('[data-dsend]');if(ds)sendDrawerMsg(ds.dataset.dsend);
  if(e.target.id==='expand'){const d=document.getElementById('drawer');d.style.width='';localStorage.removeItem('wb-w');d.classList.toggle('wide');localStorage.setItem('wb-wide',d.classList.contains('wide')?'1':'')}
  const mt=e.target.closest('[data-msgtask]');if(mt){document.querySelector('[data-tab=team]').click();const t=D.tasks.find(x=>x.task===mt.dataset.msgtask);
-  setTimeout(()=>{document.getElementById('mtask').value=mt.dataset.msgtask;if(t&&t.owner&&t.owner.includes('·')){const sel=document.getElementById('mto');[...sel.options].forEach(o=>{if(o.value===t.owner)o.selected=true})}document.getElementById('mtext').focus()},50)}
+  setTimeout(()=>{const sel=document.getElementById('mto');sel.value='task:'+mt.dataset.msgtask;updateComposeTasks(mt.dataset.msgtask);document.getElementById('mtask').value=mt.dataset.msgtask;document.getElementById('mtext').focus()},50)}
+ const ms=e.target.closest('[data-msgsession]');if(ms){const sel=document.getElementById('mto');if(sel){sel.value=ms.dataset.msgsession;updateComposeTasks();document.getElementById('mtext').focus()}}
  if(e.target.id==='close')document.getElementById('drawer').classList.remove('open')});
 (()=>{const g=document.getElementById('grip'),d=document.getElementById('drawer');let on=false;
  g.addEventListener('mousedown',e=>{on=true;g.classList.add('drag');e.preventDefault()});
@@ -362,6 +400,7 @@ document.addEventListener('click',e=>{const g=e.target.closest('[data-g]'),dd=e.
  const w=localStorage.getItem('wb-w');if(w)d.style.width=w})();
 document.getElementById('q').addEventListener('input',e=>{S.q=e.target.value;renderBoard()});
 document.getElementById('kind').addEventListener('change',e=>{S.kind=e.target.value;renderBoard()});
+document.addEventListener('change',e=>{if(e.target.id==='mto'){localStorage.setItem('wb-to',e.target.value);updateComposeTasks()}});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement.id!=='q'){e.preventDefault();document.getElementById('q').focus()}
  if(e.key==='e'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'&&document.getElementById('drawer').classList.contains('open')){document.getElementById('expand').click()}
  if(e.key==='Escape'){document.getElementById('drawer').classList.remove('open');tip.classList.remove('on');document.getElementById('q').value='';S.q='';renderBoard()}});
