@@ -218,7 +218,12 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
             steps.append({"do": "fix the presubmit failures, re-run `board check run`", "eta": "~1h"})
         warn_steps()
         ladder(need_check=False)
-    elif n.startswith("RUN check") or n.startswith("GET R1") or n.startswith("GET R2") or n.startswith("SUBMIT"):
+    elif n.startswith(("RUN check", "GET R1", "GET R2", "SUBMIT", "RESUBMIT")):
+        if raw == "needs_revision":
+            last = next((d for d in reversed(t.get("decisions") or []) if d.get("kind") == "revision" and d.get("reason")), None)
+            steps.append({"do": f"confirm every point of the human review is covered ({t.get('pushes_since_decision', 0)} "
+                                f"push(es) since it was sent back)" + (f": “{last['reason'][:160]}”" if last else ""),
+                          "eta": "~15m"})
         findings()
         warn_steps()
         ladder()
@@ -230,7 +235,20 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
     elif n.startswith("IMPORT"):
         findings()
         steps.append({"do": "import the task into codimango", "eta": "~10m"})
-    return steps
+    return rank_steps(steps)
+
+
+ROUTINE = re.compile(r"^(submit|resubmit|once green|wait|then |push, then wait|waiting for|review in progress)", re.I)
+
+
+def rank_steps(steps: list[dict]) -> list[dict]:
+    """Real work first; obvious routine steps (submit, resubmit, waits) after it and marked 'routine' so the page greys
+    them. Order within each class is kept — it is the plan."""
+    for st in steps:
+        st["routine"] = bool(ROUTINE.match(st["do"]))
+    if all(st["routine"] for st in steps):
+        return steps                                     # a pure wait: nothing to demote
+    return [st for st in steps if not st["routine"]] + [st for st in steps if st["routine"]]
 
 
 ROLE_LABEL = {"author": "building session", "independent": "independent agent"}
@@ -259,10 +277,12 @@ def review_summary(t: dict) -> dict:
         bullets.append(({"ok": "ok", "bad": "bad", "old": "dim", "none": "pend"}[ck["state"]], f"{ROLE_LABEL[role]}: {cword}"))
     raw = t.get("status_raw")
     human = {"needs_reviewers_assigned": "waiting for a reviewer", "being_reviewed": "being reviewed",
-             "needs_revision": f"sent back ({rounds}×)", "accepted": "accepted", "used_in_training": "accepted · in training",
+             "needs_revision": f"needs revision ({rounds}×)", "accepted": "accepted", "used_in_training": "accepted · in training",
              "draft": "not submitted"}.get(raw, raw or "—")
     bullets.append(("ok" if raw in ("accepted", "used_in_training") else "bad" if raw == "needs_revision" else "info",
                     f"human: {human}"))
+    order = {"bad": 0, "pend": 1, "info": 2, "ok": 3, "dim": 4}       # problems first
+    bullets.sort(key=lambda b: order.get(b[0], 5))
     ok = [r for r in g if g[r]["review"]["state"] == "ok"]
     return {"agent": "✓✓" if len(ok) == 2 else "✓" if ok else "", "agent_current": bool(ok), "agent_green": len(ok) == 2,
             "human": human, "bullets": bullets, "gates": g}

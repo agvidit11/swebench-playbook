@@ -13,6 +13,77 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
+def _workers(tev: list[dict], window_s: int = 48 * 3600) -> list[str]:
+    """Agents seen working on the task recently: the sessions themselves (Claude / Codex) plus what they launched."""
+    now = time.time()
+    out = set()
+    for e in tev:
+        if e["type"] not in ("presence", "touch", "build_action", "claim", "check", "review"):
+            continue
+        try:
+            at = datetime.fromisoformat(e["occurred_at"]).timestamp()
+        except (ValueError, KeyError):
+            continue
+        if now - at > window_s:
+            continue
+        kind = (e.get("actor") or {}).get("kind")
+        if kind in ("claude", "codex"):
+            out.add(kind)
+        out |= set((e.get("payload") or {}).get("agents") or [])
+        if e["type"] == "build_action" and (e.get("payload") or {}).get("model"):
+            m = str(e["payload"]["model"]).lower()
+            out.add("codex" if "gpt" in m or "codex" in m else "muse" if "avocado" in m or "muse" in m else "claude")
+    return sorted(out)
+
+
+RETIRE = re.compile(r"\b(retire|archive it|park(ed)?|abandon|drop the task|kill the task|not salvageable)\b", re.I)
+
+
+def task_tags(t: dict) -> list[dict]:
+    """Short labels at the end of a row: who works on it, type, how close it is, agent advice. [{k, label, why}]"""
+    tags = []
+    names = {"claude": "Claude", "codex": "Codex", "muse": "Muse"}
+    for w in t.get("workers") or []:
+        tags.append({"k": "who", "label": names.get(w, w), "why": f"{names.get(w, w)} worked on it in the last 48h"})
+    kind = t.get("kind") or ""
+    if kind in ("multi-turn", "single-turn"):
+        tags.append({"k": "type", "label": "MT" if kind == "multi-turn" else "ST", "why": kind})
+    steps = [s_ for s_ in t.get("steps") or [] if not s_.get("routine")]
+    ladder = all(("building session" in s_["do"] or "independent agent" in s_["do"]) for s_ in steps)
+    if re.match(r"(RE)?SUBMIT", t.get("next") or ""):
+        tags.append({"k": "stage", "label": "ready", "why": "both presubmits and approvals are in — submit"})
+    elif t.get("group") in ("ATTENTION", "READY") and steps and ladder and t.get("valid") == "PASS":
+        tags.append({"k": "stage", "label": "near submit", "why": "validation passes; only presubmits / approvals left"})
+    notes = [g.get("review", {}).get("note") or "" for g in (t.get("gates") or {}).values()] + \
+            [g.get("check", {}).get("summary") or "" for g in (t.get("gates") or {}).values()]
+    hit = next((n for n in notes if RETIRE.search(n)), None)
+    if hit:
+        tags.append({"k": "warn", "label": "retire?", "why": "an agent suggested retiring/parking it: " + hit[:140]})
+    rounds = int((t.get("vp") or "0.0").split(".")[0])
+    if rounds >= 2:
+        tags.append({"k": "warn", "label": f"{rounds} rounds", "why": f"revision requested {rounds} times"})
+    if t.get("infra_only"):
+        tags.append({"k": "info", "label": "infra", "why": "validation failed only on infrastructure — a rerun should fix it"})
+    idle = t.get("owner_last_at")
+    if t.get("claim_health") == "OWNED" and idle:
+        try:
+            if time.time() - datetime.fromisoformat(idle).timestamp() > 24 * 3600:
+                tags.append({"k": "info", "label": "idle 1d+", "why": "claimed, but no activity for over a day"})
+        except ValueError:
+            pass
+    return tags
+
+
+def _vp(o: dict, decisions: list[dict]) -> str:
+    """'V.P': times a revision was requested . commits since the last request (or in total if never)."""
+    from .projection import ts
+    revs = [ts(d["at"]) for d in decisions if d.get("kind") == "revision" and ts(d.get("at"))]
+    n = len(revs) or (1 if o.get("codimango.status") == "needs_revision" else 0)
+    last = max(revs) if revs else (ts(o.get("codimango.reviewed_at")) if n else None)
+    times = [t for t in (ts(x) for x in o.get("git.commit_times") or []) if t]
+    return f"{n}.{sum(1 for t in times if not last or t > last)}"
+
+
 def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
     """Detail for hover cards and the task card: validation checks, timestamps, commits, reviews, rounds."""
     from .reviews import versions
@@ -60,6 +131,8 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
             "single-turn" if o.get("codimango.track") else "not imported"),
         "legacy": legacy[-1] if legacy else None,
         "decisions": dec, "review_history_stale": history_stale,
+        "vp": _vp(o, dec),
+        "workers": _workers(tev),
         "versions": versions(o.get("git.commit_times") or [], dec) if (dec or o.get("git.commit_times")) else [],
     }
 
@@ -94,7 +167,7 @@ def payload(snap, cfg) -> dict:
             "group", "next", "state", "state_age_s", "age_level", "owner", "claim_health", "valid", "review",
             "confidence", "confidence_stale", "sync", "check", "check_stale", "check_fail", "pushes_before_submit",
             "pushes_after_submit", "track", "active", "dissent", "links", "tag", "status_raw", "done_kind",
-            "category", "imported", "validated", "age_label", "claim_source", "tbr_status", "infra_only", "gates", "check_need")},
+            "category", "imported", "validated", "age_label", "claim_source", "tbr_status", "infra_only", "gates", "check_need", "pushes_since_decision")},
             "findings": [{"code": x.code, "severity": x.severity, "summary": x.summary, "next": x.next_action}
                          for x in v.findings],
             **_task_extra(v, obs_by_task, ev_by_task, decisions)}
@@ -103,6 +176,7 @@ def payload(snap, cfg) -> dict:
         t["rsum"] = insights.review_summary(t)
         t["steps"] = insights.next_steps(t, flow)
         t["assignee"] = insights.assignee(t, load, live_hosts)
+        t["tags"] = task_tags(t)
         views.append(t)
     weekly = st.weekly(snap.observations, cfg, snap.now, 10)
     cm_at = snap.health.get("codimango").observed_at.isoformat() if snap.health.get("codimango") and \

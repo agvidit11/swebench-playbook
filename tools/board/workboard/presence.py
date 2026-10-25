@@ -66,8 +66,25 @@ def _path_hits(text: str, tasks: set[str]) -> set[str]:
     return hits
 
 
+AGENT_CMDS = {"codex": re.compile(r"\bcodex\s+exec\b|codex-step\.sh"),
+              "muse": re.compile(r"\bmuse\s+exec\b|\bmc2?\.sh\b|\bmetacode\b")}
+
+
+def _agents_for(texts: list[str], task: str) -> list[str]:
+    """Other agents this session drove on the task: tool inputs that name the task and launch codex / muse."""
+    found = set()
+    for txt in texts:
+        if task in txt:
+            found |= {a for a, rx in AGENT_CMDS.items() if rx.search(txt)}
+    return sorted(found)
+
+
 def _tool_inputs(data: bytes) -> str:
     """Only the tool-use inputs and cwd fields of transcript lines (not assistant prose or tool output)."""
+    return "\n".join(_tool_input_list(data))
+
+
+def _tool_input_list(data: bytes) -> list[str]:
     out = []
     for raw in data.split(b"\n")[-4000:]:
         if b'"tool_use"' not in raw and b'"cwd"' not in raw:
@@ -86,7 +103,7 @@ def _tool_inputs(data: bytes) -> str:
                 for v in part["input"].values():
                     if isinstance(v, str):
                         out.append(v[:4000])
-    return "\n".join(out)
+    return out
 
 
 def scan(tasks: set[str], *, now: float | None = None, window_s: int = WINDOW_S) -> list[dict]:
@@ -102,9 +119,10 @@ def scan(tasks: set[str], *, now: float | None = None, window_s: int = WINDOW_S)
             if now - mtime > window_s:
                 continue
             data = _tail(path)
-            for task in _path_hits(_tool_inputs(data), tasks):
+            texts = _tool_input_list(data)
+            for task in _path_hits("\n".join(texts), tasks):
                 found.append({"task": task, "session_id": path.stem, "title": _title(data), "kind": "claude",
-                              "last_seen": mtime})
+                              "last_seen": mtime, "agents": _agents_for(texts, task)})
     if CODEX.is_dir():
         for path in CODEX.glob("*/*/*/*.jsonl"):
             try:
@@ -143,7 +161,10 @@ def emit(cfg, state_dir: Path, host_id: str, tasks: set[str], *, now: float | No
         if now - seen.get(key, 0) < REEMIT_S:
             continue
         alias = f"{host_id}·{f['title']}" if f["title"] else f"{host_id}·{f['kind']} {f['session_id'][-6:]}"
-        ev = events.new_event("presence", f["task"], {"last_seen": f["last_seen"]},
+        payload = {"last_seen": f["last_seen"]}
+        if f.get("agents"):
+            payload["agents"] = f["agents"]
+        ev = events.new_event("presence", f["task"], payload,
                               actor={"session_id": f["session_id"], "alias": alias, "kind": f["kind"]},
                               commit=None, source="presence")
         if events.spool_append(Path(state_dir), ev):

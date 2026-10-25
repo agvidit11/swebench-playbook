@@ -364,3 +364,19 @@ class AuditFixesTest(ProjectionTest):
         v = self.view([cm("t", entered_pool_at="2026-10-10T00:00:00Z", updated_at="2026-10-23T10:00:00Z")])
         self.assertEqual(v.fields["age_label"], "back in draft since (approx.)")
         self.assertEqual(v.fields["state_age_s"], 10 * 3600)
+
+
+class NeedsRevisionProgressTest(ProjectionTest):
+    def test_pushes_after_request_move_to_ladder(self):
+        base = dict(entered_pool_at="2026-10-20T00:00:00Z", reviewed_at="2026-10-21T00:00:00Z")
+        repo_ = repo({SHA_S: "2026-10-22T00:00:00+00:00"})
+        idle = self.view([cm("t", "needs_revision", **base), gt("t", head_time="2026-10-20T12:00:00+00:00"), repo_])
+        self.assertEqual(idle.fields["next"], "ADDRESS review")
+        pushed = [cm("t", "needs_revision", **base), gt("t", times=["2026-10-22T00:00:00+00:00"], head_time="2026-10-22T00:00:00+00:00"), repo_]
+        v = self.view(pushed)
+        self.assertEqual((v.fields["pushes_since_decision"], v.fields["next"]), (1, "RUN check"))
+        done = [e("check", "t", {"pass": 1}, commit=SHA_A), e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A),
+                e("review", "t", {"verdict": "ready"}, commit=SHA_A),
+                e("review", "t", {"verdict": "ready", "role": "author"}, session="s2", host="h2", commit=SHA_A)]
+        self.assertEqual(self.view(pushed, done).fields["next"], "RESUBMIT")
+        self.assertEqual(self.view(pushed).fields["tag"], "Needs revision")

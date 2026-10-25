@@ -20,7 +20,7 @@ STATE = {
 THRESHOLD_KEY = {"QUEUE": "review", "REVIEW": "review", "NEEDS_REV": "needs_revision"}
 VALID = {"passing": "PASS", "passed": "PASS", "pending": "RUN", "running": "RUN", "failed": "FAIL", "failing": "FAIL"}
 GROUP_ORDER = {"ATTENTION": 0, "READY": 1, "VALIDATING": 2, "REVIEWING": 3, "DONE": 4}
-TAG = {"draft": "Draft", "needs_revision": "Sent back", "needs_reviewers_assigned": "Needs reviewers",
+TAG = {"draft": "Draft", "needs_revision": "Needs revision", "needs_reviewers_assigned": "Needs reviewers",
        "being_reviewed": "In review", "accepted": "Accepted", "used_in_training": "In training", "archived": "Archived"}
 IMPORT_GRACE_S = 15 * 60          # a push newer than the server by less than this is "importing", not drift
 GIT_ONLY_MAX_AGE_S = 14 * 86400   # git-only folders older than this are not tasks (templates, samples)
@@ -188,11 +188,11 @@ def _next(f, findings):
         return "VALIDATING", "WAIT validation"
     if state in ("QUEUE", "REVIEW"):
         return "REVIEWING", "WAIT reviewer"
-    if state == "NEEDS_REV":
-        return "READY", "ADDRESS review"
+    if state == "NEEDS_REV" and not f.get("pushes_since_decision"):
+        return "READY", "ADDRESS review"                  # nothing pushed since it was sent back
     if state == "NOT_IMPORTED":
         return "READY", "IMPORT task"
-    if f.get("dissent") and state == "DRAFT":
+    if f.get("dissent") and state in ("DRAFT", "NEEDS_REV"):
         return "ATTENTION", "ADDRESS agent review"
     # DRAFT ladder: both presubmits (building session + independent agent) clean on this commit
     if f["check_fail"]:
@@ -203,7 +203,7 @@ def _next(f, findings):
         return "READY", "GET R1"
     if f["review"] == "R1":
         return "READY", "GET R2"
-    return "READY", "SUBMIT"
+    return "READY", "RESUBMIT" if state == "NEEDS_REV" else "SUBMIT"
 
 
 def _ref_claim(g_claims: dict, cfg, now):
@@ -394,6 +394,8 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         f["pushes_before_submit"] = sum(1 for t in times if not pool or t < pool)
         f["pushes_after_submit"] = sum(1 for t in times if pool and t >= pool)
         f["pushes"] = f"{f['pushes_before_submit']}+{f['pushes_after_submit']}"
+        decided = ts(cm.get("codimango.reviewed_at"))
+        f["pushes_since_decision"] = sum(1 for t in times if decided and t > decided)
         f["round"] = None
         f["group"], f["next"] = _next(f, findings)
         views.append(TaskView(task, f, findings))

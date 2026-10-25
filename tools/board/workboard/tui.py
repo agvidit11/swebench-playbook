@@ -180,7 +180,7 @@ def _owner(f) -> str:
 def _next(f) -> str:
     n = f.get("next", "")
     emoji = NEXT_EMOJI.get(n.split(" ")[0], "•")
-    col = RED if n.startswith(("FIX", "RESOLVE")) else GREEN if n.startswith("SUBMIT") else \
+    col = RED if n.startswith(("FIX", "RESOLVE")) else GREEN if n.startswith(("SUBMIT", "RESUBMIT")) else \
         AMBER if n.startswith(("RERUN", "ADDRESS", "RUN", "GET", "CHECK")) else GREY
     return f"{emoji} {fg(col)}{n}{RESET}"
 

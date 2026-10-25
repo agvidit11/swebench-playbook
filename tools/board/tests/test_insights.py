@@ -56,3 +56,25 @@ class InsightsTest(unittest.TestCase):
     def test_wait_reviewer_wording(self):
         s = insights.next_steps({"next": "WAIT reviewer", "status_raw": "being_reviewed", "vsum": {"issues": []}}, {})
         self.assertIn("in progress", s[0]["do"])
+
+
+class TagsAndVersionsTest(unittest.TestCase):
+    def test_vp(self):
+        from workboard.html import _vp
+        o = {"git.commit_times": ["2026-10-18T00:00:00+00:00", "2026-10-20T00:00:00+00:00", "2026-10-22T00:00:00+00:00"]}
+        self.assertEqual(_vp(o, []), "0.3")
+        decs = [{"kind": "revision", "at": "2026-10-19T00:00:00+00:00"}, {"kind": "revision", "at": "2026-10-21T00:00:00+00:00"}]
+        self.assertEqual(_vp(o, decs), "2.1")
+        self.assertEqual(_vp(dict(o, **{"codimango.status": "needs_revision", "codimango.reviewed_at": "2026-10-21T00:00:00Z"}), []), "1.1")
+
+    def test_tags(self):
+        from workboard.html import task_tags
+        t = {"workers": ["claude", "codex"], "kind": "multi-turn", "next": "SUBMIT", "vp": "2.1", "infra_only": False,
+             "gates": {"independent": {"review": {"note": "§5d: retire this, dedup vs own task"}, "check": {}}}}
+        labels = [x["label"] for x in task_tags(t)]
+        self.assertEqual(labels, ["Claude", "Codex", "MT", "ready", "retire?", "2 rounds"])
+
+    def test_routine_steps_greyed_and_last(self):
+        steps = insights.rank_steps([{"do": "resubmit for human review"}, {"do": "fix the README"}])
+        self.assertEqual([s["do"] for s in steps], ["fix the README", "resubmit for human review"])
+        self.assertTrue(steps[1]["routine"])
