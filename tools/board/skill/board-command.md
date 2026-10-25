@@ -1,6 +1,6 @@
 ---
 description: Show the workboard (who owns what, what to do next) or run a board subcommand
-argument-hint: "[checkin | courier | show <task> | available | msg <task|session> ... | status ...]"
+argument-hint: "[checkin | courier | serve --ensure | show <task> | available | msg <task|session> ... | status ...]"
 allowed-tools: Bash(board:*), Bash(~/.local/bin/board:*), SendMessage
 ---
 

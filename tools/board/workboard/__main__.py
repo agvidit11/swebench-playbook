@@ -361,6 +361,13 @@ def status_checks(cfg) -> list[dict]:
     good = [l for l in cron.splitlines() if l.strip() == expected]
     out.append({"name": "background sync (cron */2 board sync)", "ok": bool(good),
                 "detail": "" if good else ("found a board sync line with another schedule" if "board sync" in cron else "not installed")})
+    serve_expected = serve_cron_line(board_path())
+    serve_good = [l for l in cron.splitlines() if l.strip() == serve_expected]
+    out.append({"name": "dashboard watchdog (cron board serve --ensure)", "ok": bool(serve_good),
+                "detail": "" if serve_good else ("found another serve schedule" if "board serve --ensure" in cron
+                                                   else "not installed")})
+    healthy, detail = serve_health()
+    out.append({"name": "dashboard serve health", "ok": healthy, "detail": detail})
     return out
 
 
@@ -873,6 +880,77 @@ def cron_line(board: str) -> str:
     return f"*/2 * * * * {board} sync --quiet >/dev/null 2>&1"
 
 
+def serve_cron_line(board: str, port: int = 8765) -> str:
+    port_arg = "" if port == 8765 else f" --port {port}"
+    return f"* * * * * {board} serve --ensure{port_arg} >/dev/null 2>&1"
+
+
+def serve_health(port: int = 8765, timeout: float = 0.35) -> tuple[bool, str]:
+    """True only for this workboard's loopback health endpoint."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=timeout) as response:
+            data = json.loads(response.read(4096))
+        if response.status == 200 and data.get("ok") is True and data.get("service") == "workboard":
+            return True, f"healthy on 127.0.0.1:{port}"
+        return False, f"unexpected service on port {port}"
+    except Exception as exc:
+        return False, f"not responding on 127.0.0.1:{port} ({exc.__class__.__name__})"
+
+
+def _serve_lock(port: int):
+    """Acquire the single-instance lock, returning an open file or None."""
+    import fcntl
+    from . import sync as s
+    inherited = os.environ.pop("WORKBOARD_SERVE_LOCK_FD", None)
+    if inherited is not None:
+        try:
+            fh = os.fdopen(int(inherited), "a+")
+            fh.seek(0); fh.truncate(); fh.write(str(os.getpid())); fh.flush()
+            return fh
+        except (OSError, ValueError):
+            pass
+    path = s.default_state_dir() / f"serve-{port}.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fh = open(path, "a+")
+    try:
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        fh.close()
+        return None
+    fh.seek(0)
+    fh.truncate()
+    fh.write(str(os.getpid()))
+    fh.flush()
+    return fh
+
+
+def _ensure_serve(args) -> int:
+    """Start a detached server if neither its health endpoint nor lock is live."""
+    healthy, _ = serve_health(args.port)
+    if healthy:
+        return 0
+    probe = _serve_lock(args.port)
+    if probe is None:                         # another process is serving or still gathering its first snapshot
+        return 0
+    cache = Path(os.environ.get("WORKBOARD_CACHE", "~/.cache/workboard")).expanduser()
+    cache.mkdir(parents=True, exist_ok=True)
+    log = open(cache / f"serve-{args.port}.log", "ab", buffering=0)
+    argv = [board_path(), "serve", "--port", str(args.port), "--interval", str(args.interval)]
+    env = dict(os.environ, WORKBOARD_SERVE_LOCK_FD=str(probe.fileno()))
+    try:
+        subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                         start_new_session=True, close_fds=True, pass_fds=(probe.fileno(),), env=env)
+    except OSError as exc:
+        probe.close()
+        log.close()
+        print(f"could not start dashboard: {exc}", file=sys.stderr)
+        return 1
+    probe.close()
+    log.close()
+    return 0
+
+
 def cmd_setup(args, cfg):
     """Set up this machine: config (from the private ledger if missing), `board` on PATH, the skill, hooks,
     a 2-minute cron sync, a claim-ref probe and a first sync. Fails if any required step fails."""
@@ -948,14 +1026,14 @@ def cmd_setup(args, cfg):
         problems.append(f"hooks: {exc}")
     if sh.which("crontab"):
         cur = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout
-        managed = re.compile(r"^\*/2 \* \* \* \* \S*/tools/board/board sync --quiet >/dev/null 2>&1$")
+        managed = re.compile(r"^(?:\*/2|\*) \* \* \* \* \S*/tools/board/board (?:sync --quiet|serve --ensure(?: --port \d+)?) >/dev/null 2>&1$")
         lines = [l for l in cur.splitlines() if not managed.match(l.strip())]
-        lines.append(cron_line(board))
+        lines.extend((cron_line(board), serve_cron_line(board)))
         r = subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n", text=True, capture_output=True)
         if r.returncode != 0:
             problems.append(f"cron: {r.stderr.strip() or 'crontab failed'}")
         else:
-            print("cron: board sync every 2 minutes")
+            print("cron: board sync every 2 minutes; dashboard watchdog every minute")
     else:
         problems.append("cron: crontab not available (claim data for edit-blocking will go stale)")
     state = s.default_state_dir()
@@ -1073,6 +1151,7 @@ def build_parser():
     sv = sub.add_parser("serve", help="serve the live HTML dashboard on localhost")
     sv.add_argument("--port", type=int, default=8765)
     sv.add_argument("--interval", type=int, default=30, help="seconds between refreshes (each one pulls the shared ledger)")
+    sv.add_argument("--ensure", action="store_true", help="exit 0 if serving; otherwise start one detached instance")
     s = sub.add_parser("show", parents=[common], help="one task in full")
     s.add_argument("task")
     s.add_argument("--no-reviews", action="store_true", help="skip fetching human reviews")
@@ -1159,6 +1238,15 @@ def cmd_html(args, cfg):
 
 
 def cmd_serve(args, cfg):
+    if args.ensure:
+        return _ensure_serve(args)
+    instance_lock = _serve_lock(args.port)
+    if instance_lock is None:
+        healthy, detail = serve_health(args.port)
+        if healthy:
+            return 0
+        print(f"dashboard lock is held but health failed: {detail}", file=sys.stderr)
+        return 1
     from . import html
     from .app import gather
     def fresh():
@@ -1183,12 +1271,17 @@ def cmd_serve(args, cfg):
         st = s.sync(cfg, state_dir=s.default_state_dir(), timeout_seconds=20)
         return {"to": target["to_label"], "state": "published" if st.last_push_ok and not st.pending else "queued",
                 "synced": bool(st.last_push_ok and not st.pending)}
-    srv = html.serve(fresh, cfg, port=args.port, interval=args.interval, send_fn=send)
-    print(f"🧭 workboard live at http://localhost:{args.port}/  (VS Code forwards the port; Ctrl-C to stop)")
     try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        srv = html.serve(fresh, cfg, port=args.port, interval=args.interval, send_fn=send)
+        print(f"🧭 workboard live at http://localhost:{args.port}/  (VS Code forwards the port; Ctrl-C to stop)")
+        try:
+            srv.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            srv.server_close()
+    finally:
+        instance_lock.close()
     return 0
 
 

@@ -13,9 +13,10 @@ board claim <task> [--to "<tab title words>"]        board release <task> --reas
 board check run <task>     # run your pre-submit gate (unchanged) and log the result against the commit
 board review add <task> --verdict ready --confidence 4 --note "..."
 board stats [--quality] [--from D --to D]            board rank [import <file>]
-board status               # sources, ledger, claims, hooks, cron
+board status               # sources, ledger, claims, hooks, cron, dashboard health
 board ui                   # interactive terminal app (tabs, filters, search, details)
 board serve                # live web dashboard on localhost:8765 (Board / Team / Stats)
+board serve --ensure       # exit 0 if healthy/already starting; otherwise start one detached server
 board msg <who> "text"     # target a task, stable session/name, server, or all
 board inbox · board ack <id> · board feed   # your messages, mark handled, cross-server activity
 board courier              # dedicated Claude courier: block until a delivery is ready (zero tokens while waiting)
@@ -40,6 +41,10 @@ board import-claims --dry-run   # one-time: show live rows of an old CLAIMS.md (
   live session owns. They never touch the network and always fail open; the 2-minute background `board sync`
   then attempts the atomic claim for touched free tasks (so ownership lags activity by up to one sync).
 - Nothing ever writes to codimango or to task files.
+- **Live dashboard regions** use strong canonical-content ETags: summary/board poll every 60s, Team every 15s only
+  while open, activity every 30s while visible, and Stats on open plus every five minutes. A no-change poll is a
+  bodyless `304`; elapsed clocks tick locally every 15s. Task validation/history arrays load only when its drawer
+  opens. `/data.json` and the self-contained `board html` export remain compatible.
 
 ## Messaging and the courier
 
@@ -72,9 +77,12 @@ git pull && tools/board/board setup --ledger <private ledger git url>
 ```
 
 `setup` fetches the config from the private ledger (if missing), links `board` into `~/.local/bin`, installs the
-`workboard` skill into `~/.claude/skills/`, adds the hooks (backup kept) and a 2-minute `board sync` cron line,
-probes claim refs and does the first sync; it exits non-zero if any of these fail.
+`workboard` skill into `~/.claude/skills/`, adds the hooks (backup kept), a 2-minute `board sync` cron line, and a
+one-minute `board serve --ensure` watchdog, probes claim refs and does the first sync; it exits non-zero if any of
+these fail. `serve --ensure` uses a per-port lock, so concurrent cron invocations cannot create duplicate servers.
 Undo: `board install-hooks --uninstall` and remove the cron line.
 
 Tests: `python3 -m unittest discover -s tests` (stdlib only, Python ≥ 3.11).
 Increment-1 stress: `python3 -m tests.stress_increment1` (synthetic data only).
+Increment-2 stress: `python3 -m tests.stress_increment2 --idle-seconds 60` (300 tasks, 40 sessions, 1,000 activity
+items, 200 keyed refreshes, and an idle-CPU sample; synthetic data only).

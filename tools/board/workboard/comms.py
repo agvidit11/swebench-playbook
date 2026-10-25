@@ -273,15 +273,16 @@ def feed(evs: list[dict], since_s: float = 24 * 3600, now: float | None = None, 
         p = e["payload"]
         what = {"msg": f"💬 → {p.get('to_label', '')}: {p.get('text', '')}",
                 "claim": "👤 claimed" + (" (auto)" if p.get("auto") else ""), "release": f"🔓 released — {p.get('reason', '')}",
-                "steal": "🤺 took over an expired claim", "assign": f"➡️ assigned to {p.get('to_alias', '')}",
+                "steal": "🤺 took over an expired claim", "assign": f"→ assigned to {p.get('to_alias', '')}",
                 "check": f"🧪 presubmit P{p.get('pass', 0)} W{p.get('warn', 0)} F{p.get('fail', 0)}",
                 "review": f"👀 review: {p.get('verdict', '')}" + (f" C{p['confidence']}" if p.get("confidence") else ""),
-                "presence": "✍️ started working", "note": f"📜 CLAIMS.md: {p.get('legacy_owner', '')} {p.get('status', '')}",
+                "presence": "✍ started working", "note": f"📜 CLAIMS.md: {p.get('legacy_owner', '')} {p.get('status', '')}",
                 "checkin": ("💤 checked in: idle" if p.get("status") == "idle" else
                             "📋 checked in: " + (", ".join(p.get("tasks") or []) or "working"))}[e["type"]]
         if e["type"] == "note" and not p.get("legacy_owner"):
             continue
-        out.append({"at": e["occurred_at"], "ts": at, "host": e.get("host_id", ""), "who": e["actor"].get("alias", ""),
+        out.append({"id": e.get("event_id") or f"{e.get('host_id', '')}:{e.get('seq', '')}",
+                    "at": e["occurred_at"], "ts": at, "host": e.get("host_id", ""), "who": e["actor"].get("alias", ""),
                     "type": e["type"], "task": task, "what": what})
     out.sort(key=lambda x: -x["ts"])
     return out[:limit]
@@ -294,7 +295,8 @@ def _checkin_view(e: dict | None, now: float) -> dict:
         ago = int(now - datetime.fromisoformat(e["occurred_at"]).timestamp())
     except ValueError:
         return {"status": None}
-    return {"status": e["payload"].get("status"), "tasks": e["payload"].get("tasks") or [], "checkin_ago_s": ago}
+    return {"status": e["payload"].get("status"), "tasks": e["payload"].get("tasks") or [],
+            "checkin_at": e.get("occurred_at"), "checkin_ago_s": ago}
 
 
 def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = None,
@@ -362,8 +364,11 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
             native.append({k: v for k, v in {
                 "session_key": s.get("session_key"), "native_id": sid, "alias": f"{h}·{s.get('name')}",
                 "name": s.get("name"), "kind": s.get("kind"), "kind_icon": s.get("kind_icon"),
-                "age_s": s.get("age_s"), "ago_s": 0 if s.get("live") else s.get("age_s"),
-                "status": s.get("status"), "status_ago_s": status_since, "live": s.get("live"),
+                "started_at": s.get("started_at"), "age_s": s.get("age_s"),
+                "last_activity_at": s.get("last_activity_at"),
+                "ago_s": 0 if s.get("live") else s.get("age_s"),
+                "status": s.get("status"), "status_since": s.get("status_since"),
+                "status_ago_s": status_since, "live": s.get("live"),
                 "classification": s.get("classification"), "liveness_reason": s.get("liveness_reason"),
                 "focus": s.get("focus"), "tasks": tasks, "child_runs": child_runs, "transport": s.get("transport"),
                 "restart": s.get("restart"), "tokens": s.get("tokens"), "advice": s.get("advice"),
@@ -375,6 +380,7 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
         fallback = [dict({"session_key": sid, "native_id": sid, "alias": a, "name": a.split("·", 1)[-1],
                           "kind": kind, "kind_icon": {"claude": "🟣", "codex": "🟢", "muse": "🟠",
                                                         "human": "👤"}.get(kind, "❔"),
+                          "started_at": None, "last_activity_at": datetime.fromtimestamp(t, timezone.utc).isoformat(),
                           "age_s": None, "ago_s": int(now - t),
                           "status": None, "live": None,
                           "classification": "human-shell" if kind == "human" else "ledger-only",
@@ -404,7 +410,10 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
         local_state = sync_state if h == local_host else None
         sync_error = getattr(local_state, "error", "") if local_state is not None else host_state.get("sync_error", "")
         queue = getattr(local_state, "pending", 0) if local_state is not None else host_state.get("queue", 0)
-        out.append({"id": h, "last_sync_ago_s": int(now - last) if last else None,
+        out.append({"id": h,
+                    "last_sync_at": datetime.fromtimestamp(last, timezone.utc).isoformat() if last else None,
+                    "last_sync_ago_s": int(now - last) if last else None,
+                    "last_activity_at": datetime.fromtimestamp(last_act, timezone.utc).isoformat() if last_act else None,
                     "last_activity_ago_s": int(now - last_act) if last_act else None,
                     "sessions": rows, "session_count": len(interactive), "human_actor_count": sum(bool(s.get("is_actor")) for s in rows),
                     "status_counts": counts, "queue": int(queue or 0), "sync_error": str(sync_error or "")[:300],

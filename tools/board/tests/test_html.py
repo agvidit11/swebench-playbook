@@ -46,11 +46,23 @@ class HtmlTest(unittest.TestCase):
     def test_team_and_owner_contract_is_in_the_inline_page(self):
         from workboard.html_page import PAGE
         for text in ("server-grid", "session-table", "status · for", "focus tasks", "hooks / transport",
-                     "data-session", "openSession", "MESSAGE THIS SESSION"):
+                     "data-session", "openSession", "MESSAGE THIS SESSION", "claude:'C'", "board status</code> there"):
             self.assertIn(text, PAGE)
         for text in ("✍ working", "💤 assigned idle", "⏳ in pipeline", "🛠 pushed", "🔓 free", "❔ never seen"):
             self.assertIn(text, PAGE)
         self.assertNotIn("predates the current board hooks", PAGE)
+
+    def test_region_cadences_and_no_full_snapshot_poll(self):
+        from workboard.html_page import PAGE
+        for text in ("pollRegion('summary')", "pollRegion('board')", "pollRegion('team')",
+                     "pollRegion('activity')", "pollRegion('stats')", "60000", "15000", "30000", "300000"):
+            self.assertIn(text, PAGE)
+        self.assertNotIn("fetch('data.json'", PAGE)
+
+    def test_inline_page_uses_no_multi_codepoint_emoji_sequences(self):
+        from workboard.html_page import PAGE
+        self.assertNotIn("\ufe0f", PAGE)
+        self.assertNotIn("\u200d", PAGE)
 
 
 class LinksTest(unittest.TestCase):

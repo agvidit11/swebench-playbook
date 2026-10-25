@@ -112,7 +112,7 @@ code{background:#0e1016;border:1px solid var(--line);border-radius:5px;padding:0
 <div class="tabs"><button class="tab on" data-tab="board">📋 Board</button><button class="tab" data-tab="team">💬 Team</button><button class="tab" data-tab="stats">📊 Stats</button></div>
 <section id="board">
 <div class="controls" id="chips"></div>
-<div class="controls"><div class="seg" id="owner"></div><select class="kind" id="kind" title="task type"><option value="">🧩 all types</option><option value="multi-turn">🔁 multi-turn</option><option value="single-turn">1️⃣ single-turn</option></select><input type="search" id="q" placeholder="🔍 search tasks  ( / )"><span class="health" id="health"></span></div>
+<div class="controls"><div class="seg" id="owner"></div><select class="kind" id="kind" title="task type"><option value="">🧩 all types</option><option value="multi-turn">🔁 multi-turn</option><option value="single-turn">① single-turn</option></select><input type="search" id="q" placeholder="🔍 search tasks  ( / )"><span class="health" id="health"></span></div>
 <div class="tbl"><table><thead><tr>
 <th data-k="task" data-h="task">Task</th><th data-k="next" data-h="next">Next</th><th data-k="tag" data-h="tag">Status</th>
 <th data-k="owner" data-h="owner">Owner</th><th data-k="valid" data-h="valid">Validation</th>
@@ -129,6 +129,9 @@ code{background:#0e1016;border:1px solid var(--line);border-radius:5px;padding:0
 <script>
 const LIVE = __LIVE__;
 let D = JSON.parse(document.getElementById('data').textContent);
+const RK={g:'group',n:'next',al:'age_level',o:'owner',ch:'claim_health',v:'valid',r:'review',s:'sync',tg:'tag',sr:'status_raw',vd:'validated',ag:'age_label',os:'ownership_state',ow:'ownership_reason',oa:'owner_last_at',k:'kind',vp:'vp',vs:'vsum',old:'older_results',as:'assignee',ep:'entered_pool_at',rhs:'review_history_stale',ss:'state_since',ax:'assignment',ac:'activity',pp:'pipeline',lp:'last_push',gs:'gate_summary',rs:'rsum',rc:'revision_count',ld:'latest_decision',fc:'finding_codes',sy:'sync_summary',lg:'legacy_summary',ta:'tags',kl:'kind_line',dv:'detail_version',rv:'row_version'};
+function inflateRow(row){const x=Object.fromEntries(Object.entries(row).map(([k,v])=>[RK[k]||k,v]));if(Array.isArray(x.vsum)){const[p,t,issues,skipped,info]=x.vsum;x.vsum={passed:p,total:t,issues:issues.map(i=>({severity:i[0],check:i[1],why:i[2],fix:'open the task card for full validation detail'})),skipped,info:info.map(i=>({check:i[0],why:i[1]}))}}if(x.gate_summary&&x.gate_summary.a){const g=x.gate_summary;x.gate_summary={author:{check:{state:g.a[0],fail:g.a[1],warn:g.a[2],at:g.a[4],summary:g.a[5]},review:{state:g.a[3]}},independent:{check:{state:g.i[0],fail:g.i[1],warn:g.i[2],at:g.i[4],summary:g.i[5]},review:{state:g.i[3]}}}}if(Array.isArray(x.tags))x.tags=x.tags.map(i=>Array.isArray(i)?{k:i[0],label:i[1],why:i[2]}:i);if(Array.isArray(x.assignment))x.assignment={state:x.assignment[0],owner:x.assignment[1],reason:x.assignment[2]};else if(typeof x.assignment==='string')x.assignment={state:x.assignment};if(Array.isArray(x.activity))x.activity={state:x.activity[0],last_at:x.activity[1],reason:x.activity[2]};if(Array.isArray(x.pipeline))x.pipeline={state:x.pipeline[0],since:x.pipeline[1],reason:x.pipeline[2]};if(Array.isArray(x.last_push))x.last_push={at:x.last_push[0],session_alias:x.last_push[1],time_kind:x.last_push[2]};if(Array.isArray(x.rsum))x.rsum={agent:x.rsum[0],agent_current:x.rsum[1],agent_green:x.rsum[2],human:x.rsum[3]};if(Array.isArray(x.latest_decision))x.latest_decision={kind:x.latest_decision[0],at:x.latest_decision[1],reason:x.latest_decision[2]};return x}
+const decodeBoard=data=>data.tasks?(data.tasks||[]).map(inflateRow):(data.rows||[]).map(values=>inflateRow(Object.fromEntries((data.fields||[]).map((key,i)=>[key,values[i]]))));D.tasks=decodeBoard(D);
 const G = {MINE:['#ff8f6b','🙋','action needed'],READYSUB:['#7bd88f','🚀','ready to submit'],VALIDATING:['#7ab8ff','⏳','server validating'],
  REVIEWING:['#b39dff','👀','with reviewers'],DONE:['#8b90a0','🎉','done']};
 const GHELP = {MINE:'Something for you or one of your sessions to do: fix, address feedback, presubmit, review, submit. Broken ones (red edge) come first within each status.',
@@ -150,38 +153,45 @@ const HEAD = {task:'The task folder. Hover a task name for what it is; click for
  tags:'Quick labels: who worked on it in the last 48h (Claude / Codex / Muse), MT/ST, ready / near submit, retire? when an agent suggested parking it, revision rounds, infra-only failures, idle owner.',
  sync:'Two ticks: 1st = codimango has your latest push (grey while importing, amber if it is on an older commit) · 2nd = validated (green passed · red ✘ failed or a reviewer sent it back · grey while running or results are old).'};
 const S = {tags:new Set(), groups:new Set(['MINE','READYSUB','VALIDATING']), gfirst:true, kind:'', sig:{}, owner:'all', q:'', sort:'tag', dir:1, first:true, rowh:{}, keys:'', blocks:{},
- prev:JSON.parse(localStorage.getItem('wb-prev')||'{}')};
+ prev:JSON.parse(localStorage.getItem('wb-prev')||'{}'),etags:D._etags||{},details:{},detailEtags:{},detailRowVersions:{},drawerRowVersion:null,
+ teamKeys:'',teamh:{},teamSig:{},activityIds:new Set(),teamReady:false,lastNetworkAt:Date.now()};
 const code = s => esc(s).replace(/`([^`]+)`/g,'<code>$1</code>');
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const age = s => s==null?'?':s<60?'<1m':s<3600?Math.floor(s/60)+'m':s<86400?Math.floor(s/3600)+'h':Math.floor(s/86400)+'d';
 const fdate = x => x?new Date(x).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+const elapsed = (at,fallback=null) => at?Math.max(0,(Date.now()-Date.parse(at))/1000):fallback;
+const taskAge = t => elapsed(t.state_since,t.state_age_s);
+function shortName(value){const whole=String(value||''),raw=whole.split('·').pop().trim(),m=whole.match(/\b([a-z][\w-]*-[0-9a-f]{2,})\b/i);return m?m[1]:(raw.split(/[\s(]/)[0]||'assigned').slice(0,22)}
+const kindCue=x=>`${x.kind_icon||'❔'} ${{claude:'C',codex:'X',muse:'M',human:'H',unlinked:'?'}[x.kind]||'?'}`;
 const L = (cls,ch,txt) => `<li><span class="b-${cls}">${ch}</span><span>${txt}</span></li>`;
 const CH = {ok:'●',pend:'○',bad:'✘',dim:'·',info:'→'};
 const tick = (n,green,amber) => n?`<span class="tk ${green?'g':amber?'a':'d'}">${'✓'.repeat(n)}</span>`:'<span class="tk d">✓✓</span>';
-function kindLine(t){const c=t.category||{};const track=(t.track||'').includes('multi')?'multi-turn':(t.track?'single-turn':'');
+function kindLine(t){if(t.kind_line)return t.kind_line;const c=t.category||{};const track=(t.track||'').includes('multi')?'multi-turn':(t.track?'single-turn':'');
  return [track&&('SWE-bench '+track), (c.category||'').replace(/_/g,' '), (c.subdomain||'').replace(/_/g,' '), (c.languages||[]).join('/'), c.difficulty].filter(Boolean).join(' · ')}
-function ownerIdle(t){return t.owner_last_at?(Date.now()-Date.parse(t.owner_last_at))/1000:null}
+function ownerIdle(t){return elapsed(t.owner_last_at)}
 function ownState(t){return t.ownership_state||(t.claim_health==='DONE'?'done':t.claim_health==='ACTIVE'?'actively_working':t.claim_health==='OWNED'||t.claim_health==='LEGACY'?'assigned_idle':t.claim_health==='CONFLICT'?'conflict':t.claim_health==='PIPELINE'?'in_pipeline':t.claim_health==='RECENT'?'worked_recently':t.claim_health==='UNSEEN'?'never_seen':'available')}
-function owner(t){const s=ownState(t),o=esc(t.owner);if(s==='done')return'';if(s==='available')return'<span class="info">🔓 free</span>';
- if(s==='actively_working')return`<span style="color:var(--violet)">✍ working (${o||'active session'})</span> <span class="dim">· ${age(((t.active||[])[0]||{}).ago_s)} ago</span>`;
- if(s==='in_pipeline')return`<span class="info">⏳ in pipeline</span>${o?' <span class="dim">· '+o+'</span>':''}`;
- if(s==='worked_recently'){const p=(t.last_push||{}).at,pa=p?Math.max(0,(Date.now()-Date.parse(p))/1000):null;return`<span class="run">🛠 pushed ${age(pa)} ago</span>`}
+function ownReason(t){return t.ownership_reason||({done:'task lifecycle is complete',conflict:'more than one assignment is live',actively_working:'recent task activity',in_pipeline:'server work is in progress',assigned_idle:'assignment is live with no recent activity',worked_recently:'remote change within 72 hours',available:'no assignment, activity, pipeline, or recent change',never_seen:'insufficient fresh evidence'}[ownState(t)]||'')}
+function assigneeText(t){const s=ownState(t);if(s==='done'||s==='in_pipeline')return'nobody needed right now';if(s==='worked_recently')return'check with '+((t.last_push||{}).session_alias||'the last session')+' first';if(s==='assigned_idle')return(t.owner||'assigned owner')+' — message or take over';if(s==='actively_working')return'keep with '+(t.owner||'the active session');if(s==='available')return'any free session can claim it';return'inspect the three ownership axes first'}
+function owner(t){const s=ownState(t),full=String(t.owner||''),o=esc(shortName(full));if(s==='done')return'';if(s==='available')return'<span class="info">🔓 free</span>';
+ if(s==='actively_working'){const a=((t.active||[])[0]||{}),at=a.at||(t.activity||{}).last_at;return`<span style="color:var(--violet)" title="${esc(full)}">✍ working (${o||'active session'})</span> <span class="dim">· <span class="clock" data-at="${esc(at||'')}" data-fallback="${a.ago_s??''}">—</span> ago</span>`}
+ if(s==='in_pipeline')return`<span class="info">⏳ in pipeline</span>${o?' <span class="dim" title="'+esc(full)+'">· '+o+'</span>':''}`;
+ if(s==='worked_recently'){const p=(t.last_push||{}).at;return`<span class="run">🛠 pushed <span class="clock" data-at="${esc(p||'')}">—</span> ago</span>`}
  if(s==='never_seen')return'<span class="dim">❔ never seen</span>';
- if(s==='conflict')return`<span class="bad">⚔ conflict (${o})</span>`;
- if(s==='assigned_idle'){const i=ownerIdle(t);return`<span class="dim">💤 assigned idle (${o||'assigned'}, idle ${i==null?'?':age(i)})</span>`}
+ if(s==='conflict')return`<span class="bad" title="${esc(full)}">⚔ conflict (${o})</span>`;
+ if(s==='assigned_idle'){return`<span class="dim" title="${esc(full)}">💤 assigned idle (${o||'assigned'}, idle <span class="clock" data-at="${esc(t.owner_last_at||'')}">—</span>)</span>`}
  return`<span style="color:var(--violet)">👤 ${o}</span>`}
 function valid(t){const v=t.vsum;if(t.older_results&&t.valid!=='RUN')return'<span class="run">↻ older commit</span>';const f=v.issues.filter(i=>i.severity==='fail').length,w=v.issues.filter(i=>i.severity==='warn').length;
  if(t.valid==='RUN')return'<span class="run">○ running</span>';if(!v.total)return'<span class="dim">· none yet</span>';
  if(f)return`<span class="bad">✘ ${f} issue${f>1?'s':''}</span>`;if(w)return`<span class="run">▲ ${w} warning${w>1?'s':''}</span>`;return'<span class="ok">✔ clean</span>'+(v.info&&v.info.length?' <span class="dim">ⓘ</span>':'')}
-function review(t){const raw=t.status_raw,n=t.decisions.filter(d=>d.kind==='revision').length;
+function review(t){const raw=t.status_raw,n=t.revision_count??(t.decisions||[]).filter(d=>d.kind==='revision').length;
  if(raw==='accepted')return'<span class="ok">✔ accepted</span>';if(raw==='used_in_training')return'<span style="color:var(--teal)">✔ in training</span>';
  if(raw==='needs_revision')return`<span class="bad">✘ needs revision${n>1?' '+n+'×':''}</span>`;if(raw==='being_reviewed')return'<span style="color:var(--violet)">👀 in review</span>';
  if(raw==='needs_reviewers_assigned')return'<span class="info">⌛ awaiting reviewer</span>';if(raw==='archived')return'<span class="dim">📦 archived</span>';
  return n?`<span class="dim">· draft (↩${n}×)</span>`:'<span class="dim">· not submitted</span>'}
 const TK=(st,glyph)=>st==='ok'?'<span class="tk g">✓</span>':st==='bad'?'<span class="tk r">✘</span>':st==='amber'?'<span class="tk a">✓</span>':st==='none'?'<span class="tk d">○</span>':`<span class="tk d">${glyph||'✓'}</span>`;
-function gate(t){return (t.rsum&&t.rsum.gates)||{author:{check:{state:'none'},review:{state:'none'}},independent:{check:{state:'none'},review:{state:'none'}}}}
+function gate(t){return t.gate_summary||(t.rsum&&t.rsum.gates)||{author:{check:{state:'none'},review:{state:'none'}},independent:{check:{state:'none'},review:{state:'none'}}}}
 function check(t){const g=gate(t);return ['author','independent'].map(r=>{const c=g[r].check;return TK(c.state,c.state==='old'&&c.fail?'✘':'✓')}).join('')}
-function sync(t){const s=t.sync,codes=(t.findings||[]).map(f=>f.code);
+function sync(t){const s=t.sync,codes=t.finding_codes||(t.findings||[]).map(f=>f.code);
  // 1st tick: does codimango have your latest push?  2nd tick: is the validation result for that commit?
  const imp=s==='OK'||s==='OK·doc'||s==='STALE_VALID'?'ok':s==='IMPORTING'?'grey':s==='HEAD≠SERVER'?'amber':'none';
  const oldv=s==='IMPORTING'||s==='HEAD≠SERVER'||s==='STALE_VALID'||codes.includes('VALID≠SERVER');
@@ -194,46 +204,46 @@ function tag(t){return `<span class="tag" style="background:${TAGC[t.tag]||'#666
 const AGEW={'decided':'decided','submitted':'submitted','in review since (approx.)':'in review','archived':'archived','back in draft since (approx.)':'back','created':'created'};
 // ---- hover cards: short, only what matters
 function tipTask(t){return `<h4>${esc(t.task)}</h4><ul>${L('info','◆',esc(kindLine(t)||'no category yet'))}${t.category&&t.category.domain?L('dim','·',esc(t.category.domain)):''}${t.category&&t.category.usecase?L('dim','·',esc(t.category.usecase.replace(/_/g,' '))):''}</ul>`}
-function tipNext(t){return `<h4>next · ETA</h4><ul>${t.steps.map(s=>L(s.routine?'dim':'pend','→',`<span class="${s.routine?'dim':''}">${code(s.do)}</span> <span class="dim">${esc(s.eta)}</span>`)).join('')||L('ok','●','nothing to do')}</ul>`}
-function tipTag(t){let h=`<h4>${esc(t.tag)} · ${esc(t.age_label||'')} ${age(t.state_age_s)} ago</h4><ul>`;
+function tipNext(t){const steps=t.steps||[];if(!steps.length)return `<h4>next</h4><ul>${L(t.next==='—'?'ok':'pend','→',esc(t.next||'nothing to do'))}${L('dim','·','open the task card for the full ordered steps and ETAs')}</ul>`;return `<h4>next · ETA</h4><ul>${steps.map(s=>L(s.routine?'dim':'pend','→',`<span class="${s.routine?'dim':''}">${code(s.do)}</span> <span class="dim">${esc(s.eta)}</span>`)).join('')||L('ok','●','nothing to do')}</ul>`}
+function tipTag(t){let h=`<h4>${esc(t.tag)} · ${esc(t.age_label||'')} ${age(taskAge(t))} ago</h4><ul>`;
  if(t.vp){const [a,b]=t.vp.split('.');h+=L('info','#',`${esc(t.vp)} = ${a==='0'?'never sent back':'revision requested '+a+'×'} · ${b} push${b==='1'?'':'es'} ${a==='0'?'so far':'since the last request'}`)}if(t.entered_pool_at)h+=L('dim','↗','submitted '+fdate(t.entered_pool_at));
- t.decisions.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',(d.kind==='accept'?'accepted ':'revision requested ')+fdate(d.at)));
+ const dec=t.decisions||[t.latest_decision].filter(Boolean);dec.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',(d.kind==='accept'?'accepted ':'revision requested ')+fdate(d.at)));
  if(t.age_level&&t.age_level!=='ok')h+=L(t.age_level==='block'?'bad':'pend','!',t.age_level==='block'?'overdue for this state':'getting old');return h+'</ul>'}
-function tipOwner(t){const a=t.assignment||{},x=t.activity||{},p=t.pipeline||{},s=ownState(t);let h=`<h4>${esc(s.replace(/_/g,' '))} · ${esc(t.ownership_reason||'')}</h4><ul>`;
+function tipOwner(t){const a=t.assignment||{},x=t.activity||{},p=t.pipeline||{},s=ownState(t);let h=`<h4>${esc(s.replace(/_/g,' '))} · ${esc(ownReason(t))}</h4><ul>`;
  h+=L(a.state==='claimed'?'ok':'dim','👤',`assignment: ${esc(a.state||t.claim_health||'unknown')}${a.owner?' · '+esc(a.owner):''}`);
- h+=L(x.state==='active'?'ok':'dim','✍️',`activity: ${esc(x.state||((t.active||[]).length?'active':'inactive'))}${x.reason?' · '+esc(x.reason):''}`);
+ h+=L(x.state==='active'?'ok':'dim','✍',`activity: ${esc(x.state||((t.active||[]).length?'active':'inactive'))}${x.reason?' · '+esc(x.reason):''}`);
  h+=L(p.state&&p.state!=='none'?'pend':'dim','⏳',`pipeline: ${esc(p.state||'none')}${p.reason?' · '+esc(p.reason):''}`);
  if((t.last_push||{}).at)h+=L('dim','🛠',`latest remote change ${fdate(t.last_push.at)} · ${esc(t.last_push.time_kind||'time')}${t.last_push.session_alias?' · last session '+esc(t.last_push.session_alias):''}`);else h+=L('dim','🛠','latest remote change: none observed');
- if(t.legacy)h+=t.claim_health==='LEGACY'?L('info','📜',`CLAIMS.md: ${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)} · ${esc(t.legacy.updated)}`):L('dim','📜',`old CLAIMS.md row (not an active owner): ${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)}`);
- h+=L('dim','→',esc(t.assignee));return h+'</ul>'}
+ const lg=t.legacy||t.legacy_summary;if(lg)h+=t.claim_health==='LEGACY'?L('info','📜',`CLAIMS.md: ${esc(lg.legacy_owner)} · ${esc(lg.status)} · ${esc(lg.updated)}`):L('dim','📜',`old CLAIMS.md row (not an active owner): ${esc(lg.legacy_owner)} · ${esc(lg.status)}`);
+ h+=L('dim','→',esc(t.assignee||assigneeText(t)));return h+'</ul>'}
 function tipValid(t){const v=t.vsum;if(t.older_results)return'<h4>validation</h4><ul>'+L('pend','↻','these results are for an older commit — your latest push has not been validated')+L('info','→','codimango task rerun '+esc(t.task))+'</ul>';if(t.valid==='RUN'&&!v.issues.length)return'<h4>validation</h4><ul>'+L('pend','○','running')+'</ul>';
  const inf=(v.info||[]).map(i=>L('dim','ⓘ',`<b>${esc(i.check)}</b> ${esc(i.why)} (informational, not blocking)`)).join('');
  if(!v.issues.length)return`<h4>validation</h4><ul>${L('ok','●',`${v.total-(v.info||[]).length} of ${v.total} checks clear`)}${inf}</ul>`;
  return `<h4>validation · ${v.passed}/${v.total} clear</h4><ul>${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)}<br><span class="dim">→ ${esc(i.fix.replace('{task}',t.task))}</span>`)).join('')}${v.skipped&&v.skipped.length?L('dim','⤷',esc([...new Set(v.skipped)].join(', '))+' skipped until the above passes'):''}${inf}</ul>`}
-function tipReview(t){let h=`<h4>human review · ${esc(t.rsum.human)}</h4><ul>`;
- t.decisions.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',`${d.kind==='accept'?'accepted':'revision requested'} ${fdate(d.at)}`));
- const d=t.decisions[t.decisions.length-1];if(d&&d.reason)h+=L('dim','“',esc(d.reason.slice(0,140)));
+function tipReview(t){let h=`<h4>human review · ${esc(t.rsum.human)}</h4><ul>`;const decisions=t.decisions||[t.latest_decision].filter(Boolean);
+ decisions.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',`${d.kind==='accept'?'accepted':'revision requested'} ${fdate(d.at)}`));
+ const d=decisions[decisions.length-1];if(d&&d.reason)h+=L('dim','“',esc(d.reason.slice(0,140)));
  if(t.review_history_stale)h+=L('pend','↻','review history is refreshing — rounds may be incomplete');
  if(t.entered_pool_at&&!t.decisions.length)h+=t.status_raw==='draft'?L('info','↩','previously submitted '+fdate(t.entered_pool_at)+', back in draft'):L('info','⌛','submitted '+fdate(t.entered_pool_at)+', no decision yet');
  if(!t.entered_pool_at)h+=L('dim','·','not submitted yet');
  const g=gate(t);h+=L(g.author.review.state==='ok'&&g.independent.review.state==='ok'?'ok':'pend','🤖',`required agent approvals: building session ${g.author.review.state==='ok'?'✓':'—'} · independent agent ${g.independent.review.state==='ok'?'✓':'—'}`);return h+'</ul>'}
 function tipCheck(t){const g=gate(t);let h='<h4>presubmit · building session + independent agent</h4><ul>';
- [['author','1️⃣ building session','board check run '+t.task+' --role author'],['independent','2️⃣ independent agent','fresh agent: board check record '+t.task+' --role independent …']].forEach(([r,l,how])=>{const c=g[r].check;
+ [['author','① building session','board check run '+t.task+' --role author'],['independent','② independent agent','fresh agent: board check record '+t.task+' --role independent …']].forEach(([r,l,how])=>{const c=g[r].check;
   if(c.state==='none'){h+=L('dim','·',`${l}: not run <span class="dim">→ ${esc(how)}</span>`);return}
   h+=L(c.state==='ok'?'ok':c.state==='bad'?'bad':'dim',c.fail?'✘':'●',`${l}: ${c.fail?c.fail+' failure(s)':'clean'}${c.warn?', '+c.warn+' warning(s)':''} · ${fdate(c.at)}${c.state==='old'?' · <b>older commit — re-run</b>':''}`);
   if(c.summary)h+=L('info','💡','suggested: '+esc(c.summary))});return h+'</ul>'}
-function tipSync(t){const s=t.sync;let h='<h4>server · 1st tick imported · 2nd tick validated</h4><ul>';
- if((t.findings||[]).some(f=>f.code==='VALID≠SERVER'))h+=L('pend','↻','validation results are for an older server commit (grey 2nd tick)');
+function tipSync(t){const s=t.sync,codes=t.finding_codes||(t.findings||[]).map(f=>f.code);let h='<h4>server · 1st tick imported · 2nd tick validated</h4><ul>';
+ if(codes.includes('VALID≠SERVER'))h+=L('pend','↻','validation results are for an older server commit (grey 2nd tick)');
  if(t.valid==='FAIL'){const i=t.vsum.issues.filter(x=>x.severity==='fail');h+=L('bad','✘','validation failed'+(i.length?': '+esc(i.map(x=>x.check).join(', ')):''))}
  if(t.status_raw==='needs_revision')h+=L('bad','✘','reviewer asked for a revision');if(t.valid==='RUN')h+=L('dim','⏳','validating now');
  if(s==='OK'||s==='OK·doc')h+=L('ok','●','server has your latest commit')+L(t.validated?'ok':'pend',t.validated?'●':'○',t.validated?'and validated it':'validation running');
  else if(s==='IMPORTING')h+=L('info','⏳','your push is being imported (a few minutes)');
  else if(s==='STALE_VALID')h+=L('pend','▲','validated an older commit; code changed since')+L('info','→','codimango task rerun');
- else if(s==='HEAD≠SERVER')h+=L('pend','▲',(t.findings.find(f=>f.code==='HEAD≠SERVER')||{}).summary||'latest push not on server')+L('info','→','rerun if it does not catch up');
+ else if(s==='HEAD≠SERVER')h+=L('pend','▲',t.sync_summary||((t.findings||[]).find(f=>f.code==='HEAD≠SERVER')||{}).summary||'latest push not on server')+L('info','→','rerun if it does not catch up');
  else h+=L('dim','·','not compared');return h+'</ul>'}
 const TAGK={who:'#b39dff',type:'#7ab8ff',stage:'#7bd88f',warn:'#ff875f',info:'#8b90a0'};
 function tagsCell(t){return (t.tags||[]).map(x=>`<span class="pill" style="border-color:${TAGK[x.k]};color:${TAGK[x.k]}">${esc(x.label)}</span>`).join('')}
-function tipTags(t){return `<h4>tags</h4><ul>${(t.tags||[]).map(x=>L('info','◆',`<b>${esc(x.label)}</b> — ${esc(x.why)}`)).join('')||L('dim','·','none')}</ul>`}
+function tipTags(t){return `<h4>tags</h4><ul>${(t.tags||[]).map(x=>L('info','◆',`<b>${esc(x.label)}</b>${x.why?' — '+esc(x.why):''}`)).join('')||L('dim','·','none')}</ul>`}
 const TIPS={tags:tipTags,task:tipTask,next:tipNext,tag:t=>tipTag(t)+tipReview(t),owner:tipOwner,valid:tipValid,review:tipReview,check:tipCheck,sync:tipSync};
 function changed(t){const p=S.prev[t.task];return p&&(p.tag!==t.tag||p.valid!==t.valid||p.next!==t.next||p.review!==t.review||p.owner!==t.owner)}
 function visible(){return D.tasks.filter(t=>S.groups.has(dg(t))&&(!S.tags.size||S.tags.has(t.tag))&&(!S.kind||t.kind===S.kind)&&
@@ -253,25 +263,26 @@ function renderBoard(){const counts={};D.tasks.forEach(t=>{if(!S.kind||t.kind===
  setHTML('owner',['all','free','active','claimed','pipeline','recent'].map(o=>`<button class="${S.owner===o?'on':''}" data-o="${o}">${{all:'👥 all',free:'🔓 free',active:'✍ working',claimed:'💤 assigned idle',pipeline:'⏳ pipeline',recent:'🛠 pushed recently'}[o]}</button>`).join(''));
  setHTML('bar',Object.entries(G).map(([g,[c]])=>`<span style="flex:${counts[g]||0};background:${c}"></span>`).join(''));
  let rows=visible();const order=Object.keys(G);
- const val=t=>{const k=S.sort;return k==='tag'?(TAGO.indexOf(t.tag)<0?99:TAGO.indexOf(t.tag))*1e9+(t.group==='ATTENTION'?0:5e8)-Math.min(t.state_age_s||0,4e8)
+ const val=t=>{const k=S.sort;return k==='tag'?(TAGO.indexOf(t.tag)<0?99:TAGO.indexOf(t.tag))*1e9+(t.group==='ATTENTION'?0:5e8)-Math.min(taskAge(t)||0,4e8)
   :k==='review'?t.rsum.agent.length:k==='valid'?t.vsum.issues.length:String(t[k]??'')};
  rows=[...rows].sort((a,b)=>order.indexOf(dg(a))-order.indexOf(dg(b))||(S.sort?((val(a)>val(b)?1:val(a)<val(b)?-1:0)*S.dir):0)||a.task.localeCompare(b.task));
- const items=[];let last=null;rows.forEach(t=>{const g=dg(t);if(g!==last){last=g;const[c,e,l]=G[g];items.push(['§'+g,`<tr class="group"><td colspan="8" style="border-left:4px solid ${c}" title="${esc(GHELP[g])}">${e} ${l} · ${rows.filter(r=>dg(r)===g).length}</td></tr>`])}
+ const items=[];let last=null;rows.forEach(t=>{const g=dg(t);if(g!==last){last=g;const[c,e,l]=G[g];items.push(['§'+g,`<tr class="group" data-group="${g}"><td colspan="8" style="border-left:4px solid ${c}" title="${esc(GHELP[g])}">${e} ${l} · ${rows.filter(r=>dg(r)===g).length}</td></tr>`])}
   items.push([t.task,rowHtml(t)])});
  const keys=items.map(x=>x[0]).join('|');const tb=document.getElementById('rows');
- if(keys!==S.keys||!items.length){              // different rows or order: rebuild (animate only on first paint)
-  tb.classList.toggle('anim',S.first);if(S.first)setTimeout(()=>tb.classList.remove('anim'),1500);tb.innerHTML=items.map(x=>x[1]).join('')||'<tr><td colspan="8" class="empty">🌈 nothing matches — try another filter</td></tr>';
-  S.keys=keys;S.rowh=Object.fromEntries(items);S.sig=Object.fromEntries(rows.map(t=>[t.task,rowSig(t)]))}
- else items.forEach(([k,h])=>{if(S.rowh[k]!==h){S.rowh[k]=h;const old=[...tb.children].find(r=>(r.dataset.t||'')===k||(k[0]==='§'&&r.classList.contains('group')&&r.textContent.includes(G[k.slice(1)][2])));
-  if(old){const tmp=document.createElement('tbody');tmp.innerHTML=h;const n=tmp.firstElementChild;if(n.classList.contains('row')){const t=rows.find(r=>r.task===k),sg=rowSig(t);if(S.sig[k]!==sg)n.classList.add('flash');S.sig[k]=sg}old.replaceWith(n)}}});
- S.first=false;
+ if(S.first||!items.length){                    // first paint / empty state is the only bulk replacement
+  tb.classList.toggle('anim',S.first);if(S.first)setTimeout(()=>tb.classList.remove('anim'),1500);tb.innerHTML=items.map(x=>x[1]).join('')||'<tr><td colspan="8" class="empty">🌈 nothing matches — try another filter</td></tr>'}
+ else{                                         // keyed reconcile: moves keep the original DOM node identity
+  const keyOf=r=>r.dataset.t||(r.dataset.group?'§'+r.dataset.group:'');
+  const existing=new Map([...tb.children].map(r=>[keyOf(r),r]).filter(x=>x[0]));[...tb.children].filter(r=>!keyOf(r)).forEach(r=>r.remove());
+  items.forEach(([k,h])=>{let n=existing.get(k);if(!n||S.rowh[k]!==h){const tmp=document.createElement('tbody');tmp.innerHTML=h;const fresh=tmp.firstElementChild;if(fresh.classList.contains('row')){const t=rows.find(r=>r.task===k),sg=rowSig(t);if(n&&S.sig[k]!==sg)fresh.classList.add('flash')}if(n)n.remove();n=fresh}tb.appendChild(n);existing.delete(k)});existing.forEach(r=>r.remove())}
+ S.keys=keys;S.rowh=Object.fromEntries(items);S.sig=Object.fromEntries(rows.map(t=>[t.task,rowSig(t)]));
+ S.first=false;tickClocks();
  document.querySelectorAll('th[data-k]').forEach(th=>{const want=th.textContent.replace(/ [▲▼]$/,'')+(S.sort===th.dataset.k?(S.dir>0?' ▲':' ▼'):'');if(th.textContent!==want)th.textContent=want});
- const h=D.health;setHTML('health',Object.entries(h).map(([k,v])=>`<span class="${v.ok?'ok':'bad'}">${v.ok?'✔':'✘'} ${k}</span>`).join(' · ')+(D.ledger_ok===null?'':` · <span class="${D.ledger_ok?'ok':'bad'}">${D.ledger_ok?'✔':'✘'} ledger${D.ledger_at?' '+age((Date.now()-Date.parse(D.ledger_at))/1000)+' ago':''}</span>`)+(D.refresh_error?` · <span class="bad">refresh failing: ${esc(D.refresh_error)}</span>`:''));
- const stale=D.codimango_at&&(Date.now()-new Date(D.codimango_at))/1000>600;
- document.getElementById('dot').className='dot'+(Object.values(h).every(v=>v.ok)&&!D.refresh_error&&!stale&&D.ledger_ok!==false?'':' bad')}
+}
+function renderSummary(){const W=D.week||{};setHTML('week',`📈 W${W.week??'—'}: <b>${W.this_week??'—'}</b> accepted · last week at this point ${W.same_point_last_week??'—'} · 4-week median ${W.median_4wk??'—'}`);const h=D.health||{};setHTML('health',Object.entries(h).map(([k,v])=>`<span class="${v.ok?'ok':'bad'}">${v.ok?'✔':'✘'} ${k}</span>`).join(' · ')+(D.ledger_ok==null?'':` · <span class="${D.ledger_ok?'ok':'bad'}">${D.ledger_ok?'✔':'✘'} ledger${D.ledger_at?' '+age(elapsed(D.ledger_at))+' ago':''}</span>`)+(D.refresh_error?` · <span class="bad">refresh failing: ${esc(D.refresh_error)}</span>`:''));const stale=D.codimango_at&&elapsed(D.codimango_at)>600;document.getElementById('dot').className='dot'+(Object.values(h).every(v=>v.ok)&&!D.refresh_error&&!stale&&D.ledger_ok!==false?'':' bad');renderWhen()}
 function countUp(el){const end=parseFloat(el.dataset.n);if(isNaN(end))return;let s=null;const step=ts=>{s=s||ts;const p=Math.min(1,(ts-s)/700);el.textContent=(end%1?(end*p).toFixed(1):Math.round(end*p));if(p<1)requestAnimationFrame(step)};requestAnimationFrame(step)}
-function renderStats(){const w=D.week,f=D.funnel,fl=D.flow,hr=x=>x==null?'—':x>=48?(x/24).toFixed(1)+'d':Math.round(x)+'h';
- const top=Math.max(1,...D.weekly.map(r=>r.accepted));const ftop=Math.max(1,f.built,f.imported);const delta=w.this_week-w.same_point_last_week;
+function renderStats(){const w=D.week||{},f=D.funnel||{},fl=D.flow||{},weekly=D.weekly||[],hr=x=>x==null?'—':x>=48?(x/24).toFixed(1)+'d':Math.round(x)+'h';
+ const top=Math.max(1,...weekly.map(r=>r.accepted));const ftop=Math.max(1,f.built||0,f.imported||0);const delta=(w.this_week||0)-(w.same_point_last_week||0);
  document.getElementById('stats').innerHTML=`<div class="cards">
  <div class="card"><div class="lbl">🏁 accepted this week</div><div class="big ok" data-n="${w.this_week}">${w.this_week}</div><div class="${delta>=0?'ok':'bad'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)} vs last week at this point</div></div>
  <div class="card"><div class="lbl">📅 4-week median</div><div class="big" data-n="${w.median_4wk}">${w.median_4wk}</div></div>
@@ -279,30 +290,35 @@ function renderStats(){const w=D.week,f=D.funnel,fl=D.flow,hr=x=>x==null?'—':x
  <div class="card"><div class="lbl">👀 waiting on reviewer</div><div class="big">${hr(fl.wait_p50_h)}</div><div class="dim">p75 ${hr(fl.wait_p75_h)}</div></div>
  <div class="card"><div class="lbl">🏆 all-time accepted</div><div class="big" data-n="${w.total}">${w.total}</div></div></div>
  <div class="panel"><h3>📈 accepted per week <span class="dim">(<span class="ok">■</span> multi-turn <span style="color:var(--teal)">■</span> single-turn)</span></h3>
- ${D.weekly.map(r=>`<div class="hbar"><span class="l">${r.week}</span><span class="b" style="width:${r.accepted_mt/top*60}%;background:var(--green)"></span><span class="b" style="width:${r.accepted_st/top*60}%;background:var(--teal);margin-left:-10px"></span><b>${r.accepted}</b><span class="dim">↗ ${r.submitted} submitted · ✎ ${r.worked_on} new</span></div>`).join('')}</div>
+ ${weekly.map(r=>`<div class="hbar"><span class="l">${r.week}</span><span class="b" style="width:${r.accepted_mt/top*60}%;background:var(--green)"></span><span class="b" style="width:${r.accepted_st/top*60}%;background:var(--teal);margin-left:-10px"></span><b>${r.accepted}</b><span class="dim">↗ ${r.submitted} submitted · ✎ ${r.worked_on} new</span></div>`).join('')}</div>
  <div class="panel"><h3>🧭 funnel</h3>${[['🧱 built',f.built],['📥 imported',f.imported],['📤 submitted',f.submitted],['✅ accepted',f.accepted]].map(([l,v],i,a)=>`<div class="hbar"><span class="l">${l}</span><span class="b" style="width:${v/ftop*70}%;background:var(--violet)"></span><b>${v}</b>${i?`<span class="dim">${Math.round(100*v/(a[i-1][1]||1))}% of previous</span>`:''}</div>`).join('')}
  <div class="dim">📦 archived ${f.archived} · 🔧 open ${f.open}</div></div>`;document.querySelectorAll('#stats [data-n]').forEach(countUp)}
-function openDrawer(name,refresh){const t=D.tasks.find(x=>x.task===name);if(!t)return;const Lk=t.links||{};S.open=name;
+function exposeDrawer(refresh){const d=document.getElementById('drawer');if(refresh)return;d.classList.remove('noanim');d.classList.remove('open');d.classList.toggle('wide',!!localStorage.getItem('wb-wide'));void d.offsetWidth;d.classList.add('open')}
+function drawTaskDrawer(t,refresh){const Lk=t.links||{},v=t.vsum||{issues:[],passed:0,total:0};
  const btn=(k,l,p)=>Lk[k]?`<a class="btn ${p?'primary':''}" href="${esc(Lk[k])}" target="_blank" rel="noopener">${l} ↗</a>`:'';
- const v=t.vsum;
  const html=`<div class="head"><p class="card-title">${Lk.codimango?`<a href="${esc(Lk.codimango)}" target="_blank" rel="noopener" title="open in codimango">${esc(t.task)} ↗</a>`:esc(t.task)}</p><div class="kind">${esc(kindLine(t))}</div>
  <div>${tag(t)} &nbsp; ${next(t)}</div>
  <div class="btns">${btn('codimango','🥭 Open in codimango',1)}${btn('github','🐙 Files at server commit')}${btn('latest','📂 Latest on main')}
  <button class="btn" data-msgtask="${esc(t.task)}">💬 Message the owner</button></div></div>
  <div class="sec next-sec"><h3>🚀 NEXT STEPS</h3>${t.steps.map((s,i)=>`<div class="step ${s.routine?'routine':''}"><span class="n">${i+1}</span><span>${code(s.do)}</span><span class="eta">${esc(s.eta)}</span></div>`).join('')||'<div class="dim">nothing to do 🎉</div>'}
   <div class="who">👤 ${esc(t.assignee)}</div></div>
- ${v.issues.length?`<div class="sec"><h3>⚠️ PROBLEMS · ${v.passed}/${v.total} checks clear</h3><ul class="lst">${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)} <span class="dim">→ ${esc(i.fix)}</span>`)).join('')}</ul></div>`:''}
+ ${v.issues.length?`<div class="sec"><h3>⚠ PROBLEMS · ${v.passed}/${v.total} checks clear</h3><ul class="lst">${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)} <span class="dim">→ ${esc(i.fix)}</span>`)).join('')}</ul></div>`:''}
  <div class="sec"><h3>👥 REVIEW</h3><ul class="lst">${t.rsum.bullets.map(([k,x])=>L(k,CH[k],esc(x))).join('')}</ul>
   ${t.decisions.length&&t.decisions[t.decisions.length-1].reason?`<div class="dim" style="margin-top:6px">last review: “${esc(t.decisions[t.decisions.length-1].reason)}”</div>`:''}</div>
- ${t.versions.length?`<div class="sec"><h3>🗂 ROUNDS · ${esc(t.vp||'')}</h3><ul class="lst">${t.versions.map((x,i)=>L(x.ended==='accept'?'ok':x.ended?'bad':'pend',x.ended==='accept'?'✔':x.ended?'↩':'✍️',
+ ${t.versions.length?`<div class="sec"><h3>🗂 ROUNDS · ${esc(t.vp||'')}</h3><ul class="lst">${t.versions.map((x,i)=>L(x.ended==='accept'?'ok':x.ended?'bad':'pend',x.ended==='accept'?'✔':x.ended?'↩':'✍',
   `<b>${x.label==='now'?'current round':x.label}</b> · ${x.commits} commit${x.commits===1?'':'s'}${x.ended?` · ${x.ended==='accept'?'accepted':'revision requested'} <b>${fdate(x.at)}</b>`:' so far'}${x.reason?`<div class="dim">“${esc(x.reason.slice(0,200))}”</div>`:''}`)).join('')}</ul></div>`:''}
  <div class="sec"><h3>🧪 PRESUBMIT</h3><ul class="lst">${tipCheck(t).replace(/^<h4>.*?<\/h4><ul>|<\/ul>$/g,'')}</ul></div>
  <div class="sec"><h3>🔗 WHO & SERVER</h3><ul class="lst">${tipOwner(t).replace(/^<h4>.*?<\/h4><ul>|<\/ul>$/g,'')}${tipSync(t).replace(/^<h4>.*?<\/h4><ul>|<\/ul>$/g,'')}</ul></div>
  <div class="dim" style="margin-top:10px">terminal: <code>board show ${esc(t.task)}</code></div>`;
- if(refresh&&S.drawerHtml===html)return;S.drawerHtml=html;document.getElementById('dbody').innerHTML=html;
- const d=document.getElementById('drawer');if(refresh)return;d.classList.remove('noanim');d.classList.remove('open');d.classList.toggle('wide',!!localStorage.getItem('wb-wide'));void d.offsetWidth;d.classList.add('open')}
+ if(refresh&&S.drawerHtml===html)return;S.drawerHtml=html;document.getElementById('dbody').innerHTML=html;exposeDrawer(refresh)}
+async function fetchTask(name){const headers={},old=S.detailEtags[name];if(old)headers['If-None-Match']=old;
+ try{const r=await fetch('/api/task/'+encodeURIComponent(name),{cache:'no-store',headers});if(r.status===304)return S.details[name];if(!r.ok)throw Error('HTTP '+r.status);const detail=await r.json();S.details[name]=detail;S.detailEtags[name]=r.headers.get('ETag')||detail.detail_version||'';return detail}catch(e){throw e}}
+async function openDrawer(name,refresh=false,force=false){const row=D.tasks.find(x=>x.task===name);if(!row)return;S.open=name;
+ if(!refresh){S.drawerHtml='';document.getElementById('dbody').innerHTML='<div class="empty">loading task details…</div>';exposeDrawer(false)}
+ let detail=S.details[name],changed=detail&&S.detailRowVersions[name]!==row.row_version;if(LIVE&&(!detail||force||changed)){try{detail=await fetchTask(name)}catch(e){document.getElementById('dbody').innerHTML=`<div class="empty bad">could not load task details · ${esc(e.message||e)}</div>`;return}}
+ const t=detail?{...row,...detail}:row;S.detailRowVersions[name]=row.row_version;S.drawerRowVersion=row.row_version||null;drawTaskDrawer(t,refresh)}
 function refreshDrawer(){const d=document.getElementById('drawer');if(!S.open||!d.classList.contains('open'))return;
- const top=d.scrollTop;d.classList.add('noanim');S.open.startsWith('session:')?openSession(S.open.slice(8),true):openDrawer(S.open,true);d.scrollTop=top}
+ const top=d.scrollTop;d.classList.add('noanim');if(S.open.startsWith('session:'))openSession(S.open.slice(8),true);else{const row=D.tasks.find(x=>x.task===S.open),detail=S.details[S.open];if(row&&(detail||!LIVE))drawTaskDrawer(detail?{...row,...detail}:row,true)}d.scrollTop=top}
 const HC={};const hostColor=h=>HC[h]||(HC[h]=['#f78fb3','#7ab8ff','#7bd88f','#f5c26b','#b39dff'][Object.keys(HC).length%5]);
 function allSessions(){return (D.servers||[]).flatMap(s=>(s.sessions||[]).map(x=>({...x,host:x.host||s.id})))}
 function sessionKey(x){return x.session_key||x.native_id}
@@ -310,15 +326,15 @@ function sessionByKey(key){return allSessions().find(x=>sessionKey(x)===key||x.n
 function hookTransport(x){if(x.is_actor)return'<span class="dim">human shell</span>';if(x.is_summary)return'<span class="dim">no parent</span>';const r=x.restart||{},tr=x.transport||{};
  const h=r.state==='loaded'?'<span class="ok">hooks loaded</span>':r.state==='probably-missing'?'<span class="bad">hooks probably missing</span>':r.state==='not-applicable'?'<span class="dim">hooks n/a</span>':'<span class="dim">hooks unknown</span>';
  return h+' · '+(tr.available?'<span class="ok">'+esc(tr.kind||'transport ready')+'</span>':'<span class="dim">'+esc(tr.kind||'unavailable')+'</span>')}
-function statusText(x){const raw=x.status_group==='waiting'?'waiting for permission':x.status||'unknown',dur=x.status_ago_s==null?(x.ago_s==null?null:x.ago_s):x.status_ago_s;return esc(raw)+(dur==null?'':' · '+age(dur))}
+function statusText(x,stable=false){const raw=x.status_group==='waiting'?'waiting for permission':x.status||'unknown',fallback=x.status_ago_s==null?x.ago_s:x.status_ago_s,dur=elapsed(x.status_since,fallback);return esc(raw)+(dur==null?'':` · <span class="clock" data-at="${esc(x.status_since||'')}" data-fallback="${x.status_since?'':fallback??''}">${stable?'—':age(dur)}</span>`)}
 function childRuns(x){const kids=(x.child_runs||[]).map(r=>`<li>${esc(r.kind_icon||'')} <b>${esc(r.name||r.native_id)}</b> · ${esc(r.status||'unknown')}${r.cwd_task?' · '+esc(r.cwd_task):''} <span class="dim">${r.parent_confidence?'· '+esc(r.parent_confidence)+' parent link':''}</span></li>`).join('');
  const old=x.older_child_run_count||x.older_run_count||0;return kids+(old?`<li class="dim">${old} older run(s) counted, not shown</li>`:'')}
 function openSession(key,refresh){const x=sessionByKey(key);if(!x)return;S.open='session:'+sessionKey(x);const tr=x.transport||{},r=x.restart||{},f=x.focus||{},tok=x.tokens||{},adv=x.advice||{};
  const resume=r.needed&&r.command?`<div class="sec"><h3>↻ RESUME TO LOAD HOOKS</h3><div class="bad">${esc(r.reason)}</div><code>${esc(r.command)}</code></div>`:'';
  const children=childRuns(x),canMessage=!x.is_summary&&!x.is_actor;
  const compose=canMessage?`<div class="sec"><h3>💬 MESSAGE THIS SESSION</h3><div class="compose"><select id="dmtask">${taskOptions(sessionKey(x),'')}</select><textarea id="dmtext" placeholder="message this session"></textarea><button class="btn primary" data-dsend="${esc(sessionKey(x))}">Send 🚀</button><span id="dmstatus"></span></div></div>`:'';
- const html=`<div class="head"><p class="card-title">${esc(x.kind_icon||'')} ${esc(x.name||x.alias)}</p><div class="kind">${esc(x.kind||'unknown')} · ${esc(x.host||'unknown host')} · ${esc(sessionKey(x))}</div><div>${statusText(x)}</div></div>
- <div class="sec"><h3>◎ STATUS & FOCUS</h3><div class="session-detail"><div class="line"><b>status</b> ${statusText(x)} · <b>session age</b> ${age(x.age_s)}</div><div class="line"><b>focus</b> ${esc((x.tasks||[]).join(', ')||'none detected')} · ${esc(f.confidence||'unknown')} confidence${(f.evidence||[]).length?' · '+esc(f.evidence.join(', ')):''}</div><div class="line"><b>liveness</b> ${esc(x.classification||'unknown')} · ${esc(x.liveness_reason||'no native evidence')}</div></div></div>
+ const html=`<div class="head"><p class="card-title">${esc(kindCue(x))} ${esc(x.name||x.alias)}</p><div class="kind">${esc(x.kind||'unknown')} · ${esc(x.host||'unknown host')} · ${esc(sessionKey(x))}</div><div>${statusText(x)}</div></div>
+ <div class="sec"><h3>◎ STATUS & FOCUS</h3><div class="session-detail"><div class="line"><b>status</b> ${statusText(x)} · <b>session age</b> <span class="clock" data-at="${esc(x.started_at||'')}" data-fallback="${x.age_s??''}">${age(elapsed(x.started_at,x.age_s))}</span></div><div class="line"><b>focus</b> ${esc((x.tasks||[]).join(', ')||'none detected')} · ${esc(f.confidence||'unknown')} confidence${(f.evidence||[]).length?' · '+esc(f.evidence.join(', ')):''}</div><div class="line"><b>liveness</b> ${esc(x.classification||'unknown')} · ${esc(x.liveness_reason||'no native evidence')}</div></div></div>
  <div class="sec"><h3>⌁ HOOKS, TRANSPORT & TOKENS</h3><div class="session-detail"><div class="line">${hookTransport(x)} · ${esc(tr.reason||'')}</div><div class="line"><b>tokens</b> ${tok.total==null?'—':tok.total+' total · '+tok.last_hour+' last hour'} · <b>context size</b> —</div><div class="line"><b>advice</b> ${esc(adv.state||'unavailable')} · ${esc(adv.reason||'')}</div></div></div>
  <div class="sec"><h3>↕ BOARD ACTIVITY</h3><div class="session-detail"><div class="line"><b>last report</b> ${x.last_report?esc(x.last_report.kind)+(x.last_report.task?' · '+esc(x.last_report.task):'')+' · '+fdate(x.last_report.at):'none'}</div><div class="line"><b>last request</b> ${x.last_request?fdate(x.last_request.at)+(x.last_request.task?' · '+esc(x.last_request.task):''):'none'}</div>${children?`<div class="line"><b>child runs</b><ul class="lst">${children}</ul></div>`:''}</div></div>${resume}${compose}`;
  if(refresh&&S.drawerHtml===html)return;S.drawerHtml=html;document.getElementById('dbody').innerHTML=html;const d=document.getElementById('drawer');if(refresh)return;d.classList.remove('noanim');d.classList.remove('open');d.classList.toggle('wide',!!localStorage.getItem('wb-wide'));void d.offsetWidth;d.classList.add('open')}
@@ -326,31 +342,20 @@ function deliveryLabel(m){const d=(m.delivery||{}).state||'published',n=((m.deli
 function taskOptions(to,selected){let tasks=[];if(to.startsWith('task:'))tasks=[to.slice(5)];else{const s=(D.session_targets||[]).find(x=>x.session_key===to||x.native_id===to);tasks=(s&&s.tasks)||[]}
  return `<option value="">no task</option>${tasks.length>1?'<option value="__all__">all this session’s tasks</option>':''}${tasks.map(t=>`<option ${t===selected?'selected':''} value="${esc(t)}">${esc(t)}</option>`).join('')}`}
 function updateComposeTasks(selected){const to=document.getElementById('mto'),task=document.getElementById('mtask');if(to&&task)task.innerHTML=taskOptions(to.value,selected||'')}
-function renderTeam(){let me=localStorage.getItem('wb-to')||'all';
- const srv=(D.servers||[]).map(s=>{const c=s.status_counts||{};return`<div class="srv"><h3><span class="badge" style="background:${hostColor(s.id)}">${esc(s.id)}</span> server
-  <span class="dim">· heartbeat ${s.last_sync_ago_s==null?'never':age(s.last_sync_ago_s)+' ago'}</span>
-  <span class="${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'ok':'bad'}">${s.last_sync_ago_s==null?'● never synced':s.last_sync_ago_s<600?'● sync fresh':'● sync stale'}</span></h3>
+function serverCards(){return (D.servers||[]).map(s=>{const c=s.status_counts||{},sa=elapsed(s.last_sync_at,s.last_sync_ago_s),aa=elapsed(s.last_activity_at,s.last_activity_ago_s),fresh=sa!=null&&sa<600;return`<div class="srv"><h3><span class="badge" style="background:${hostColor(s.id)}">${esc(s.id)}</span> server
+  <span class="dim">· heartbeat ${sa==null?'never':`<span class="clock" data-at="${esc(s.last_sync_at||'')}" data-fallback="${sa}">${age(sa)}</span> ago`}</span>
+  <span class="${fresh?'ok':'bad'}">${sa==null?'● never synced':fresh?'● sync fresh':'● sync stale'}</span></h3>
   <div>${s.session_count||0} session(s) · <span class="ok">${c.busy||0} busy</span> · <span class="run">${c.waiting||0} waiting</span> · ${c.idle||0} idle · ${c.unknown||0} unknown</div>
-  <div class="dim">queue ${s.queue||0} · ${s.owned.length} assigned task(s)${s.last_activity_ago_s!=null?' · ledger activity '+age(s.last_activity_ago_s)+' ago':''}${s.human_actor_count?' · '+s.human_actor_count+' human actor(s)':''}</div>
-  ${s.sync_error?`<div class="bad">last sync failed: ${esc(s.sync_error)}</div>`:''}${s.last_sync_ago_s==null?'<div class="bad">no heartbeat yet — run board setup there</div>':''}</div>`}).join('');
- const msgs=(D.messages||[]).slice(-30).reverse().map(m=>`<div class="msg ${m.from.includes('dashboard')?'me':''}"><div class="meta">${esc(m.from)} → <b>${esc(m.to_label)}</b>${m.task?' · '+esc(m.task):''} · ${fdate(m.at)} · ${deliveryLabel(m)}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';
- const base=[{v:'all',l:'📣 everyone'},...(D.servers||[]).map(s=>({v:s.id,l:'🖥 server '+s.id}))];
- const ses=(D.session_targets||[]).map(s=>({v:s.session_key,l:(s.kind_icon||'')+' '+s.name+' · '+s.host}));
- const tasks=Object.entries(D.task_targets||{}).map(([t,r])=>({v:'task:'+t,l:'◆ '+t+' → '+(r.state==='resolved'?(r.label+' · '+(r.host||'?')):'nobody'),disabled:r.state!=='resolved'}));
- const allopts=[...base,...ses,...tasks];if(!allopts.some(x=>x.v===me&&!x.disabled))me='all';
- const opts=allopts.map(o=>`<option ${o.v===me?'selected':''} ${o.disabled?'disabled':''} value="${esc(o.v)}">${esc(o.l)}</option>`).join('');
- const feed=(D.feed||[]).map((f,i)=>`<div class="fi" style="animation-delay:${Math.min(i*8,300)}ms"><span class="t">${new Date(f.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
-  <span><span class="badge" style="background:${hostColor(f.host)}">${esc(f.host)}</span></span><span>${esc(f.what)} ${f.task?'<b>'+esc(f.task)+'</b>':''}<div class="w">${esc(f.who)}</div></span></div>`).join('')||'<div class="dim">quiet</div>';
- const order=['waiting','busy','idle','unknown'],labels={waiting:'waiting for permission',busy:'busy',idle:'idle',unknown:'unknown'};const rows=[];order.forEach(g=>{const xs=allSessions().filter(x=>(x.status_group||'unknown')===g).sort((a,b)=>String(a.name||a.alias).localeCompare(String(b.name||b.alias)));if(!xs.length)return;rows.push(`<tr class="sgroup"><td colspan="7">${esc(labels[g])} · ${xs.length}</td></tr>`);xs.forEach(x=>{const adv=x.advice||{};rows.push(`<tr class="srow" data-session="${esc(sessionKey(x))}"><td>${esc(x.kind_icon||'❔')}</td><td><b>${esc(x.name||x.alias)}</b><div class="dim">${esc(x.host||'')}</div></td><td>${statusText(x)}</td><td class="focus">${esc((x.tasks||[]).join(', ')||'—')}${x.child_runs&&x.child_runs.length?`<div class="dim">${x.child_runs.length} child run(s)${x.older_child_run_count?' · '+x.older_child_run_count+' older':''}</div>`:''}</td><td>—</td><td>${hookTransport(x)}</td><td class="advice">${esc(adv.state||'—')} · ${esc(adv.reason||x.liveness_reason||'')}</td></tr>`)});});
- const diags=(D.servers||[]).flatMap(s=>(s.session_diagnostics||[]).map(d=>`${s.id}: ${d.classification} · ${d.reason}`));
- document.getElementById('team').innerHTML=`<div class="server-grid">${srv}</div><div class="team"><div><div class="panel"><h3>sessions & actors</h3><div class="session-table"><table><thead><tr><th>kind</th><th>name</th><th>status · for</th><th>focus tasks</th><th>tokens</th><th>hooks / transport</th><th>advice</th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="7" class="empty">no live sessions discovered</td></tr>'}</tbody></table></div>${diags.length?`<details class="diag"><summary class="dim">${diags.length} excluded/error record(s)</summary><div class="dim">${diags.map(esc).join('<br>')}</div></details>`:''}</div>
-  <div class="panel"><h3>📋 session hygiene</h3><div class="dim">Hook state comes from hook-sourced ledger events in the last seven days. Only a busy/recent session with no evidence while hooks are installed gets a resume command; idle sessions remain unknown.</div></div></div>
-  <div class="team-side"><div class="panel"><h3>💬 send a message</h3>
-  <div class="dim" style="margin-bottom:6px">State is honest: queued locally → published in the private ledger → delivered by the courier or hook → explicitly acked. Start one normal Claude session with <code>board courier</code>; it waits without model tokens. Task targets are pinned to the displayed owner when sent.</div>
-  <div class="compose"><select id="mto">${opts}</select><select id="mtask">${taskOptions(me,'')}</select>
-  <textarea id="mtext" placeholder="e.g. please finish the current check, then acknowledge this message"></textarea>
-  <button class="btn primary" id="msend">Send 🚀</button><span id="mstatus"></span></div></div>
-  <div class="panel feed"><h3>🕒 activity across servers (24h)</h3>${feed}</div><div class="panel"><h3>📨 messages</h3>${msgs}</div></div></div>`}
+  <div class="dim">queue ${s.queue||0} · ${(s.owned||[]).length} assigned task(s)${aa!=null?` · ledger activity <span class="clock" data-at="${esc(s.last_activity_at||'')}" data-fallback="${aa}">${age(aa)}</span> ago`:''}${s.human_actor_count?' · '+s.human_actor_count+' human actor(s)':''}</div>
+  ${s.sync_error?`<div class="bad">last sync failed: ${esc(s.sync_error)}</div>`:''}${sa==null?`<div class="bad">${esc(s.id)} has never synced — run <code>board status</code> there</div>`:!fresh?`<div class="bad">${esc(s.id)} has not synced for <span class="clock" data-at="${esc(s.last_sync_at||'')}" data-fallback="${sa}">${age(sa)}</span> — run <code>board status</code> there</div>`:''}</div>`}).join('')}
+function sessionRow(x){const adv=x.advice||{};return `<tr class="srow" data-session="${esc(sessionKey(x))}"><td>${esc(kindCue(x))}</td><td><b>${esc(x.name||x.alias)}</b><div class="dim">${esc(x.host||'')}</div></td><td>${statusText(x,true)}</td><td class="focus">${esc((x.tasks||[]).join(', ')||'—')}${x.child_runs&&x.child_runs.length?`<div class="dim">${x.child_runs.length} child run(s)${x.older_child_run_count?' · '+x.older_child_run_count+' older':''}</div>`:''}</td><td>—</td><td>${hookTransport(x)}</td><td class="advice">${esc(adv.state||'—')} · ${esc(adv.reason||x.liveness_reason||'')}</td></tr>`}
+function sessionItems(){const order=['waiting','busy','idle','unknown'],labels={waiting:'waiting for permission',busy:'busy',idle:'idle',unknown:'unknown'},items=[];order.forEach(g=>{const xs=allSessions().filter(x=>(x.status_group||'unknown')===g).sort((a,b)=>String(a.name||a.alias).localeCompare(String(b.name||b.alias)));if(!xs.length)return;items.push(['§'+g,`<tr class="sgroup" data-session-group="${g}"><td colspan="7">${esc(labels[g])} · ${xs.length}</td></tr>`]);xs.forEach(x=>items.push([sessionKey(x),sessionRow(x)]))});return items}
+function activityItem(f,i=0){return `<div class="fi" data-activity="${esc(f.id||f.at+'|'+f.who+'|'+f.task)}" style="animation-delay:${Math.min(i*8,300)}ms"><span class="t">${new Date(f.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span><span><span class="badge" style="background:${hostColor(f.host)}">${esc(f.host)}</span></span><span>${esc(f.what)} ${f.task?'<b>'+esc(f.task)+'</b>':''}<div class="w">${esc(f.who)}</div></span></div>`}
+function patchActivity(){const box=document.getElementById('activityitems');if(!box)return;const items=D.feed||[];if(!S.activityIds.size){box.innerHTML=items.map(activityItem).join('')||'<div class="dim">quiet</div>';items.forEach(f=>S.activityIds.add(f.id||f.at+'|'+f.who+'|'+f.task));return}const fresh=items.filter(f=>!S.activityIds.has(f.id||f.at+'|'+f.who+'|'+f.task));[...fresh].reverse().forEach(f=>{const id=f.id||f.at+'|'+f.who+'|'+f.task;box.insertAdjacentHTML('afterbegin',activityItem(f));S.activityIds.add(id)});while(box.children&&box.children.length>150)box.lastElementChild.remove()}
+function renderComposer(){let me=localStorage.getItem('wb-to')||'all';const base=[{v:'all',l:'📣 everyone'},...(D.servers||[]).map(s=>({v:s.id,l:'🖥 server '+s.id}))],ses=(D.session_targets||[]).map(s=>({v:s.session_key,l:kindCue(s)+' '+s.name+' · '+s.host})),tasks=Object.entries(D.task_targets||{}).map(([t,r])=>({v:'task:'+t,l:'◆ '+t+' → '+(r.state==='resolved'?(r.label+' · '+(r.host||'?')):'nobody'),disabled:r.state!=='resolved'})),allopts=[...base,...ses,...tasks];if(!allopts.some(x=>x.v===me&&!x.disabled))me='all';const opts=allopts.map(o=>`<option ${o.v===me?'selected':''} ${o.disabled?'disabled':''} value="${esc(o.v)}">${esc(o.l)}</option>`).join(''),host=document.getElementById('composer');if(!host)return;if(!document.getElementById('mto'))host.innerHTML=`<div class="compose"><select id="mto">${opts}</select><select id="mtask">${taskOptions(me,'')}</select><textarea id="mtext" placeholder="e.g. please finish the current check, then acknowledge this message"></textarea><button class="btn primary" id="msend">Send 🚀</button><span id="mstatus"></span></div>`;else{const to=document.getElementById('mto'),task=document.getElementById('mtask'),selected=to.value||me,chosen=task.value,text=document.getElementById('mtext').value;to.innerHTML=opts;to.value=allopts.some(x=>x.v===selected&&!x.disabled)?selected:me;updateComposeTasks(chosen);document.getElementById('mtext').value=text}}
+function renderTeam(){if(!S.teamReady){document.getElementById('team').innerHTML=`<div class="server-grid" id="servercards"></div><div class="team"><div><div class="panel"><h3>sessions & actors</h3><div class="session-table"><table><thead><tr><th>kind</th><th>name</th><th>status · for</th><th>focus tasks</th><th>tokens</th><th>hooks / transport</th><th>advice</th></tr></thead><tbody id="sessionrows"></tbody></table></div><div id="sessiondiags"></div></div><div class="panel"><h3>📋 session hygiene</h3><div class="dim">Hook state comes from hook-sourced ledger events in the last seven days. Only a busy/recent session with no evidence while hooks are installed gets a resume command; idle sessions remain unknown.</div></div></div><div class="team-side"><div class="panel"><h3>💬 send a message</h3><div class="dim" style="margin-bottom:6px">State is honest: queued locally → published in the private ledger → delivered by the courier or hook → explicitly acked. Start one normal Claude session with <code>board courier</code>; it waits without model tokens. Task targets are pinned to the displayed owner when sent.</div><div id="composer"></div></div><div class="panel feed"><h3>🕒 activity across servers (24h)</h3><div id="activityitems"></div></div><div class="panel"><h3>📨 messages</h3><div id="teammessages"></div></div></div></div>`;S.teamReady=true}
+ setHTML('servercards',serverCards());const items=sessionItems(),keys=items.map(x=>x[0]).join('|'),tb=document.getElementById('sessionrows'),keyOf=r=>r.dataset.session||('§'+(r.dataset.sessionGroup||''));if(!S.teamKeys){tb.innerHTML=items.map(x=>x[1]).join('')||'<tr><td colspan="7" class="empty">no live sessions discovered</td></tr>'}else{const existing=Object.fromEntries([...tb.children].map(r=>[keyOf(r),r])),wanted=[];items.forEach(([k,h])=>{let node=existing[k];if(!node||S.teamh[k]!==h){const tmp=document.createElement('tbody');tmp.innerHTML=h;const fresh=tmp.firstElementChild;if(node)node.replaceWith(fresh);node=fresh}S.teamh[k]=h;wanted.push(node)});[...tb.children].forEach(node=>{if(!items.some(([k])=>k===keyOf(node)))node.remove()});wanted.forEach(node=>tb.appendChild(node));if(!items.length)tb.innerHTML='<tr><td colspan="7" class="empty">no live sessions discovered</td></tr>'}S.teamKeys=keys;S.teamh=Object.fromEntries(items);
+ const diags=(D.servers||[]).flatMap(s=>(s.session_diagnostics||[]).map(d=>`${s.id}: ${d.classification} · ${d.reason}`));setHTML('sessiondiags',diags.length?`<details class="diag"><summary class="dim">${diags.length} excluded/error record(s)</summary><div class="dim">${diags.map(esc).join('<br>')}</div></details>`:'');renderComposer();const msgs=(D.messages||[]).slice(-30).reverse().map(m=>`<div class="msg ${m.from.includes('dashboard')?'me':''}"><div class="meta">${esc(m.from)} → <b>${esc(m.to_label)}</b>${m.task?' · '+esc(m.task):''} · ${fdate(m.at)} · ${deliveryLabel(m)}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';setHTML('teammessages',msgs);patchActivity();tickClocks()}
 async function sendMsg(){const to=document.getElementById('mto').value,text=document.getElementById('mtext').value,rawTask=document.getElementById('mtask').value,task=rawTask==='__all__'?'':rawTask;
  const st=document.getElementById('mstatus');if(!LIVE){st.innerHTML='<span class="bad">sending needs the live page (board serve)</span>';return}
  st.textContent='sending…';localStorage.setItem('wb-to',to);
@@ -360,12 +365,14 @@ async function sendMsg(){const to=document.getElementById('mto').value,text=docu
 async function sendDrawerMsg(to){const text=document.getElementById('dmtext').value,rawTask=document.getElementById('dmtask').value,task=rawTask==='__all__'?'':rawTask,st=document.getElementById('dmstatus');
  if(!LIVE){st.innerHTML='<span class="bad">sending needs the live page (board serve)</span>';return}st.textContent='sending…';
  try{const r=await fetch('api/msg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,text,task})}),j=await r.json();st.innerHTML=j.ok?`<span class="sent">✓ ${esc(j.state||'queued')}</span>`:`<span class="bad">${esc(j.error)}</span>`;if(j.ok)document.getElementById('dmtext').value=''}catch(e){st.innerHTML='<span class="bad">failed</span>'}}
-function render(){const W=D.week;setHTML('week',`📈 W${W.week}: <b>${W.this_week}</b> accepted · last week at this point ${W.same_point_last_week} · 4-week median ${W.median_4wk}`);
- renderWhen();renderBoard();refreshDrawer();if(!document.getElementById('stats').hidden)renderStats();if(!document.getElementById('team').hidden)renderTeam()}
+function render(){renderSummary();renderBoard();if(!document.getElementById('stats').hidden&&Object.keys(D.funnel||{}).length)renderStats();if(!document.getElementById('team').hidden)renderTeam()}
 function renderWhen(){const ageS=D.codimango_at?Math.max(0,(Date.now()-new Date(D.codimango_at))/1000):null;
  const exact=s=>s==null?'?':s<3600?Math.round(s/60)+'m':Math.floor(s/3600)+'h'+String(Math.round(s%3600/60)).padStart(2,'0')+'m';
- document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+exact(ageS)+' old'+(D.codimango_detail&&!D.health.codimango.ok?' — '+D.codimango_detail:'')+' · page built '+exact(Math.max(0,(Date.now()-new Date(D.generated_at))/1000))+' ago';
+ document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+exact(ageS)+' old'+(D.codimango_detail&&D.health&&D.health.codimango&&!D.health.codimango.ok?' — '+D.codimango_detail:'')+' · last changed region '+exact(Math.max(0,(Date.now()-S.lastNetworkAt)/1000))+' ago';
 }
+function tickClocks(){document.querySelectorAll('.clock').forEach(el=>{const v=elapsed(el.dataset.at,el.dataset.fallback===''?null:Number(el.dataset.fallback));el.textContent=age(v)});renderWhen()}
+function applyRegion(name,data){if(name==='summary'){Object.assign(D,data);renderSummary()}else if(name==='board'){const open=S.open&&!String(S.open).startsWith('session:')?S.open:null,oldRow=open?(D.tasks||[]).find(x=>x.task===open):null;D.tasks=decodeBoard(data);renderBoard();const newRow=open?D.tasks.find(x=>x.task===open):null,visible=document.getElementById('drawer').classList.contains('open');if(visible&&open&&newRow&&(!oldRow||oldRow.row_version!==newRow.row_version))openDrawer(open,true,true)}else if(name==='team'){Object.assign(D,data);if(!document.getElementById('team').hidden){renderTeam();if(S.open&&String(S.open).startsWith('session:'))refreshDrawer()}}else if(name==='activity'){D.feed=data.items||[];if(!document.getElementById('team').hidden)patchActivity()}else if(name==='stats'){Object.assign(D,data);if(!document.getElementById('stats').hidden)renderStats()}}
+async function pollRegion(name){const headers={},old=S.etags[name];if(old)headers['If-None-Match']=old;try{const r=await fetch('/api/regions/'+name,{cache:'no-store',headers});if(r.status===304)return false;if(!r.ok)throw Error('HTTP '+r.status);const data=await r.json();S.etags[name]=r.headers.get('ETag')||'';S.lastNetworkAt=Date.now();applyRegion(name,data);return true}catch(_){document.getElementById('dot').className='dot bad';return false}}
 // ---- interactions
 const tip=document.getElementById('tip');let hideT=null;
 function showTip(html,x,y){clearTimeout(hideT);tip.innerHTML=html;tip.classList.add('on');const r=tip.getBoundingClientRect();
@@ -385,7 +392,7 @@ document.addEventListener('click',e=>{const g=e.target.closest('[data-g]'),dd=e.
  if(o){S.owner=o.dataset.o;renderBoard()}if(r)openDrawer(r.dataset.t);if(sr)openSession(sr.dataset.session);
  if(th){const k=th.dataset.k;if(S.sort!==k){S.sort=k;S.dir=1}else if(S.dir>0)S.dir=-1;else S.sort=null;renderBoard()}
  if(tb){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===tb));['board','team','stats'].forEach(k=>document.getElementById(k).hidden=tb.dataset.tab!==k);
-  if(tb.dataset.tab==='stats')renderStats();if(tb.dataset.tab==='team')renderTeam()}
+  if(tb.dataset.tab==='stats'){document.getElementById('stats').innerHTML='<div class="empty">loading stats…</div>';pollRegion('stats')}if(tb.dataset.tab==='team'){renderTeam();pollRegion('team');pollRegion('activity')}}
  if(e.target.id==='msend')sendMsg();
  const ds=e.target.closest('[data-dsend]');if(ds)sendDrawerMsg(ds.dataset.dsend);
  if(e.target.id==='expand'){const d=document.getElementById('drawer');d.style.width='';localStorage.removeItem('wb-w');d.classList.toggle('wide');localStorage.setItem('wb-wide',d.classList.contains('wide')?'1':'')}
@@ -406,7 +413,7 @@ document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement.i
  if(e.key==='Escape'){document.getElementById('drawer').classList.remove('open');tip.classList.remove('on');document.getElementById('q').value='';S.q='';renderBoard()}});
 window.addEventListener('beforeunload',()=>localStorage.setItem('wb-prev',JSON.stringify(Object.fromEntries(D.tasks.map(t=>[t.task,{tag:t.tag,valid:t.valid,next:t.next,review:t.review,owner:t.owner}])))));
 render();
-if(LIVE)setInterval(async()=>{try{const r=await fetch('data.json',{cache:'no-store'});if(r.ok){D=await r.json();render()}}catch(_){document.getElementById('dot').className='dot bad'}},20000);
-setInterval(renderWhen,15000);
+if(LIVE){setInterval(()=>{pollRegion('summary');pollRegion('board')},60000);setInterval(()=>{if(!document.getElementById('team').hidden)pollRegion('team')},15000);setInterval(()=>{if(!document.getElementById('team').hidden)pollRegion('activity')},30000);setInterval(()=>{if(!document.getElementById('stats').hidden)pollRegion('stats')},300000)}
+setInterval(tickClocks,15000);
 </script></body></html>
 """

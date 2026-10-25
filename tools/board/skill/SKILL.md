@@ -47,7 +47,9 @@ delivery without a positive tool result.
 **Agent approvals — also two: the building session and one independent agent:**
 `board review add <task> --verdict ready|changes|comment --role author|independent --note "<one line>"`
 R2 = the building session AND an independent agent said ready on the same commit. A new push turns reviews into R~.
-Everything you record is pushed to the shared ledger immediately; the dashboard pulls it every 30 s.
+Everything you record is pushed to the shared ledger immediately; the dashboard pulls it every 30 s. Its browser
+polls canonical regions conditionally (bodyless 304 when unchanged), so filters, rows, and open drawers stay put.
+`board setup` installs `board serve --ensure` as a one-minute single-instance watchdog alongside sync.
 
 | Want | Command |
 |---|---|
@@ -63,8 +65,8 @@ Everything you record is pushed to the shared ledger immediately; the dashboard 
 | Message a task owner / session / server / everyone | `board msg <task|task:slug|session|server|all> "text" [--task T]` |
 | Your messages (also shown to you automatically) | `board inbox` · `board ack <id|all>` |
 | Operate the delivery courier | `board courier` · `board courier-wait --json` · `board receipt …` |
-| What is happening on both servers | `board feed` · web Team tab (`board serve`) |
-| Health | `board status` |
+| What is happening on both servers | `board feed` · web Team tab (`board serve` / `board serve --ensure`) |
+| Health | `board status` (includes live dashboard and watchdog health) |
 | One-time import of an old CLAIMS.md | `board import-claims --dry-run`, then without `--dry-run` |
 
 Rules: never edit a task another live session owns; never fake a review or delivery receipt; `--json` on any read for scripts.

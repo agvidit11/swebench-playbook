@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -147,3 +147,24 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
                                           f"session discovery: {exc.__class__.__name__}")
     return Snapshot(views, obs, evs, health, findings, sync_state, now,
                     native_sessions, session_diagnostics)
+
+
+def refresh_sessions(cfg, snap: Snapshot) -> Snapshot:
+    """Cheap Team refresh: ledger/spool + native session inputs, no Codimango or Git work."""
+    now = datetime.now(timezone.utc)
+    state_dir = sync_mod.default_state_dir()
+    evs, ev_findings = events.read_events(ledger_event_files(cfg))
+    known = {e["event_id"] for e in evs}
+    evs += [e for e in pending_spool_events(state_dir, sync_mod.safe_host(sync_mod.host_id_for(cfg)))
+            if e["event_id"] not in known]
+    sessions, diagnostics = [], []
+    try:
+        from . import session_inventory
+        sessions, diagnostics = session_inventory.discover(
+            cfg, evs, sync_mod.safe_host(sync_mod.host_id_for(cfg)), now=now.timestamp())
+    except Exception as exc:
+        diagnostics = [{"host": sync_mod.safe_host(sync_mod.host_id_for(cfg)),
+                        "classification": "source-error",
+                        "reason": f"session discovery: {exc.__class__.__name__}"}]
+    return replace(snap, events=evs, sessions=sessions, session_diagnostics=diagnostics,
+                   findings=list(snap.findings) + ev_findings, now=now)

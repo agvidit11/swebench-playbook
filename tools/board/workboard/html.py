@@ -137,6 +137,53 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
     }
 
 
+def _team_payload(snap, cfg, servers=None) -> dict:
+    """Build only Team data; safe to call on the cheap native-session refresh path."""
+    from . import comms
+    from . import sync as sync_mod
+    if servers is None:
+        local_host = sync_mod.safe_host(sync_mod.host_id_for(cfg))
+        servers = comms.servers(snap.events, snap.views, cfg, getattr(snap, "sessions", []),
+                                getattr(snap, "session_diagnostics", []), sync_state=snap.sync_state,
+                                local_host=local_host)
+    task_targets = {}
+    for view in snap.views:
+        try:
+            target = comms.target_for_task(view.entity_id, snap.views, getattr(snap, "sessions", []))
+            recipient = target["resolved_recipients"][0]
+            task_targets[view.entity_id] = {"state": "resolved", "to": target["to"],
+                                            "label": target["to_label"], "host": recipient.get("host"),
+                                            "session_key": recipient.get("session_key")}
+        except ValueError as exc:
+            task_targets[view.entity_id] = {"state": "nobody", "reason": str(exc)}
+    session_targets = []
+    for server in servers:
+        for session in server["sessions"]:
+            if session.get("is_summary") or session.get("is_actor"):
+                continue
+            session_targets.append({"session_key": session.get("session_key") or session.get("native_id"),
+                                    "native_id": session.get("native_id"),
+                                    "name": session.get("name") or session.get("alias"),
+                                    "host": server["id"], "kind": session.get("kind"),
+                                    "kind_icon": session.get("kind_icon"), "tasks": session.get("tasks") or [],
+                                    "transport": session.get("transport")})
+    return {"servers": servers, "messages": comms.messages(snap.events)[-80:],
+            "sessions": sorted(set(__import__("workboard.events", fromlist=["x"]).latest_aliases(snap.events).values())),
+            "session_targets": session_targets, "task_targets": task_targets}
+
+
+def fast_regions(snap, cfg, names=("team", "activity")) -> dict[str, dict]:
+    """Regions which can be refreshed without running task sources/projectors."""
+    from . import comms
+    names = set(names)
+    out = {}
+    if "team" in names:
+        out["team"] = _team_payload(snap, cfg)
+    if "activity" in names:
+        out["activity"] = {"items": comms.feed(snap.events, since_s=24 * 3600, limit=150)}
+    return out
+
+
 def payload(snap, cfg) -> dict:
     from . import comms, insights, reviews, stats as st
     from .app import cache_dir
@@ -184,27 +231,7 @@ def payload(snap, cfg) -> dict:
         t["assignee"] = insights.assignee(t, load, live_hosts)
         t["tags"] = task_tags(t)
         views.append(t)
-    # Recipient resolution is computed server-side and pinned when a message is sent.
-    task_targets = {}
-    for view in snap.views:
-        try:
-            target = comms.target_for_task(view.entity_id, snap.views, getattr(snap, "sessions", []))
-            recipient = target["resolved_recipients"][0]
-            task_targets[view.entity_id] = {"state": "resolved", "to": target["to"],
-                                             "label": target["to_label"], "host": recipient.get("host"),
-                                             "session_key": recipient.get("session_key")}
-        except ValueError as exc:
-            task_targets[view.entity_id] = {"state": "nobody", "reason": str(exc)}
-    session_targets = []
-    for server in servers:
-        for session in server["sessions"]:
-            if session.get("is_summary") or session.get("is_actor"):
-                continue
-            session_targets.append({"session_key": session.get("session_key") or session.get("native_id"),
-                                    "native_id": session.get("native_id"), "name": session.get("name") or session.get("alias"),
-                                    "host": server["id"], "kind": session.get("kind"),
-                                    "kind_icon": session.get("kind_icon"), "tasks": session.get("tasks") or [],
-                                    "transport": session.get("transport")})
+    team = _team_payload(snap, cfg, servers)
     weekly = st.weekly(snap.observations, cfg, snap.now, 10)
     cm_at = snap.health.get("codimango").observed_at.isoformat() if snap.health.get("codimango") and \
         snap.health["codimango"].observed_at else None
@@ -219,12 +246,9 @@ def payload(snap, cfg) -> dict:
         "funnel": st.funnel(snap.observations), "flow": flow,
         "ages": st.pipeline_age(snap.views, snap.now), "load": load,
         "tasks": views,
-        "servers": servers,
+        **team,
         "codimango_detail": snap.health["codimango"].detail if snap.health.get("codimango") else "",
         "feed": comms.feed(snap.events, since_s=24 * 3600, limit=150),
-        "messages": comms.messages(snap.events)[-80:],
-        "sessions": sorted({a for a in __import__("workboard.events", fromlist=["x"]).latest_aliases(snap.events).values()}),
-        "session_targets": session_targets, "task_targets": task_targets,
     }
 
 
@@ -243,27 +267,92 @@ def write(snap, cfg, path: Path) -> Path:
     return path
 
 
-def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 60, host: str = "127.0.0.1", send_fn=None):
-    """Serve the dashboard; data refreshes in the background every `interval` seconds."""
-    state = {"data": payload(gather_fn(), cfg), "at": time.time(), "error": None}
-    lock = threading.Lock()
+def _etag_matches(header: str | None, etag: str) -> bool:
+    if not header:
+        return False
+    tags = [part.strip() for part in header.split(",")]
+    return "*" in tags or etag in (tag[2:] if tag.startswith("W/") else tag for tag in tags)
 
-    def refresher():
-        while True:
-            time.sleep(interval)
-            try:
-                d = payload(gather_fn(), cfg)
-                with lock:
-                    state["data"], state["at"], state["error"] = d, time.time(), None
-            except Exception as exc:              # keep the last data, but tell the page
-                with lock:
-                    state["error"] = f"{exc.__class__.__name__}: {exc}"[:200]
 
-    threading.Thread(target=refresher, daemon=True).start()
+class _Server(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(self, *args, **kwargs):
+        self.stop_event = threading.Event()
+        super().__init__(*args, **kwargs)
+
+    def server_close(self):
+        self.stop_event.set()
+        super().server_close()
+
+
+def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 30, team_interval: int = 12,
+          host: str = "127.0.0.1", send_fn=None):
+    """Serve coherent, canonical regions plus the historical compatibility view."""
+    from . import regions
+    from .app import refresh_sessions
+
+    initial = gather_fn()
+    generations = regions.source_generations(cfg)
+    cache = regions.RegionCache(payload(initial, cfg), now=initial.now, generations=generations)
+    state = {"snap": initial, "at": initial.now.isoformat(), "error": None, "generations": generations}
+    state_lock = threading.RLock()
+
+    def set_error(exc):
+        error = f"{exc.__class__.__name__}: {exc}"[:200]
+        with state_lock:
+            state["error"] = error
+            gens = dict(state["generations"], presence="error:" + error)
+        summary = dict(cache.region("summary").data, refresh_error=error)
+        cache.replace_selected({"summary": summary}, generations=gens, force=True)
+
+    def core_rebuild():
+        try:
+            snap = gather_fn()
+            gens = regions.source_generations(cfg)
+            full = payload(snap, cfg)
+            full["refresh_error"] = None
+            cache.replace(full, now=snap.now, generations=gens)
+            with state_lock:
+                state.update(snap=snap, at=snap.now.isoformat(), error=None, generations=gens)
+        except Exception as exc:              # keep last-good documents and expose the failure in summary
+            set_error(exc)
+
+    def team_rebuild():
+        try:
+            gens = regions.source_generations(cfg)
+            dirty = [name for name in ("team", "activity") if
+                     cache.region(name).basis != tuple((key, gens.get(key))
+                                                       for key in regions.REGION_INPUTS[name])]
+            if not dirty:
+                return
+            with state_lock:
+                base = state["snap"]
+            snap = refresh_sessions(cfg, base)
+            cache.replace_selected(fast_regions(snap, cfg, dirty), generations=gens)
+            with state_lock:
+                state.update(snap=snap, at=snap.now.isoformat(), generations=gens)
+        except Exception as exc:
+            set_error(exc)
 
     class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
         def log_message(self, *a):
             pass
+
+        def _send(self, code, body=b"", ctype=None, etag=None, cache_control="no-store"):
+            self.send_response(code)
+            if ctype:
+                self.send_header("Content-Type", ctype)
+            if etag:
+                self.send_header("ETag", etag)
+            self.send_header("Cache-Control", cache_control)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if body and self.command != "HEAD":
+                self.wfile.write(body)
 
         def do_POST(self):
             origin = self.headers.get("Origin", "")
@@ -284,27 +373,62 @@ def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 60, host: str = "
                 code, out = 400, {"ok": False, "error": str(exc)}
             except Exception as exc:          # never crash the server
                 code, out = 500, {"ok": False, "error": exc.__class__.__name__}
-            data = json.dumps(out).encode()
-            self.send_response(code)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(data)
+            self._send(code, regions.canonical_bytes(out), "application/json")
 
         def do_GET(self):
-            with lock:
-                data = dict(state["data"], refresh_error=state["error"], refreshed_ago_s=int(time.time() - state["at"]))
-            if self.path.startswith("/data.json"):
-                body, ctype = json.dumps(data, default=str).encode(), "application/json"
-            elif self.path in ("/", "/index.html"):
-                body, ctype = page(data, live=True).encode(), "text/html; charset=utf-8"
+            from urllib.parse import unquote, urlsplit
+            path = urlsplit(self.path).path
+            if path.startswith("/api/regions/"):
+                name = unquote(path[len("/api/regions/"):])
+                doc = cache.region(name) if name in regions.NAMES else None
+                if doc is None:
+                    self.send_error(404)
+                elif _etag_matches(self.headers.get("If-None-Match"), doc.etag):
+                    self._send(304, etag=doc.etag, cache_control="no-cache")
+                else:
+                    self._send(200, doc.body, "application/json", doc.etag, "no-cache")
+                return
+            if path.startswith("/api/task/"):
+                task = unquote(path[len("/api/task/"):])
+                doc = cache.detail(task)
+                if doc is None:
+                    self.send_error(404)
+                elif _etag_matches(self.headers.get("If-None-Match"), doc.etag):
+                    self._send(304, etag=doc.etag, cache_control="no-cache")
+                else:
+                    self._send(200, doc.body, "application/json", doc.etag, "no-cache")
+                return
+            with state_lock:
+                built_at, error = state["at"], state["error"]
+            if path == "/api/health":
+                self._send(200, regions.canonical_bytes({"ok": True, "service": "workboard", "built_at": built_at}),
+                           "application/json", cache_control="no-cache")
+            elif path == "/data.json":
+                data = dict(cache.compatibility(), generated_at=built_at, refresh_error=error)
+                self._send(200, regions.canonical_bytes(data), "application/json")
+            elif path in ("/", "/index.html"):
+                data = dict(cache.bootstrap(), generated_at=built_at, refresh_error=error)
+                self._send(200, page(data, live=True).encode(), "text/html; charset=utf-8")
             else:
                 self.send_error(404)
-                return
-            self.send_response(200)
-            self.send_header("Content-Type", ctype)
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
 
-    srv = ThreadingHTTPServer((host, port), Handler)
+    srv = _Server((host, port), Handler)
+    srv.region_cache = cache
+
+    def scheduler():
+        next_core = time.monotonic() + max(1, interval)
+        next_team = time.monotonic() + max(1, team_interval)
+        while not srv.stop_event.is_set():
+            now = time.monotonic()
+            if now >= next_core:
+                core_rebuild()
+                next_core = time.monotonic() + max(1, interval)
+                next_team = min(next_team, time.monotonic() + max(1, team_interval))
+            elif now >= next_team:
+                team_rebuild()
+                next_team = time.monotonic() + max(1, team_interval)
+            wait = max(0.05, min(next_core, next_team) - time.monotonic())
+            srv.stop_event.wait(wait)
+
+    threading.Thread(target=scheduler, daemon=True, name="workboard-regions").start()
     return srv

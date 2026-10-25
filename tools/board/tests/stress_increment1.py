@@ -148,7 +148,7 @@ global.document={getElementById:id=>els[id]||make(id),querySelectorAll:()=>[],qu
 global.window={addEventListener:()=>{}};global.localStorage={getItem:()=>null,setItem:()=>{},removeItem:()=>{}};
 global.innerWidth=1600;global.setInterval=()=>0;global.setTimeout=()=>0;global.requestAnimationFrame=()=>0;
 '''
-    tail = "\ndocument.getElementById('team').hidden=false;renderTeam();if(!document.getElementById('team').innerHTML.includes('Synthetic session 39'))throw Error('team render incomplete');if(!document.getElementById('rows').innerHTML.includes('synthetic-task-299'))throw Error('board render incomplete');\n"
+    tail = "\ndocument.getElementById('team').hidden=false;renderTeam();if(!document.getElementById('sessionrows').innerHTML.includes('Synthetic session 39'))throw Error('team render incomplete');if(!document.getElementById('rows').innerHTML.includes('synthetic-task-299'))throw Error('board render incomplete');\n"
     with tempfile.TemporaryDirectory() as d:
         script = Path(d) / "render.js"
         script.write_text(harness + js + tail)

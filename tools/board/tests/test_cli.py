@@ -382,7 +382,8 @@ class StatusChecksTest(unittest.TestCase):
     def checks(self, cron, settings_text):
         (self.home / ".claude" / "settings.json").write_text(settings_text)
         with mock.patch("workboard.__main__.subprocess.run",
-                        return_value=mock.Mock(stdout=cron)), mock.patch("shutil.which", return_value="/usr/bin/x"):
+                        return_value=mock.Mock(stdout=cron)), mock.patch("shutil.which", return_value="/usr/bin/x"), \
+             mock.patch("workboard.__main__.serve_health", return_value=(False, "synthetic down")):
             from workboard.config import load_config
             return {c["name"]: c for c in cli.status_checks(load_config(Path("/nonexistent")))}
 
@@ -483,6 +484,7 @@ class SetupCommandTest(unittest.TestCase):
         written = [c[1] for c in calls if c[0] == ["crontab", "-"]][0]
         self.assertIn(other, written)
         self.assertIn(cli.cron_line(cli.board_path()), written)
+        self.assertIn(cli.serve_cron_line(cli.board_path()), written)
         code, err, _ = self.run_setup(written)
         self.assertEqual(code, 0, err)
 
@@ -523,3 +525,40 @@ class SetupCommandTest(unittest.TestCase):
         self.assertIn("claim refs probe failed", err.getvalue())
         self.assertTrue((self.home / ".local" / "bin" / "board").is_symlink())
         self.assertTrue((self.home / ".claude" / "skills" / "workboard" / "SKILL.md").is_symlink())
+
+
+class ServeEnsureTest(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory(prefix="wb-ensure-")
+        self.addCleanup(td.cleanup)
+        self.tmp = Path(td.name)
+        p = mock.patch.dict(os.environ, {"WORKBOARD_STATE": str(self.tmp / "state"),
+                                         "WORKBOARD_CACHE": str(self.tmp / "cache")})
+        p.start(); self.addCleanup(p.stop)
+
+    def test_single_instance_lock(self):
+        first = cli._serve_lock(18765)
+        self.assertIsNotNone(first)
+        try:
+            self.assertIsNone(cli._serve_lock(18765))
+        finally:
+            first.close()
+        again = cli._serve_lock(18765)
+        self.assertIsNotNone(again); again.close()
+
+    def test_ensure_exits_zero_when_healthy(self):
+        args = mock.Mock(port=18765, interval=30)
+        with mock.patch.object(cli, "serve_health", return_value=(True, "healthy")), \
+             mock.patch.object(cli, "_serve_lock") as lock, mock.patch.object(cli.subprocess, "Popen") as popen:
+            self.assertEqual(cli._ensure_serve(args), 0)
+        lock.assert_not_called(); popen.assert_not_called()
+
+    def test_ensure_starts_detached_and_passes_lock(self):
+        args = mock.Mock(port=18765, interval=30)
+        with mock.patch.object(cli, "serve_health", return_value=(False, "down")), \
+             mock.patch.object(cli.subprocess, "Popen") as popen:
+            self.assertEqual(cli._ensure_serve(args), 0)
+        kwargs = popen.call_args.kwargs
+        self.assertTrue(kwargs["start_new_session"])
+        self.assertTrue(kwargs["pass_fds"])
+        self.assertIn("WORKBOARD_SERVE_LOCK_FD", kwargs["env"])
