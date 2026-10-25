@@ -136,7 +136,7 @@ const HEAD = {task:'The task folder. Hover a task name for what it is; click for
  valid:'codimango validation. Hover shows only the problems and how to fix them.',
  review:'Human review in codimango: ✔ accepted · ✘ sent back (n times) · 👀 in review · ⌛ waiting for a reviewer · · not submitted. Hover for the last decision.',
  check:'Pre-submit gate (board check run / record). ✔ clean on this commit · ✘ failures · grey = old or not run. Hover shows what the session suggested fixing.',
- sync:'Server verdict on your latest push: ✔ validated clean · ✘ validation failed or sent back · ⏳ grey = importing / validating · ▲ amber = server validated an older commit.'};
+ sync:'Server verdict on your latest push: ✔ latest commit validated, nothing failed (warnings: see Validation) · ✘ validation failed or a reviewer sent it back · ⏳ grey = importing / validating · ▲ amber = server validated an older commit.'};
 const S = {tags:new Set(), groups:new Set(['ATTENTION','READY','VALIDATING','REVIEWING']), done:new Set(['accepted','in_training','archived']), owner:'all', q:'', sort:null, dir:1,
  prev:JSON.parse(localStorage.getItem('wb-prev')||'{}')};
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -153,7 +153,7 @@ function owner(t){const h=t.claim_health,o=esc(t.owner);if(h==='DONE')return'';i
  if(h==='LEGACY')return`<span class="dim">📜 ${o}</span>`;return`<span style="color:var(--violet)">👤 ${o}</span>`}
 function valid(t){const v=t.vsum;if(t.older_results&&t.valid!=='RUN')return'<span class="run">↻ older commit</span>';const f=v.issues.filter(i=>i.severity==='fail').length,w=v.issues.filter(i=>i.severity==='warn').length;
  if(t.valid==='RUN')return'<span class="run">○ running</span>';if(!v.total)return'<span class="dim">· none yet</span>';
- if(f)return`<span class="bad">✘ ${f} issue${f>1?'s':''}</span>`;if(w)return`<span class="run">▲ ${w} warning${w>1?'s':''}</span>`;return'<span class="ok">✔ clean</span>'}
+ if(f)return`<span class="bad">✘ ${f} issue${f>1?'s':''}</span>`;if(w)return`<span class="run">▲ ${w} warning${w>1?'s':''}</span>`;return'<span class="ok">✔ clean</span>'+(v.info&&v.info.length?' <span class="dim">ⓘ</span>':'')}
 function review(t){const raw=t.status_raw,n=t.decisions.filter(d=>d.kind==='revision').length;
  if(raw==='accepted')return'<span class="ok">✔ accepted</span>';if(raw==='used_in_training')return'<span style="color:var(--teal)">✔ in training</span>';
  if(raw==='needs_revision')return`<span class="bad">✘ sent back${n>1?' '+n+'×':''}</span>`;if(raw==='being_reviewed')return'<span style="color:var(--violet)">👀 in review</span>';
@@ -175,15 +175,17 @@ function tipTag(t){let h=`<h4>${esc(t.tag)} · ${esc(t.age_label||'')} ${age(t.s
  t.decisions.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',(d.kind==='accept'?'accepted ':'sent back ')+fdate(d.at)));
  if(t.age_level&&t.age_level!=='ok')h+=L(t.age_level==='block'?'bad':'pend','!',t.age_level==='block'?'overdue for this state':'getting old');return h+'</ul>'}
 function tipOwner(t){let h=`<h4>who · source: ${esc(t.claim_source||'none')}</h4><ul>`;(t.active||[]).slice(0,3).forEach(a=>h+=L('pend','👀',`${esc(a.alias)} · ${age(a.ago_s)} ago`));
- if(t.claim_health==='OWNED')h+=L('ok','👤','claimed by '+esc(t.owner));if(t.legacy&&t.legacy.live!==false)h+=L('info','📜',`${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)} · ${esc(t.legacy.updated)}`);
+ if(t.claim_health==='OWNED')h+=L('ok','👤','claimed by '+esc(t.owner));if(t.legacy)h+=t.claim_health==='LEGACY'?L('info','📜',`CLAIMS.md: ${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)} · ${esc(t.legacy.updated)}`):L('dim','📜',`old CLAIMS.md row (not an active owner): ${esc(t.legacy.legacy_owner)} · ${esc(t.legacy.status)}`);
  if(t.claim_health==='FREE')h+=L('info','🔓','nobody');h+=L('dim','→',esc(t.assignee));return h+'</ul>'}
 function tipValid(t){const v=t.vsum;if(t.older_results)return'<h4>validation</h4><ul>'+L('pend','↻','these results are for an older commit — your latest push has not been validated')+L('info','→','codimango task rerun '+esc(t.task))+'</ul>';if(t.valid==='RUN'&&!v.issues.length)return'<h4>validation</h4><ul>'+L('pend','○','running')+'</ul>';
- if(!v.issues.length)return`<h4>validation</h4><ul>${L('ok','●',`all ${v.total} checks passed`)}</ul>`;
- return `<h4>validation · ${v.passed}/${v.total} passed</h4><ul>${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)}<br><span class="dim">→ ${esc(i.fix.replace('{task}',t.task))}</span>`)).join('')}${v.skipped&&v.skipped.length?L('dim','⤷',esc([...new Set(v.skipped)].join(', '))+' skipped until the above passes'):''}</ul>`}
+ const inf=(v.info||[]).map(i=>L('dim','ⓘ',`<b>${esc(i.check)}</b> ${esc(i.why)} (informational, not blocking)`)).join('');
+ if(!v.issues.length)return`<h4>validation</h4><ul>${L('ok','●',`${v.total-(v.info||[]).length} of ${v.total} checks clear`)}${inf}</ul>`;
+ return `<h4>validation · ${v.passed}/${v.total} clear</h4><ul>${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)}<br><span class="dim">→ ${esc(i.fix.replace('{task}',t.task))}</span>`)).join('')}${v.skipped&&v.skipped.length?L('dim','⤷',esc([...new Set(v.skipped)].join(', '))+' skipped until the above passes'):''}${inf}</ul>`}
 function tipReview(t){let h=`<h4>human review · ${esc(t.rsum.human)}</h4><ul>`;
  t.decisions.slice(-3).forEach(d=>h+=L(d.kind==='accept'?'ok':'bad',d.kind==='accept'?'✔':'↩',`${d.kind==='accept'?'accepted':'sent back'} ${fdate(d.at)}`));
  const d=t.decisions[t.decisions.length-1];if(d&&d.reason)h+=L('dim','“',esc(d.reason.slice(0,140)));
- if(t.entered_pool_at&&!t.decisions.length)h+=L('info','⌛','submitted '+fdate(t.entered_pool_at)+', no decision yet');
+ if(t.review_history_stale)h+=L('pend','↻','review history is refreshing — rounds may be incomplete');
+ if(t.entered_pool_at&&!t.decisions.length)h+=t.status_raw==='draft'?L('info','↩','previously submitted '+fdate(t.entered_pool_at)+', back in draft'):L('info','⌛','submitted '+fdate(t.entered_pool_at)+', no decision yet');
  if(!t.entered_pool_at)h+=L('dim','·','not submitted yet');
  const ar=t.agent_reviews||[];if(ar.length)h+=L('dim','🤖',`${ar.length} agent-session check${ar.length>1?'s':''} (optional second opinion)`);return h+'</ul>'}
 function tipCheck(t){const c=t.last_check;if(!c)return'<h4>presubmit</h4><ul>'+L('dim','·','no result recorded on the board (it may have been run elsewhere)')+L('info','→','board check run '+esc(t.task)+'  ·  or board check record')+'</ul>';
@@ -220,7 +222,7 @@ function renderBoard(){const counts={};D.tasks.forEach(t=>counts[t.group]=(count
   <td data-tip="review">${review(t)}</td><td data-tip="check">${check(t)}</td><td data-tip="sync">${sync(t)}</td></tr>`});
  document.getElementById('rows').innerHTML=html||'<tr><td colspan="8" class="empty">🌈 nothing matches — try another filter</td></tr>';
  document.querySelectorAll('th[data-k]').forEach(th=>{th.textContent=th.textContent.replace(/ [▲▼]$/,'')+(S.sort===th.dataset.k?(S.dir>0?' ▲':' ▼'):'')});
- const h=D.health;document.getElementById('health').innerHTML=Object.entries(h).map(([k,v])=>`<span class="${v.ok?'ok':'bad'}">${v.ok?'✔':'✘'} ${k}</span>`).join(' · ')+(D.ledger_ok===null?'':` · <span class="${D.ledger_ok?'ok':'bad'}">${D.ledger_ok?'✔':'✘'} ledger</span>`);
+ const h=D.health;document.getElementById('health').innerHTML=Object.entries(h).map(([k,v])=>`<span class="${v.ok?'ok':'bad'}">${v.ok?'✔':'✘'} ${k}</span>`).join(' · ')+(D.ledger_ok===null?'':` · <span class="${D.ledger_ok?'ok':'bad'}">${D.ledger_ok?'✔':'✘'} ledger${D.ledger_at?' '+age((Date.now()-Date.parse(D.ledger_at))/1000)+' ago':''}</span>`);
  const stale=D.codimango_at&&(Date.now()-new Date(D.codimango_at))/1000>600;
  document.getElementById('dot').className='dot'+(Object.values(h).every(v=>v.ok)&&!D.refresh_error&&!stale&&D.ledger_ok!==false?'':' bad');
  if(D.refresh_error)document.getElementById('health').innerHTML+=` · <span class="bad">refresh failing: ${esc(D.refresh_error)}</span>`}
@@ -246,7 +248,7 @@ function openDrawer(name){const t=D.tasks.find(x=>x.task===name);if(!t)return;co
  <button class="btn" data-msgtask="${esc(t.task)}">💬 Message the owner</button></div></div>
  <div class="sec next-sec"><h3>🚀 NEXT STEPS</h3>${t.steps.map((s,i)=>`<div class="step"><span class="n">${i+1}</span><span>${esc(s.do)}</span><span class="eta">${esc(s.eta)}</span></div>`).join('')||'<div class="dim">nothing to do 🎉</div>'}
   <div class="who">👤 ${esc(t.assignee)}</div></div>
- ${v.issues.length?`<div class="sec"><h3>⚠️ PROBLEMS · ${v.passed}/${v.total} checks passed</h3><ul class="lst">${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)} <span class="dim">→ ${esc(i.fix)}</span>`)).join('')}</ul></div>`:''}
+ ${v.issues.length?`<div class="sec"><h3>⚠️ PROBLEMS · ${v.passed}/${v.total} checks clear</h3><ul class="lst">${v.issues.map(i=>L(i.severity==='fail'?'bad':'pend',i.severity==='fail'?'✘':'▲',`<b>${esc(i.check)}</b> ${esc(i.why)} <span class="dim">→ ${esc(i.fix)}</span>`)).join('')}</ul></div>`:''}
  <div class="sec"><h3>👥 REVIEW</h3><ul class="lst">${t.rsum.bullets.map(([k,x])=>L(k,CH[k],esc(x))).join('')}</ul>
   ${t.decisions.length&&t.decisions[t.decisions.length-1].reason?`<div class="dim" style="margin-top:6px">last review: “${esc(t.decisions[t.decisions.length-1].reason)}”</div>`:''}</div>
  ${t.versions.length?`<div class="sec"><h3>🗂 ROUNDS</h3><div class="timeline">${t.versions.map((x,i)=>`${i?'<span class="arrow">→</span>':''}<span class="ver"><b>${x.label}</b> ${x.commits} commit${x.commits===1?'':'s'}${x.ended?` <span class="${x.ended==='accept'?'b-ok':'b-bad'}">${x.ended==='accept'?'✔':'↩'}</span> <span class="dim">${fdate(x.at)}</span>`:' <span class="dim">so far</span>'}</span>`).join('')}</div></div>`:''}
@@ -258,11 +260,11 @@ const HC={};const hostColor=h=>HC[h]||(HC[h]=['#f78fb3','#7ab8ff','#7bd88f','#f5
 function renderTeam(){const me=localStorage.getItem('wb-to')||'all';
  const srv=(D.servers||[]).map(s=>`<div class="srv"><h3><span class="badge" style="background:${hostColor(s.id)}">${esc(s.id)}</span> server
   <span class="dim">· heartbeat ${s.last_sync_ago_s==null?'never':age(s.last_sync_ago_s)+' ago'}</span>
-  <span class="${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'ok':'bad'}">${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'● online':'● quiet'}</span></h3>
+  <span class="${s.last_sync_ago_s!=null&&s.last_sync_ago_s<600?'ok':'bad'}">${s.last_sync_ago_s==null?'● never synced':s.last_sync_ago_s<600?'● sync fresh':'● sync stale'}</span></h3>
   <div class="dim">${s.sessions.length} session(s) seen in the last 2h · working on ${s.owned.length} task(s)${s.last_sync_ago_s==null?' · <span class="bad">no heartbeat yet — run board setup there</span>':''}${s.last_activity_ago_s!=null?' · last activity '+age(s.last_activity_ago_s)+' ago':''}</div>
   <ul class="lst">${s.sessions.map(x=>L('pend','✍️',`${esc(x.alias.split('·').slice(1).join('·')||x.alias)} <span class="dim">${age(x.ago_s)} ago</span>`)).join('')||L('dim','·','no active sessions in the last 2h')}</ul></div>`).join('');
  const msgs=(D.messages||[]).slice(-30).reverse().map(m=>`<div class="msg ${m.from.includes('dashboard')?'me':''}"><div class="meta">${esc(m.from)} → <b>${esc(m.to_label)}</b>${m.task?' · '+esc(m.task):''} · ${fdate(m.at)}
-  ${m.acked_by.length?' · <span class="ok">✓ read by '+m.acked_by.length+'</span>':' · <span class="run">unread</span>'}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';
+  ${m.acked_by.length?' · <span class="ok">✓ acked by '+m.acked_by.length+'</span>':' · <span class="run">not acked yet</span>'}</div><div>${esc(m.text)}</div></div>`).join('')||'<div class="dim">no messages yet</div>';
  const opts=['all',...(D.servers||[]).map(s=>s.id),...(D.sessions||[])];
  const feed=(D.feed||[]).map((f,i)=>`<div class="fi" style="animation-delay:${Math.min(i*8,300)}ms"><span class="t">${new Date(f.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
   <span><span class="badge" style="background:${hostColor(f.host)}">${esc(f.host)}</span></span><span>${esc(f.what)} ${f.task?'<b>'+esc(f.task)+'</b>':''}<div class="w">${esc(f.who)}</div></span></div>`).join('')||'<div class="dim">quiet</div>';
@@ -280,12 +282,12 @@ async function sendMsg(){const to=document.getElementById('mto').value,text=docu
  const st=document.getElementById('mstatus');if(!LIVE){st.innerHTML='<span class="bad">sending needs the live page (board serve)</span>';return}
  st.textContent='sending…';localStorage.setItem('wb-to',to);
  try{const r=await fetch('api/msg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,text,task})});const j=await r.json();
-  st.innerHTML=j.ok?`<span class="sent">✓ in the ledger for ${esc(j.to)}${j.synced?' — they see it within ~2 min':' (queued, publishes on next sync)'}</span>`:`<span class="bad">${esc(j.error)}</span>`;
+  st.innerHTML=j.ok?`<span class="sent">✓ in the ledger for ${esc(j.to)}${j.synced?' — published; it reaches them after their server\'s next sync and their next tool step':' (queued, publishes on next sync)'}</span>`:`<span class="bad">${esc(j.error)}</span>`;
   if(j.ok){document.getElementById('mtext').value='';const d=await (await fetch('data.json',{cache:'no-store'})).json();D=d;renderTeam()}}catch(e){st.innerHTML='<span class="bad">failed</span>'}}
 function render(){const W=D.week;document.getElementById('week').innerHTML=`📈 W${W.week}: <b>${W.this_week}</b> accepted · last week at this point ${W.same_point_last_week} · 4-week median ${W.median_4wk}`;
  const ageS=D.codimango_at?Math.max(0,(Date.now()-new Date(D.codimango_at))/1000):null;
  const exact=s=>s==null?'?':s<3600?Math.round(s/60)+'m':Math.floor(s/3600)+'h'+String(Math.round(s%3600/60)).padStart(2,'0')+'m';
- document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+exact(ageS)+' old'+(D.codimango_detail&&!D.health.codimango.ok?' — '+D.codimango_detail:'')+' · page '+new Date(D.generated_at).toLocaleTimeString();
+ document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+exact(ageS)+' old'+(D.codimango_detail&&!D.health.codimango.ok?' — '+D.codimango_detail:'')+' · page built '+exact(Math.max(0,(Date.now()-new Date(D.generated_at))/1000))+' ago';
  renderBoard();renderStats();if(!document.getElementById('team').hidden)renderTeam()}
 // ---- interactions
 const tip=document.getElementById('tip');let hideT=null;

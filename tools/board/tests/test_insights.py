@@ -69,3 +69,33 @@ class AuditValidationTest(unittest.TestCase):
                          "nobody needed right now")
         a = insights.assignee({"group": "ATTENTION", "claim_health": "FREE", "task": "t"}, {"a": 0, "b": 3}, live_hosts={"b"})
         self.assertIn("on b", a)
+
+    def test_steps_exclusive_and_warnings_first(self):
+        # agent dissent on a draft: one address step, no human-review step, ends with submit (not resubmit)
+        s = [x["do"] for x in insights.next_steps({"next": "ADDRESS agent review", "status_raw": "draft",
+                                                   "review": "R0", "vsum": {"issues": []}}, {})]
+        self.assertEqual(sum("address" in x for x in s), 1)
+        self.assertEqual(s[-1], "submit for human review")
+        # infra-only rerun: one rerun, one wait
+        vs = insights.validation_summary([{"name": "oracle", "status": "error",
+                                           "detail": "infrastructure error, not a task defect"}])
+        s = [x["do"] for x in insights.next_steps({"next": "RERUN validation", "task": "t", "vsum": vs}, {})]
+        self.assertEqual(sum("codimango task rerun" in x for x in s), 1)
+        self.assertEqual(sum(x.startswith("wait") for x in s), 1)
+        # action-required warning comes before the submit ladder
+        vs = insights.validation_summary([{"name": "balance", "status": "passed",
+                                           "detail": "passed, WITH REVIEWER ACTION REQUIRED"}], "fail")
+        s = [x["do"] for x in insights.next_steps({"next": "RUN check", "task": "t", "review": "R0", "vsum": vs}, {})]
+        self.assertTrue(s[0].startswith("calibration") or "reviewer action" in s[0])
+        self.assertTrue(any("TBR" in x for x in s[:2]))
+        self.assertEqual(s[-1], "submit for human review")
+
+    def test_not_run_detail_is_info(self):
+        vs = insights.validation_summary([{"name": "embedding dedup", "status": "passed",
+                                           "detail": "engine stopped waiting after 175m; the check has not run"}])
+        self.assertEqual(vs["issues"], [])
+        self.assertEqual(len(vs["info"]), 1)
+
+    def test_wait_reviewer_wording(self):
+        s = insights.next_steps({"next": "WAIT reviewer", "status_raw": "being_reviewed", "vsum": {"issues": []}}, {})
+        self.assertIn("in progress", s[0]["do"])

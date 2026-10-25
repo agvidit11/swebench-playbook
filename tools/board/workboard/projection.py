@@ -113,7 +113,8 @@ def _reviews(task_events, current):
     latest = {}
     for r in reviews:                                   # a later verdict from the same session replaces its earlier one
         latest[(r["actor"]["session_id"], r.get("commit"))] = r
-    at_current = [r for r in latest.values() if current and r["commit"] == current]
+    current = set(current) if isinstance(current, (set, list, tuple)) else ({current} if current else set())
+    at_current = [r for r in latest.values() if r.get("commit") in current]
     ready = {r["actor"]["session_id"] for r in at_current if r["payload"].get("verdict") == "ready"}
     dissent = len({r["actor"]["session_id"] for r in at_current if r["payload"].get("verdict") == "changes"})
     if len(ready) >= 2:
@@ -136,7 +137,8 @@ def _check(task_events, current):
     last = checks[-1]
     p = last["payload"]
     text = f"P{p.get('pass', 0)} W{p.get('warn', 0)} F{p.get('fail', 0)}"
-    return text, bool(current and last["commit"] != current), p
+    current = set(current) if isinstance(current, (set, list, tuple)) else ({current} if current else set())
+    return text, bool(current and last.get("commit") not in current), p
 
 
 def _age_level(state, age_s, cfg):
@@ -319,7 +321,10 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                                     "validation results are for an older server commit" + (" (re-validation running)" if running else ""),
                                     "wait for validation" if running else "codimango task rerun <task>"))
 
-        current = head or server_sha
+        current = {c for c in (head or server_sha,) if c}
+        if f["sync"] == "OK·doc" and server_sha:
+            current.add(server_sha)                     # doc-only commits since the server commit keep reviews current
+        f["equiv_commits"] = sorted(current)
         f["review"], f["confidence"], f["confidence_stale"], f["dissent"] = _reviews(tev, current)
         f["check"], f["check_stale"], check_payload = _check(tev, current)
         f["check_fail"] = bool(check_payload and check_payload.get("fail"))

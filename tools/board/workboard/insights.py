@@ -74,7 +74,7 @@ def validation_summary(items: list[dict], tbr_status: str | None = None) -> dict
             if ACTION.search(detail):
                 why = "provenance SUSPECT — review recommended" if "suspect" in detail.lower() else "reviewer action required"
                 issues.append({"check": name, "why": why, "fix": "verify before submit (see codimango)", "severity": "warn"})
-            elif re.search(r"(never ran|errored|did not run)", detail, re.I):
+            elif re.search(r"(never ran|errored|did not run|has not run|stopped waiting|unavailable|without a usable result)", detail, re.I):
                 info.append({"check": name, "why": short_detail(detail)[0]})
             continue
         if st == "warn" and CLEAN.search(detail) and not ACTION.search(detail):
@@ -110,60 +110,82 @@ def _h(hours):
 
 
 def next_steps(t: dict, flow: dict) -> list[dict]:
-    """Ordered steps [{do, eta}] for a task dict (projection fields + extra)."""
+    """Ordered steps [{do, eta}] for a task dict (projection fields + extra). Exactly one branch per Next action;
+    unresolved validation warnings come before any submit/resubmit ladder."""
     n = t.get("next") or ""
     steps = []
     vs = t.get("vsum") or {"issues": []}
     fails = [i for i in vs["issues"] if i["severity"] == "fail"]
+    infra = [i for i in vs["issues"] if i["why"].startswith("infra error")]
+    warns = [i for i in vs["issues"] if i["severity"] == "warn" and i not in infra]
     age_h = (t.get("state_age_s") or 0) / 3600
     wait_p50 = flow.get("wait_p50_h")
+    task = t.get("task", "<task>")
+    raw = t.get("status_raw")
+    submit = "resubmit for human review" if raw == "needs_revision" or t.get("entered_pool_at") else "submit for human review"
+
+    def warn_steps():
+        for i in warns:
+            fix = i["fix"].replace("{task}", task)
+            steps.append({"do": f"{i['check']}: {i['why']} — {fix}", "eta": "~15m"})
+        for i in infra:
+            steps.append({"do": f"{i['check']}: infra error — codimango task rerun {task} (free)", "eta": "~1m"})
+
+    def ladder(need_check=True):
+        rv = t.get("review")
+        need = 2 if rv in ("R0", "R~", None) else 1 if rv == "R1" else 0
+        if need_check and not (t.get("last_check") or {}).get("current"):
+            steps.append({"do": "`board check run` (presubmit)", "eta": "~10m"})
+        if need:
+            steps.append({"do": f"{need} agent-session review{'s' if need > 1 else ''} (`board review add`)",
+                          "eta": "~15m" if need == 1 else "~30m"})
+        steps.append({"do": submit, "eta": "~2m"})
+
     if n.startswith("RESOLVE"):
         steps.append({"do": "agree who owns it; release the other claim", "eta": "~5m"})
-    infra = [i for i in vs["issues"] if i["why"].startswith("infra error")]
-    task = t.get("task", "<task>")
-    if n.startswith("FIX validation") or n.startswith("RERUN validation"):
+    elif n.startswith("FIX validation") or n.startswith("RERUN validation"):
         for i in fails:
-            steps.append({"do": f"{i['check']}: {i['fix']}".replace("{task}", task), "eta": "effort varies"})
+            if i not in infra:
+                steps.append({"do": f"{i['check']}: {i['fix']}".replace("{task}", task), "eta": "effort varies"})
         if infra:
             steps.append({"do": f"{infra[0]['check']}: infra error — codimango task rerun {task} (free)", "eta": "~1m"})
         if vs.get("skipped"):
             steps.append({"do": f"then {', '.join(sorted(set(vs['skipped'])))} will run (skipped until then)", "eta": "—"})
-        steps.append({"do": "push, then wait for validation" if fails else "wait for the rerun to validate",
-                      "eta": "typically ~45m"})
-        if t.get("status_raw") == "needs_revision":
+        steps.append({"do": "push, then wait for validation" if [i for i in fails if i not in infra]
+                      else "wait for the rerun to validate", "eta": "typically ~45m"})
+        if raw == "needs_revision":
             steps.append({"do": "once green: resubmit for human review", "eta": "~2m"})
-    if n.startswith("ADDRESS agent"):
-        steps.append({"do": "address the session reviewer's 'changes' note (see card)", "eta": "effort varies"})
-    if n.startswith("FIX check"):
-        steps.append({"do": "fix the presubmit failures, re-run `board check run`", "eta": "~1h"})
-    if n.startswith("RERUN"):
-        steps.append({"do": f"codimango task rerun {t.get('task', '<task>')} (free)", "eta": "~1m"})
+    elif n.startswith("RERUN"):
+        steps.append({"do": f"codimango task rerun {task} (free) — results are for an older commit", "eta": "~1m"})
         steps.append({"do": "wait for validation", "eta": "~45m"})
-    if n.startswith("WAIT import"):
+    elif n.startswith("WAIT import"):
         steps.append({"do": "wait: codimango is importing your latest push", "eta": "~10m"})
-    if n.startswith("WAIT validation"):
+    elif n.startswith("WAIT validation"):
         steps.append({"do": "wait for validation to finish", "eta": "typically ~30m"})
         if infra:
             steps.append({"do": f"{infra[0]['check']} hit an infra error — if it isn't retried: codimango task rerun "
-                                f"{t.get('task', '<task>')}", "eta": "~1m"})
-    if n.startswith("ADDRESS"):
-        steps.append({"do": "address the reviewer's points (see last review)", "eta": "~3h"})
-        steps.append({"do": "presubmit + 2 agent reviews, then resubmit", "eta": "~1h"})
-    if n.startswith("RUN check"):
-        steps.append({"do": "`board check run` (presubmit)", "eta": "~10m"})
-    if n.startswith("RUN check") or n.startswith("GET R1") or n.startswith("GET R2"):
-        need = 2 if (t.get("review") in ("R0", "R~", None) or n.startswith("RUN")) else 1 if t.get("review") == "R1" else 0
-        if need:
-            steps.append({"do": f"{need} agent-session review{'s' if need > 1 else ''} (`board review add`)",
-                          "eta": "~15m" if need == 1 else "~30m"})
-        steps.append({"do": "submit for human review", "eta": "~2m"})
-    if n.startswith("SUBMIT"):
-        steps.append({"do": "submit for human review", "eta": "~2m"})
-    if n.startswith("WAIT reviewer"):
+                                f"{task}", "eta": "~1m"})
+    elif n.startswith("ADDRESS agent"):
+        steps.append({"do": "address the session reviewer's 'changes' note (see card)", "eta": "effort varies"})
+        warn_steps()
+        ladder()
+    elif n.startswith("ADDRESS"):
+        steps.append({"do": "address the human reviewer's points (see last review)", "eta": "~3h"})
+        warn_steps()
+        ladder()
+    elif n.startswith("FIX check"):
+        steps.append({"do": "fix the presubmit failures, re-run `board check run`", "eta": "~1h"})
+        warn_steps()
+        ladder(need_check=False)
+    elif n.startswith("RUN check") or n.startswith("GET R1") or n.startswith("GET R2") or n.startswith("SUBMIT"):
+        warn_steps()
+        ladder()
+    elif n.startswith("WAIT reviewer"):
         left = max(0.0, (wait_p50 or 40) - age_h)
-        steps.append({"do": "waiting for a human reviewer" + (" (past the typical wait)" if left == 0 else ""),
+        what = "review in progress — waiting for a decision" if raw == "being_reviewed" else "waiting for a reviewer to be assigned"
+        steps.append({"do": what + (" (past the typical wait)" if left == 0 else ""),
                       "eta": _h(left) if left else "any time now"})
-    if n.startswith("IMPORT"):
+    elif n.startswith("IMPORT"):
         steps.append({"do": "import the task into codimango", "eta": "~10m"})
     return steps
 

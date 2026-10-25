@@ -19,17 +19,21 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
     o = obs_by_task.get(v.entity_id, {})
     tev = ev_by_task.get(v.entity_id, [])
     head = o.get("git.task_head")
+    equiv = set(v.fields.get("equiv_commits") or ([head] if head else []))
     agent_reviews = [{"who": e["actor"].get("alias", ""), "verdict": e["payload"].get("verdict"),
                       "confidence": e["payload"].get("confidence"), "note": (e["payload"].get("note") or "")[:120],
-                      "current": bool(head and e.get("commit") == head), "at": e["occurred_at"]}
+                      "current": e.get("commit") in equiv, "at": e["occurred_at"]}
                      for e in tev if e["type"] == "review"]
     checks = [e for e in tev if e["type"] == "check"]
     last_check = None
     if checks:
         c = checks[-1]
-        last_check = dict(c["payload"], at=c["occurred_at"], current=bool(head and c.get("commit") == head))
+        last_check = dict(c["payload"], at=c["occurred_at"], current=c.get("commit") in equiv)
     legacy = [e["payload"] for e in tev if e["type"] == "note" and e["payload"].get("legacy_owner")]
-    dec = decisions.get(v.entity_id, {}).get("decisions", [])
+    rec = decisions.get(v.entity_id, {})
+    upd = o.get("codimango.updated_at")
+    history_stale = bool(rec) and bool(upd) and rec.get("key") != f"{upd}"
+    dec = [] if history_stale else rec.get("decisions", [])
     return {
         "validation": [{"name": x.get("name", ""), "status": x.get("status", ""), "detail": x.get("detail", "")}
                        for x in (o.get("codimango.validation") or [])],
@@ -42,7 +46,7 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
         "changed": (o.get("git.changed_since_validated") or [])[:8],
         "agent_reviews": agent_reviews, "last_check": last_check,
         "legacy": legacy[-1] if legacy else None,
-        "decisions": dec,
+        "decisions": dec, "review_history_stale": history_stale,
         "versions": versions(o.get("git.commit_times") or [], dec) if (dec or o.get("git.commit_times")) else [],
     }
 
@@ -95,6 +99,7 @@ def payload(snap, cfg) -> dict:
         "health": {k: {"ok": h.ok, "detail": h.detail} for k, h in snap.health.items()},
         "ledger_ok": bool(snap.sync_state and snap.sync_state.last_pull_ok
                           and (snap.sync_state.last_push_ok or not snap.sync_state.pending)) if snap.sync_state else None,
+        "ledger_at": snap.sync_state.at if snap.sync_state else None,
         "week": st.week_numbers(snap.observations, cfg, snap.now),
         "weekly": [dict(r, week=r["week"].strftime("%b %d")) for r in weekly],
         "funnel": st.funnel(snap.observations), "flow": flow,
