@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import os
 import fcntl
 import sqlite3
@@ -123,19 +124,19 @@ def _claude_paths(root: Path, cutoff: float, live_ids: set[str], limit: int = 40
         projects = list(root.iterdir())
     except OSError:
         return out
+    mains, subs = [], []
     for project in projects:
-        if not project.is_dir():
-            continue
-        candidates = list(project.glob("*.jsonl"))
-        candidates += list(project.glob("*/subagents/*.jsonl"))
-        for path in candidates:
+        if project.is_dir():
+            mains += list(project.glob("*.jsonl"))
+            subs += list(project.glob("*/subagents/*.jsonl"))
+    for path in mains + subs:                            # main transcripts first: the limit must never drop a live one
             try:
                 st = path.stat()
             except OSError:
                 continue
             native = path.parent.parent.name if path.parent.name == "subagents" else path.stem
             if st.st_mtime >= cutoff or native in live_ids:
-                out.append(("claude", path, native, {}))
+                out.append(("claude", path, native, {"subagent": path.parent.name == "subagents"}))
                 if len(out) >= limit:
                     return out
     return out
@@ -417,6 +418,45 @@ def _muse_record(raw: bytes, state: dict, native: str, meta: dict) -> None:
             source_confidence="medium")
 
 
+PEEK_BYTES = 2 * 1024 * 1024
+
+
+def _peek_claude(path: Path, now: float) -> dict | None:
+    """Current context + last-hour usage from the tail of a live transcript, independent of the history backfill
+    (which reads from the start and can lag days behind on multi-GB transcripts). Numbers only."""
+    try:
+        size = path.stat().st_size
+        with open(path, "rb") as fh:
+            fh.seek(max(0, size - PEEK_BYTES))
+            data = fh.read(PEEK_BYTES)
+    except OSError:
+        return None
+    seen, last_hour, context, at_last, model = set(), 0, None, None, None
+    for line in data.split(b"\n")[1:]:
+        if b'"usage"' not in line:
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        msg = row.get("message") if isinstance(row.get("message"), dict) else {}
+        usage = msg.get("usage") if isinstance(msg.get("usage"), dict) else None
+        if not usage or msg.get("id") in seen:
+            continue
+        seen.add(msg.get("id"))
+        at = _seconds(row.get("timestamp"))
+        nums = {k: _number(usage.get(k)) for k in ("input_tokens", "output_tokens", "cache_creation_input_tokens",
+                                                    "cache_read_input_tokens")}
+        if at is not None and 0 <= now - at <= 3600:
+            last_hour += sum(nums.values())
+        if at is not None and (at_last is None or at >= at_last):
+            at_last, model = at, msg.get("model") or model
+            context = nums["input_tokens"] + nums["cache_creation_input_tokens"] + nums["cache_read_input_tokens"]
+    if at_last is None:
+        return None
+    return {"context_tokens": context, "last_hour": last_hour, "at": _iso(at_last), "model": model}
+
+
 def _collect(cfg, evs: list[dict] | None, host_id: str, *, sessions: list[dict] | None = None,
              cache_dir: Path | None = None, claude_root: Path | None = None, codex_root: Path | None = None,
              muse_db: Path | None = None, now: float | None = None, recent_days: int = 14,
@@ -497,6 +537,20 @@ def _collect(cfg, evs: list[dict] | None, host_id: str, *, sessions: list[dict] 
     changed = bool(total_read or errors or not cache_path.exists())
     if changed:
         state["updated_at"] = _iso(now)
+    peeks = state.setdefault("peek", {})
+    for kind, path, native, meta in candidates:            # live Claude sessions: current numbers from the tail
+        if kind != "claude" or str(native) not in live_ids or meta.get("subagent"):
+            continue
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        key = f"claude:{native}"
+        if (peeks.get(key) or {}).get("mtime", 0) >= mtime:
+            continue          # unchanged, or an older copy of this session's transcript (another project dir)
+        got = _peek_claude(path, now)
+        if got:
+            peeks[key] = dict(got, mtime=mtime)
     state["last_cycle"] = {"at": _iso(now), "bytes_read": total_read, "files_read": files_read,
                            "records_seen": records_seen, "candidate_files": len(candidates),
                            "backlog_files": backlog_files, "backlog_bytes": backlog_bytes,
@@ -553,8 +607,14 @@ def _attribution(sample: dict, evs: list[dict], at: float) -> tuple[str | None, 
     tools = []
     for when, event in relevant:
         task = (event.get("entity") or {}).get("id")
-        if task and event.get("type") in ("touch", "check", "review") and 0 <= at - when <= 15 * 60:
+        if task and event.get("type") in ("touch", "check", "review", "build_action") and 0 <= at - when <= 15 * 60:
             tools.append(str(task))
+        elif task and event.get("type") == "presence":               # transcript scan: seen working this task
+            seen = _seconds((event.get("payload") or {}).get("last_seen")) if isinstance(
+                (event.get("payload") or {}).get("last_seen"), str) else (event.get("payload") or {}).get("last_seen")
+            seen = seen if isinstance(seen, (int, float)) else when
+            if -15 * 60 <= at - seen <= 30 * 60:
+                tools.append(str(task))
     tools = sorted(set(tools))
     if len(tools) == 1:
         return tools[0], "exact"
@@ -568,8 +628,16 @@ def _attribution(sample: dict, evs: list[dict], at: float) -> tuple[str | None, 
 def aggregate(state: dict, cfg, evs: list[dict], *, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     sessions = {}
-    for key, raw in state.get("sessions", {}).items():
+    peeks = state.get("peek") or {}
+    all_sessions = dict(state.get("sessions", {}))
+    for key, pk in peeks.items():                           # a live session not reached by the backfill yet
+        all_sessions.setdefault(key, {"kind": "claude", "native_id": key.split(":", 1)[1], "model": pk.get("model"),
+                                      "counters": {}, "observed_at": pk.get("at")})
+    for key, raw in all_sessions.items():
         counters = {k: _number((raw.get("counters") or {}).get(k)) for k in COUNTERS}
+        pk = peeks.get(key)
+        if pk and str(pk.get("at") or "") >= str(raw.get("observed_at") or ""):
+            raw = dict(raw, context_tokens=pk.get("context_tokens"), model=raw.get("model") or pk.get("model"))
         window = _number(raw.get("context_window")) or context_window(raw.get("model"), cfg)
         context = _number(raw.get("context_tokens"))
         if context and window and context > window and window <= 200000 and "claude" in str(raw.get("model") or "claude"):
@@ -580,6 +648,8 @@ def aggregate(state: dict, cfg, evs: list[dict], *, now: float | None = None) ->
                          "index_complete": bool((state.get("last_cycle") or {}).get("index_complete")),
                          "context": {"tokens": context or None, "window": window or None,
                                      "pressure_pct": round(100 * context / window) if context and window else None}}
+        if pk:
+            sessions[key]["last_hour_tail"] = _number(pk.get("last_hour"))
         from .costs import estimate
         sessions[key]["spend"] = estimate(raw.get("model"), counters, cfg, kind=raw.get("kind"))
     tasks, accounting = {}, {"exact": 0, "medium": 0, "ambiguous": 0, "unattributed": 0}
@@ -625,6 +695,8 @@ def aggregate(state: dict, cfg, evs: list[dict], *, now: float | None = None) ->
         attr = sum(x["attributed"] for x in kinds.values())
         days.append({"day": day, "kinds": kinds, "total": total,
                      "coverage_pct": round(100 * attr / total) if total else None})
+    for row in sessions.values():
+        row["last_hour"] = max(row.get("last_hour") or 0, row.pop("last_hour_tail", 0) or 0)
     return {"updated_at": state.get("updated_at"), "sessions": sessions, "tasks": tasks,
             "accounting": dict(accounting, total=indexed, attributed=attributed, coverage_pct=coverage),
             "daily": days, "collector": state.get("last_cycle") or {}}
@@ -638,7 +710,7 @@ def context_window(model: str | None, cfg) -> int:
             return _number(rate.context_window)
         lower = str(model).lower()
         if "claude" in lower:
-            return 200000
+            return 1_000_000 if re.search(r"(opus|sonnet)-5|\[1m\]", lower) else 200000
     return 0
 
 

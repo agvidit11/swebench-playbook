@@ -221,9 +221,19 @@ def payload(snap, cfg) -> dict:
                             local_host=local_host)
     live_hosts = {sv["id"] for sv in servers if sv["last_sync_ago_s"] is not None and sv["last_sync_ago_s"] < 900
                   and sv["sessions"]}
+    names = {}                                      # native session id -> short registry name (e.g. agvidit-0b)
+    for sv in servers:
+        for row in sv.get("sessions") or []:
+            if row.get("native_id") and row.get("name") and not row.get("is_summary"):
+                names[str(row["native_id"])] = row["name"]
     views = []
     for v in snap.views:
         f = dict(v.fields)
+        sid = f.get("owner_session") or str((f.get("assignment") or {}).get("session_key") or "").rsplit(":", 1)[-1]
+        if sid in names and names[sid] not in (f.get("owner") or ""):
+            host = (f.get("owner") or "").split("·", 1)[0]
+            title = (f.get("owner") or "").split("·", 1)[-1]
+            f["owner"] = f"{host}·{names[sid]}" + (f" · {title}" if title and title != names[sid] else "")
         t = {"task": v.entity_id, **{k: f.get(k) for k in (
             "group", "next", "state", "state_age_s", "age_level", "owner", "claim_health", "valid", "review",
             "confidence", "confidence_stale", "sync", "check", "check_stale", "check_fail", "pushes_before_submit",

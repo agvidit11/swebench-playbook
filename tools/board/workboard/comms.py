@@ -318,6 +318,38 @@ def _checkin_view(e: dict | None, now: float) -> dict:
             "checkin_at": e.get("occurred_at"), "checkin_ago_s": ago}
 
 
+def _ago(s: float) -> str:
+    return f"{int(s // 86400)}d" if s >= 86400 else f"{int(s // 3600)}h" if s >= 3600 else f"{int(s // 60)}m"
+
+
+def _fold_quiet_runs(rows: list[dict], host: str) -> list[dict]:
+    """Codex/Muse processes with no task focus and nothing recent fold into one row each (a host can have dozens of
+    leftover processes; listing them one by one buries the real sessions)."""
+    keep, quiet = [], {}
+    for r in rows:
+        f = (r.get("focus") or {}).get("tasks") or []
+        idle_s = r.get("status_ago_s") or 0
+        if r.get("kind") in ("codex", "muse") and not r.get("is_summary") and not f and idle_s > 2 * 3600:
+            quiet.setdefault(r["kind"], []).append(r)
+        else:
+            keep.append(r)
+    for kind, rs in quiet.items():
+        if len(rs) < 3:
+            keep.extend(rs)
+            continue
+        ages = sorted(r.get("status_ago_s") or 0 for r in rs)
+        keep.append({"session_key": f"quiet-{kind}:{host}", "native_id": f"quiet-{kind}:{host}", "kind": kind,
+                     "kind_icon": rs[0].get("kind_icon"), "name": f"{len(rs)} {kind.capitalize()} processes, no task",
+                     "is_summary": True, "status": f"idle {_ago(ages[0])}–{_ago(ages[-1])}", "status_group": "unknown",
+                     "focus": {"tasks": []}, "tasks": [], "child_runs": [],
+                     "advice": {"state": "watch", "reason": f"{len(rs)} live {kind} processes on {host} idle for "
+                                f"{_ago(ages[0])}–{_ago(ages[-1])} with no task — probably hung/leftover; check "
+                                f"`ps -u $USER -o pid,etime,args | grep {kind}` there and kill what is not needed"},
+                     "transport": {"available": False, "kind": "unavailable", "reason": "not an interactive session"},
+                     "restart": {"needed": False, "state": "not-applicable", "command": None}})
+    return keep
+
+
 def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = None,
             diagnostics: list[dict] | None = None, now: float | None = None,
             sync_state=None, local_host: str | None = None) -> list[dict]:
@@ -420,9 +452,13 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
         rows = native + fallback
         for row in rows:
             raw = str(row.get("status") or "unknown").lower()
+            if raw in ("busy", "shell", "working", "running") and (row.get("status_ago_s") or 0) > 6 * 3600 and \
+                    not row.get("is_actor"):
+                row["status"] = raw = f"stale ({raw} {_ago(row['status_ago_s'])} ago)"   # registry not updated since
             row["status_group"] = ("waiting" if raw.startswith("waiting") else
                                    "busy" if raw in ("busy", "shell", "working", "active", "running") else
                                    "idle" if raw == "idle" else "unknown")
+        rows = _fold_quiet_runs(rows, h)
         interactive = [s for s in rows if not s.get("is_summary") and not s.get("is_actor")]
         counts = {key: sum(s.get("status_group") == key for s in interactive)
                   for key in ("busy", "waiting", "idle", "unknown")}
