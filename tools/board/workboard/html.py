@@ -147,6 +147,16 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
     }
 
 
+def short_names(servers) -> dict[str, str]:
+    """native session id -> 'host·registry-name' (the name ListAgents / the Team tab use)."""
+    out = {}
+    for sv in servers or []:
+        for row in sv.get("sessions") or []:
+            if row.get("native_id") and row.get("name") and not row.get("is_summary"):
+                out[str(row["native_id"])] = f"{sv['id']}·{row['name']}"
+    return out
+
+
 def _team_payload(snap, cfg, servers=None) -> dict:
     """Build only Team data; safe to call on the cheap native-session refresh path."""
     from . import comms
@@ -177,8 +187,15 @@ def _team_payload(snap, cfg, servers=None) -> dict:
                                     "host": server["id"], "kind": session.get("kind"),
                                     "kind_icon": session.get("kind_icon"), "tasks": session.get("tasks") or [],
                                     "transport": session.get("transport")})
-    return {"servers": servers, "messages": comms.messages(snap.events)[-80:],
-            "sessions": sorted(set(__import__("workboard.events", fromlist=["x"]).latest_aliases(snap.events).values())),
+    names = short_names(servers)
+    msgs = comms.messages(snap.events)[-80:]
+    for m in msgs:                                    # one name per session everywhere: the registry name
+        if m.get("from_session") in names:
+            m["from"] = names[m["from_session"]]
+        for r in (m.get("delivery") or {}).get("recipients") or []:
+            if str(r.get("native_id")) in names:
+                r["name"] = names[str(r["native_id"])]
+    return {"servers": servers, "messages": msgs,
             "session_targets": session_targets, "task_targets": task_targets}
 
 
@@ -190,7 +207,10 @@ def fast_regions(snap, cfg, names=("team", "activity")) -> dict[str, dict]:
     if "team" in names:
         out["team"] = _team_payload(snap, cfg)
     if "activity" in names:
-        out["activity"] = {"items": comms.feed(snap.events, since_s=24 * 3600, limit=150)}
+        who = short_names(out.get("team", {}).get("servers") if isinstance(out.get("team"), dict) else None) or \
+            short_names(_team_payload(snap, cfg)["servers"])
+        out["activity"] = {"items": [dict(f, who=who.get(f.get("session") or "", f.get("who")))
+                                     for f in comms.feed(snap.events, since_s=24 * 3600, limit=150)]}
     return out
 
 
@@ -271,7 +291,8 @@ def payload(snap, cfg) -> dict:
         "usage_collector": (getattr(snap, "usage", {}) or {}).get("collector", {}),
         **team,
         "codimango_detail": snap.health["codimango"].detail if snap.health.get("codimango") else "",
-        "feed": comms.feed(snap.events, since_s=24 * 3600, limit=150),
+        "feed": [dict(f, who=short_names(servers).get(f.get("session") or "", f.get("who")))
+                 for f in comms.feed(snap.events, since_s=24 * 3600, limit=150)],
     }
 
 

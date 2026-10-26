@@ -301,7 +301,7 @@ def feed(evs: list[dict], since_s: float = 24 * 3600, now: float | None = None, 
         if e["type"] == "note" and not p.get("legacy_owner"):
             continue
         out.append({"id": e.get("event_id") or f"{e.get('host_id', '')}:{e.get('seq', '')}",
-                    "at": e["occurred_at"], "ts": at, "host": e.get("host_id", ""), "who": e["actor"].get("alias", ""),
+                    "at": e["occurred_at"], "ts": at, "host": e.get("host_id", ""), "who": e["actor"].get("alias", ""), "session": e["actor"].get("session_id", ""),
                     "type": e["type"], "task": task, "what": what})
     out.sort(key=lambda x: -x["ts"])
     return out[:limit]
@@ -346,6 +346,52 @@ def _fold_quiet_runs(rows: list[dict], host: str) -> list[dict]:
                                 f"{_ago(ages[0])}–{_ago(ages[-1])} with no task — probably hung/leftover; check "
                                 f"`ps -u $USER -o pid,etime,args | grep {kind}` there and kill what is not needed"},
                      "transport": {"available": False, "kind": "unavailable", "reason": "not an interactive session"},
+                     "restart": {"needed": False, "state": "not-applicable", "command": None}})
+    return keep
+
+
+def _talking(row: dict, last_seen: dict, now: float) -> bool:
+    """A session we are actually working with: busy/waiting now, recent board activity, or it holds tasks."""
+    raw = str(row.get("status") or "")
+    if raw.startswith("waiting") or (raw in ("busy", "shell", "working") and (row.get("status_ago_s") or 0) <= 6 * 3600):
+        return True
+    if (row.get("focus") or {}).get("tasks") or row.get("tasks"):
+        return True
+    seen = last_seen.get(row.get("native_id")) or last_seen.get(row.get("session_key"))
+    try:
+        if seen and now - datetime.fromisoformat(seen).timestamp() <= 24 * 3600:
+            return True
+    except ValueError:
+        pass
+    return raw == "idle" and (row.get("status_ago_s") or 10 ** 9) <= 24 * 3600
+
+
+def _fold_dormant(rows: list[dict], host: str, last_seen: dict, now: float) -> list[dict]:
+    """Keep the sessions we talk to; fold dormant interactive sessions into one row; make names unique per host."""
+    keep, dormant = [], []
+    rows = [r for r in rows if not str(r.get("alias") or r.get("name") or "").endswith("CLAIMS.md")]   # importer, not a session
+    for r in rows:
+        if r.get("is_actor") and r.get("kind") == "human":
+            r["name"] = "you (shell)"
+        if r.get("is_summary") or r.get("is_actor") or r.get("kind") != "claude" or _talking(r, last_seen, now):
+            keep.append(r)
+        else:
+            dormant.append(r)
+    counts = {}
+    for r in keep:
+        if not r.get("is_summary") and not r.get("is_actor"):
+            counts[r.get("name")] = counts.get(r.get("name"), 0) + 1
+    for r in keep:
+        if counts.get(r.get("name"), 0) > 1 and not r.get("is_summary"):
+            r["name"] = f"{r.get('name')} ·{str(r.get('native_id') or '')[:4]}"   # duplicate names get an id suffix
+    if dormant:
+        names = ", ".join(sorted(str(r.get("name")) for r in dormant))
+        keep.append({"session_key": f"dormant:{host}", "native_id": f"dormant:{host}", "kind": "claude",
+                     "kind_icon": "💤", "name": f"{len(dormant)} dormant session(s)", "is_summary": True,
+                     "status": "dormant", "status_group": "unknown", "focus": {"tasks": []}, "tasks": [],
+                     "child_runs": [], "dormant": [r.get("name") for r in dormant],
+                     "advice": {"state": "watch", "reason": f"no activity for 24h+: {names} — close them if done"},
+                     "transport": {"available": False, "kind": "unavailable", "reason": "dormant"},
                      "restart": {"needed": False, "state": "not-applicable", "command": None}})
     return keep
 
@@ -459,6 +505,12 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
                                    "busy" if raw in ("busy", "shell", "working", "active", "running") else
                                    "idle" if raw == "idle" else "unknown")
         rows = _fold_quiet_runs(rows, h)
+        last_seen = {}
+        for e in mine:
+            sid_ = (e.get("actor") or {}).get("session_id")
+            if sid_:
+                last_seen[sid_] = max(last_seen.get(sid_, ""), e.get("occurred_at") or "")
+        rows = _fold_dormant(rows, h, last_seen, now)
         interactive = [s for s in rows if not s.get("is_summary") and not s.get("is_actor")]
         counts = {key: sum(s.get("status_group") == key for s in interactive)
                   for key in ("busy", "waiting", "idle", "unknown")}
