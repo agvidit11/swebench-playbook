@@ -55,6 +55,12 @@ class ConfigShapesTest(unittest.TestCase):
         self.assertFalse(load_config(Path("/nonexistent")).reports.include_contribution)
         self.assertTrue(load_config(write("[reports]\ninclude_contribution = true\n")).reports.include_contribution)
 
+    def test_private_pricing_table_shape(self):
+        cfg = load_config(write('[[pricing.models]]\npattern = "gpt-*"\neffective_from = "2026-01-01"\n'
+                                'input_per_million = 1.5\noutput_per_million = 4.0\ncontext_window = 258400\n'))
+        self.assertEqual(cfg.pricing.models[0].pattern, "gpt-*")
+        self.assertEqual(cfg.pricing.models[0].context_window, 258400)
+
     def test_bool_rejected_for_int(self):
         with self.assertRaises(ValueError):
             load_config(write("[claims]\nexpire_after_hours = true\n"))

@@ -18,7 +18,7 @@ SESSION_FIELDS = {
 CHILD_FIELDS = {
     "session_key", "native_id", "kind", "kind_icon", "host", "name", "started_at", "age_s",
     "last_activity_at", "status", "status_since", "live", "cwd_task", "model", "effort", "provider",
-    "transport", "parent_session_key", "parent_confidence",
+    "transport", "parent_session_key", "parent_confidence", "tokens",
 }
 
 

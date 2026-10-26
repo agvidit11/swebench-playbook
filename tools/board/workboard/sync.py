@@ -169,6 +169,21 @@ def sync(cfg, *, host_id: str | None = None, state_dir: Path | None = None, time
                 st.pending = len(_spool_lines(state_dir))
             except Exception:
                 st.pending = 0
+        # Usage is an isolated derived cache: a parser/schema failure must not
+        # prevent ledger delivery, and tests with an explicit state directory
+        # never touch the live cache.
+        try:
+            from . import usage
+            configured_cache = os.environ.get("WORKBOARD_CACHE")
+            usage_cache = Path(configured_cache).expanduser() if configured_cache else state_dir
+            isolated = str(getattr(cfg, "path", "")) == "/nonexistent"
+            roots = ({"claude_root": state_dir / "usage-fixtures" / "claude",
+                      "codex_root": state_dir / "usage-fixtures" / "codex",
+                      "muse_db": state_dir / "usage-fixtures" / "muse.db"} if isolated else {})
+            usage.collect(cfg, [], host_id, cache_dir=usage_cache, byte_budget=32 * 1024 * 1024,
+                          time_budget_s=5.0, **roots)
+        except Exception:
+            pass
         _save_state(state_dir, st)
         return st
     finally:

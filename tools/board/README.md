@@ -37,6 +37,10 @@ board import-claims --dry-run   # one-time: show live rows of an old CLAIMS.md (
 - **Sessions** come from Claude's native registry with a stable kind/host/uid-domain/native-id key. Foreign-uid,
   foreign-domain, malformed, stale-PID, and PID-reused records never count as live. Codex and Muse executions appear
   as child runs under the Claude session that launched them when the link is supported by evidence.
+- **Usage indexing** incrementally tails only live/recent (14-day) Claude, Codex, and Muse logs with
+  path-fingerprint/inode/offset cursors under `~/.cache/workboard`. It stores numeric counters, IDs, timestamps,
+  task slugs, and model names—never prompt, response, command, or message text. Task totals retain
+  exact/medium/ambiguous/unattributed buckets; unknown attribution is never forced onto a task.
 - **Hooks** (Claude Code) record activity, name sessions after their tab title and block edits to a task another
   live session owns. They never touch the network and always fail open; the 2-minute background `board sync`
   then attempts the atomic claim for touched free tasks (so ownership lags activity by up to one sync).
@@ -59,10 +63,15 @@ and re-arms. Current hooks remain a fallback and also record a delivered receipt
 parent Claude session; unsupported interactive transports stay visibly unavailable.
 
 The Team tab lists each native session and its stable kind icon (🟣 Claude, 🟢 Codex, 🟠 Muse), status/age/focus,
-child runs, transport, last board report/request, restart guidance, and deterministic keep/watch advice. Token and
-context totals say unavailable until increment 3 rather than estimating them.
+child runs, indexed total/last-hour tokens, current context pressure, transport, restart guidance, and deterministic
+keep/watch/rotate/unblock advice with visible thresholds. Advice never acts automatically. Task drawers lazily read
+bounded Codimango job counts. Spend says `cost unavailable` unless a matching private `[[pricing.models]]` entry and
+authoritative model/token data support an estimate; unknown spend is never shown as `$0`.
 Each sync overwrites the private-ledger `hosts/<host>.json` summary, letting the peer host show a bounded, redacted
 session inventory and queue health without reading the other machine's home directory.
+
+Dashboard shortcuts: `/` focuses task search, `b` opens Board, `t` opens Team, `e` expands an open drawer, and
+`Esc` closes the drawer (or clears search when no drawer is open).
 
 ## Setup
 
@@ -86,3 +95,5 @@ Tests: `python3 -m unittest discover -s tests` (stdlib only, Python ≥ 3.11).
 Increment-1 stress: `python3 -m tests.stress_increment1` (synthetic data only).
 Increment-2 stress: `python3 -m tests.stress_increment2 --idle-seconds 60` (300 tasks, 40 sessions, 1,000 activity
 items, 200 keyed refreshes, and an idle-CPU sample; synthetic data only).
+Increment-3 stress: `python3 -m tests.stress_increment3` (40 sparse 200 MB transcripts, rotation, truncation,
+concurrent append, reconciliation, idle byte budget, and privacy sentinel; synthetic data only).

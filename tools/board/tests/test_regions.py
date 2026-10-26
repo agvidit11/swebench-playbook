@@ -133,3 +133,14 @@ class RegionHTTPTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["service"], "workboard")
 
+    def test_lazy_online_usage_endpoint_is_numeric_and_sanitized(self):
+        task = self.snapshot.views[0].entity_id
+        value = {"source": "codimango read-only CLI", "run_count": 2, "trial_count": 7,
+                 "trials_by_kind": {"oracle": 3, "codex": 4},
+                 "cost": {"available": False, "label": "cost unavailable"}}
+        with mock.patch("workboard.costs.online_usage", return_value=value):
+            status, _, body = self.request("/api/spend/" + urllib.parse.quote(task, safe=""))
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), value)
+        self.assertNotIn(b"prompt", body.lower())
+

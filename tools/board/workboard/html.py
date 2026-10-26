@@ -114,11 +114,21 @@ def _task_extra(v, obs_by_task, ev_by_task, decisions) -> dict:
     upd = o.get("codimango.updated_at")
     history_stale = bool(rec) and bool(upd) and rec.get("key") != f"{upd}"
     dec = [] if history_stale else rec.get("decisions", [])
+    online_kinds = {"oracle": o.get("codimango.oracle_total"), "avocado": o.get("codimango.avocado_total"),
+                    "codex": o.get("codimango.codex_total")}
+    known_online = {key: int(value) for key, value in online_kinds.items()
+                    if isinstance(value, (int, float)) and not isinstance(value, bool)}
     return {
         "validation": [{"name": x.get("name", ""), "status": x.get("status", ""), "detail": x.get("detail", "")}
                        for x in (o.get("codimango.validation") or [])],
         "oracle": [o.get("codimango.oracle_pass"), o.get("codimango.oracle_total")],
         "avocado": [o.get("codimango.avocado_pass"), o.get("codimango.avocado_total")],
+        "codex": [o.get("codimango.codex_pass"), o.get("codimango.codex_total")],
+        "online_usage": {"source": "codimango task list", "run_count": None,
+                         "trial_count": sum(known_online.values()) if known_online else None,
+                         "trials_by_kind": known_online,
+                         "cost": {"available": False, "label": "cost unavailable",
+                                  "reason": "open the drawer to fetch bounded job counts"}},
         "created_at": o.get("codimango.created_at"), "entered_pool_at": o.get("codimango.entered_pool_at"),
         "reviewed_at": o.get("codimango.reviewed_at"), "status_raw": o.get("codimango.status"),
         "server_commit": (o.get("codimango.commit_sha") or "")[:8], "server_head": (o.get("codimango.head_commit_sha") or "")[:8],
@@ -220,7 +230,7 @@ def payload(snap, cfg) -> dict:
             "pushes_after_submit", "track", "active", "dissent", "links", "tag", "status_raw", "done_kind",
             "category", "imported", "validated", "age_label", "claim_source", "tbr_status", "infra_only", "gates", "check_need", "pushes_since_decision",
             "assignment", "activity", "pipeline", "last_push", "availability", "ownership_state",
-            "ownership_reason", "owner_session")},
+            "ownership_reason", "owner_session", "local_usage", "local_spend")},
             "findings": [{"code": x.code, "severity": x.severity, "summary": x.summary, "next": x.next_action}
                          for x in v.findings],
             **_task_extra(v, obs_by_task, ev_by_task, decisions)}
@@ -246,6 +256,9 @@ def payload(snap, cfg) -> dict:
         "funnel": st.funnel(snap.observations), "flow": flow,
         "ages": st.pipeline_age(snap.views, snap.now), "load": load,
         "tasks": views,
+        "token_daily": (getattr(snap, "usage", {}) or {}).get("daily", []),
+        "token_accounting": (getattr(snap, "usage", {}) or {}).get("accounting", {}),
+        "usage_collector": (getattr(snap, "usage", {}) or {}).get("collector", {}),
         **team,
         "codimango_detail": snap.health["codimango"].detail if snap.health.get("codimango") else "",
         "feed": comms.feed(snap.events, since_s=24 * 3600, limit=150),
@@ -291,7 +304,7 @@ def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 30, team_interval
           host: str = "127.0.0.1", send_fn=None):
     """Serve coherent, canonical regions plus the historical compatibility view."""
     from . import regions
-    from .app import refresh_sessions
+    from .app import cache_dir, refresh_sessions
 
     initial = gather_fn()
     generations = regions.source_generations(cfg)
@@ -330,6 +343,9 @@ def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 30, team_interval
             with state_lock:
                 base = state["snap"]
             snap = refresh_sessions(cfg, base)
+            # refresh_sessions may advance telemetry cursors; publish the Team
+            # document against that new usage generation in the same cycle.
+            gens = regions.source_generations(cfg)
             cache.replace_selected(fast_regions(snap, cfg, dirty), generations=gens)
             with state_lock:
                 state.update(snap=snap, at=snap.now.isoformat(), generations=gens)
@@ -397,6 +413,28 @@ def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 30, team_interval
                     self._send(304, etag=doc.etag, cache_control="no-cache")
                 else:
                     self._send(200, doc.body, "application/json", doc.etag, "no-cache")
+                return
+            if path.startswith("/api/spend/"):
+                task = unquote(path[len("/api/spend/"):])
+                doc = cache.detail(task)
+                if doc is None:
+                    self.send_error(404)
+                    return
+                detail = doc.data
+                baseline = {"oracle": (detail.get("oracle") or [None, None])[1],
+                            "avocado": (detail.get("avocado") or [None, None])[1],
+                            "codex": (detail.get("codex") or [None, None])[1]}
+                try:
+                    from . import costs
+                    value = costs.online_usage(task, cfg, cache_dir(), baseline=baseline)
+                    self._send(200, regions.canonical_bytes(value), "application/json", cache_control="no-cache")
+                except Exception as exc:
+                    self._send(200, regions.canonical_bytes({"source": "codimango read-only CLI",
+                               "run_count": None, "trial_count": sum(x or 0 for x in baseline.values()),
+                               "trials_by_kind": baseline,
+                               "cost": {"available": False, "label": "cost unavailable"},
+                               "error": f"{exc.__class__.__name__}: {exc}"[:160]}),
+                               "application/json", cache_control="no-cache")
                 return
             with state_lock:
                 built_at, error = state["at"], state["error"]

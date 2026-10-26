@@ -44,6 +44,18 @@ daiquery_id = ""     # saved DaiQuery id for `workboard rank` (optional)
 [reports]
 include_contribution = false   # per-session/model stats in exports (private, non-causal)
 
+# Optional and private. Without a matching model/rate, the UI says "cost unavailable".
+# [[pricing.models]]
+# pattern = "provider/model-version"
+# effective_from = "2026-10-01"
+# input_per_million = 0.0
+# output_per_million = 0.0
+# cache_read_per_million = 0.0
+# cache_write_per_million = 0.0
+# reasoning_per_million = 0.0
+# currency = "USD"
+# context_window = 200000
+
 [legacy]
 claims_md = ""      # optional: path to an old CLAIMS.md for a one-time `workboard import-claims`
 

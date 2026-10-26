@@ -19,6 +19,14 @@ from .sources.gitsrc import GitSource, changed_files
 GIT_STAMP = "git-last-fetch"
 
 
+def _usage_roots(cfg, cdir: Path) -> dict:
+    """Keep default/no-config test snapshots isolated from real native logs."""
+    if str(getattr(cfg, "path", "")) != "/nonexistent":
+        return {}
+    root = Path(cdir) / "usage-fixtures"
+    return {"claude_root": root / "claude", "codex_root": root / "codex", "muse_db": root / "muse.db"}
+
+
 @dataclass
 class Snapshot:
     views: list
@@ -30,6 +38,7 @@ class Snapshot:
     now: datetime = None
     sessions: list = field(default_factory=list)
     session_diagnostics: list = field(default_factory=list)
+    usage: dict = field(default_factory=dict)
 
 
 def cache_dir() -> Path:
@@ -128,12 +137,31 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
             if e["event_id"] not in known]
     findings += ev_findings
     views = project(obs, evs, cfg, now, claims_healthy=claims_healthy)
-    native_sessions, session_diagnostics = [], []
+    native_sessions, session_diagnostics, usage_summary = [], [], {}
     try:
         from . import session_inventory
         host_id = sync_mod.safe_host(sync_mod.host_id_for(cfg))
         native_sessions, session_diagnostics = session_inventory.discover(
             cfg, evs, host_id, now=now.timestamp())
+        try:
+            from . import usage
+            usage_summary = usage.collect(cfg, evs, host_id, sessions=native_sessions, cache_dir=cdir,
+                                          now=now.timestamp(), byte_budget=16 * 1024 * 1024,
+                                          time_budget_s=min(1.5, max(0.2, sync_timeout / 4)),
+                                          **_usage_roots(cfg, cdir))
+            usage.decorate_sessions(native_sessions, usage_summary)
+            usage.apply_task_usage(views, usage_summary, cfg)
+            usage.apply_advice(native_sessions, views, now=now.timestamp())
+            cycle = usage_summary.get("collector") or {}
+            health["usage"] = SourceHealth("usage", not bool(cycle.get("errors")), now, 120,
+                                           f"{cycle.get('bytes_read', 0)} bytes; "
+                                           f"{len(usage_summary.get('sessions', {}))} indexed session(s)" +
+                                           (f"; {', '.join(cycle['errors'])}" if cycle.get("errors") else ""))
+        except Exception as exc:
+            session_diagnostics.append({"host": host_id, "classification": "source-error",
+                                        "reason": f"usage collector: {exc.__class__.__name__}"})
+            health["usage"] = SourceHealth("usage", False, now, 120,
+                                           f"usage collector: {exc.__class__.__name__}")
         from . import host_snapshots
         host_snapshots.cache_local(state_dir, host_id, [s for s in native_sessions if not s.get("remote")],
                                    [d for d in session_diagnostics if d.get("host") == host_id], at=now.isoformat())
@@ -146,7 +174,7 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
         health["sessions"] = SourceHealth("sessions", False, now, 30,
                                           f"session discovery: {exc.__class__.__name__}")
     return Snapshot(views, obs, evs, health, findings, sync_state, now,
-                    native_sessions, session_diagnostics)
+                    native_sessions, session_diagnostics, usage_summary)
 
 
 def refresh_sessions(cfg, snap: Snapshot) -> Snapshot:
@@ -157,14 +185,26 @@ def refresh_sessions(cfg, snap: Snapshot) -> Snapshot:
     known = {e["event_id"] for e in evs}
     evs += [e for e in pending_spool_events(state_dir, sync_mod.safe_host(sync_mod.host_id_for(cfg)))
             if e["event_id"] not in known]
-    sessions, diagnostics = [], []
+    sessions, diagnostics, usage_summary = [], [], getattr(snap, "usage", {})
     try:
         from . import session_inventory
         sessions, diagnostics = session_inventory.discover(
             cfg, evs, sync_mod.safe_host(sync_mod.host_id_for(cfg)), now=now.timestamp())
+        try:
+            from . import usage
+            usage_summary = usage.collect(cfg, evs, sync_mod.safe_host(sync_mod.host_id_for(cfg)),
+                                          sessions=sessions, cache_dir=cache_dir(), now=now.timestamp(),
+                                          byte_budget=8 * 1024 * 1024, time_budget_s=0.75,
+                                          **_usage_roots(cfg, cache_dir()))
+            usage.decorate_sessions(sessions, usage_summary)
+            usage.apply_advice(sessions, snap.views, now=now.timestamp())
+        except Exception as exc:
+            diagnostics.append({"host": sync_mod.safe_host(sync_mod.host_id_for(cfg)),
+                                "classification": "source-error",
+                                "reason": f"usage collector: {exc.__class__.__name__}"})
     except Exception as exc:
         diagnostics = [{"host": sync_mod.safe_host(sync_mod.host_id_for(cfg)),
                         "classification": "source-error",
                         "reason": f"session discovery: {exc.__class__.__name__}"}]
     return replace(snap, events=evs, sessions=sessions, session_diagnostics=diagnostics,
-                   findings=list(snap.findings) + ev_findings, now=now)
+                   findings=list(snap.findings) + ev_findings, now=now, usage=usage_summary)

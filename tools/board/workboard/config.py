@@ -100,6 +100,25 @@ class Reports:
 
 
 @dataclass
+class PricingModel:
+    """Optional private pricing.  Token facts never depend on these rates."""
+    pattern: str = ""
+    effective_from: str = ""
+    input_per_million: float = 0.0
+    output_per_million: float = 0.0
+    cache_read_per_million: float = 0.0
+    cache_write_per_million: float = 0.0
+    reasoning_per_million: float = 0.0
+    currency: str = "USD"
+    context_window: int = 0
+
+
+@dataclass
+class Pricing:
+    models: list[PricingModel] = field(default_factory=list)
+
+
+@dataclass
 class Legacy:
     claims_md: str = ""        # path to a free-text claims ledger for `workboard import-claims`
 
@@ -125,6 +144,7 @@ class Config:
     checks: Checks = field(default_factory=Checks)
     rank: Rank = field(default_factory=Rank)
     reports: Reports = field(default_factory=Reports)
+    pricing: Pricing = field(default_factory=Pricing)
     legacy: Legacy = field(default_factory=Legacy)
     plugins: Plugins = field(default_factory=Plugins)
     path: str = ""                     # internal: where this config was loaded from

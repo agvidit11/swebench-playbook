@@ -182,6 +182,14 @@ class SyncTest(unittest.TestCase):
         self.assertTrue(st.last_pull_ok)
         self.assertIsNotNone(st.at)
 
+    def test_sync_runs_usage_collector_in_isolated_cache(self):
+        cfg, state = self.host("h1")
+        with patch("workboard.usage.collect", return_value={}) as collect:
+            sync.sync(cfg, host_id="h1", state_dir=state)
+        self.assertEqual(collect.call_count, 1)
+        self.assertEqual(Path(collect.call_args.kwargs["cache_dir"]), state)
+        self.assertTrue(str(collect.call_args.kwargs["claude_root"]).startswith(str(state)))
+
     def test_snapshot_source_exception_does_not_abort_event_sync_and_is_recorded(self):
         cfg, state = self.host("h1")
         spool_some(state, 1)

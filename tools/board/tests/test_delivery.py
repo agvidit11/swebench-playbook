@@ -58,3 +58,17 @@ class ReceiptStateMachineTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BroadcastReceiptTest(unittest.TestCase):
+    def test_receipt_clears_broadcast_job(self):
+        from workboard import comms
+        actor = {"session_id": "sender", "alias": "h·me", "kind": "claude"}
+        msg = comms.new_message("hello", {"to": "all", "to_label": "everyone"}, actor)
+        msg.update(host_id="h", seq=1, recorded_at=msg["occurred_at"])
+        sessions = [{"host": "h", "kind": "claude", "session_key": "claude:h:1:x:abc", "native_id": "abc", "name": "s1"}]
+        jobs = comms.courier_jobs([msg], sessions, "h")
+        self.assertEqual(len(jobs), 1)
+        rec = comms.receipt_event(msg["event_id"], jobs[0]["recipient"], "delivered", actor)
+        rec.update(host_id="h", seq=2, recorded_at=rec["occurred_at"])
+        self.assertEqual(comms.courier_jobs([msg, rec], sessions, "h"), [])

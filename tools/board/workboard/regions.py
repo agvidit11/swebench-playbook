@@ -23,21 +23,22 @@ NAMES = ("summary", "board", "team", "activity", "stats")
 # resulting bytes are identical.
 REGION_INPUTS = {
     "summary": ("codimango", "git", "ledger", "presence"),
-    "board": ("codimango", "git", "ledger", "presence"),
-    "team": ("ledger", "registry_runs", "presence"),
+    "board": ("codimango", "git", "ledger", "presence", "usage"),
+    "team": ("ledger", "registry_runs", "presence", "usage"),
     "activity": ("ledger", "presence"),
-    "stats": ("codimango", "git", "ledger"),
+    "stats": ("codimango", "git", "ledger", "usage"),
 }
 
 DETAIL_KEYS = {
     "validation", "decisions", "versions", "changed", "gates", "agent_reviews",
-    "legacy", "findings", "steps", "checks", "last_check",
+    "legacy", "findings", "steps", "checks", "last_check", "online_usage", "local_spend",
 }
 
 ROW_KEYS = {
     "task", "group", "next", "age_level", "owner", "valid", "sync", "tag", "status_raw", "validated",
     "age_label", "ownership_state", "owner_last_at", "kind", "vp", "vsum", "older_results",
     "entered_pool_at", "review_history_stale",
+    "local_usage",
 }
 
 WIRE_KEYS = {
@@ -49,6 +50,7 @@ WIRE_KEYS = {
     "activity": "ac", "pipeline": "pp", "last_push": "lp", "gate_summary": "gs", "rsum": "rs",
     "revision_count": "rc", "latest_decision": "ld", "finding_codes": "fc", "sync_summary": "sy",
     "tags": "ta", "legacy_summary": "lg", "kind_line": "kl", "detail_version": "dv", "row_version": "rv",
+    "local_usage": "lu",
 }
 WIRE_KEYS_REVERSE = {short: long for long, short in WIRE_KEYS.items()}
 
@@ -161,8 +163,9 @@ def source_generations(cfg, *, cache: Path | None = None, state: Path | None = N
 
     event_files = app_mod.ledger_event_files(cfg)
     presence = _tree_stamp(event_files + [state / "spool.jsonl"])
+    usage = _tree_stamp([cache / "usage-v1.json"])
     return {"codimango": codimango, "git": git, "ledger": ledger_gen,
-            "registry_runs": registry_runs, "presence": presence}
+            "registry_runs": registry_runs, "presence": presence, "usage": usage}
 
 
 def _state_since(task: dict, now) -> str | None:
@@ -258,6 +261,10 @@ def _encode_nested(key: str, value):
         return [value.get("agent"), value.get("agent_current"), value.get("agent_green"), value.get("human")]
     if key == "latest_decision" and value:
         return [value.get("kind"), value.get("at"), (value.get("reason") or "")[:140]]
+    if key == "local_usage":
+        kinds = value.get("by_kind") or {}
+        return [kinds.get("claude", 0), kinds.get("codex", 0), kinds.get("muse", 0),
+                value.get("total", 0), value.get("coverage_pct"), bool(value.get("approximate"))]
     return value
 
 
@@ -289,6 +296,10 @@ def expand_task(row: dict) -> dict:
         out["rsum"] = dict(zip(("agent", "agent_current", "agent_green", "human"), out["rsum"]))
     if isinstance(out.get("latest_decision"), list):
         out["latest_decision"] = dict(zip(("kind", "at", "reason"), out["latest_decision"]))
+    if isinstance(out.get("local_usage"), list):
+        values = out["local_usage"]
+        out["local_usage"] = {"by_kind": {"claude": values[0], "codex": values[1], "muse": values[2]},
+                              "total": values[3], "coverage_pct": values[4], "approximate": values[5]}
     return out
 
 
@@ -355,7 +366,8 @@ def split_payload(full: dict, *, now=None, names=None) -> tuple[dict[str, dict],
     if "activity" in wanted:
         regions["activity"] = {"items": full.get("feed") or []}
     if "stats" in wanted:
-        regions["stats"] = {k: full.get(k) for k in ("weekly", "funnel", "flow", "ages", "load")}
+        regions["stats"] = {k: full.get(k) for k in ("weekly", "funnel", "flow", "ages", "load",
+                                                              "token_daily", "token_accounting", "usage_collector")}
     return regions, details
 
 
@@ -450,7 +462,8 @@ class RegionCache:
             out.update(self._docs["board"].data)
             out.update({"servers": [], "messages": [], "sessions": [], "session_targets": [],
                         "task_targets": {}, "feed": [], "weekly": [], "funnel": {}, "flow": {},
-                        "ages": {}, "load": {},
+                        "ages": {}, "load": {}, "token_daily": [], "token_accounting": {},
+                        "usage_collector": {},
                         # Only preloaded regions may be conditionally fetched.  Lazy regions
                         # need one 200 response before their ETag is useful to the page.
                         "_etags": {name: self._docs[name].etag for name in ("summary", "board")}})

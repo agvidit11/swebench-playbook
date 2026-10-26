@@ -59,6 +59,13 @@ class HtmlTest(unittest.TestCase):
             self.assertIn(text, PAGE)
         self.assertNotIn("fetch('data.json'", PAGE)
 
+    def test_busy_user_keyboard_and_token_contract(self):
+        from workboard.html_page import PAGE
+        for text in ("Primary action", "local tokens: Claude", "last hour", "% context",
+                     "e.key.toLowerCase()==='t'", "e.key.toLowerCase()==='b'", "e.key==='Escape'",
+                     "No tasks match these filters", "No live sessions were discovered"):
+            self.assertIn(text, PAGE)
+
     def test_inline_page_uses_no_multi_codepoint_emoji_sequences(self):
         from workboard.html_page import PAGE
         self.assertNotIn("\ufe0f", PAGE)

@@ -168,6 +168,7 @@ def ack_event(msg_id: str, actor: dict) -> dict:
 def courier_jobs(evs: list[dict], sessions: list[dict], host_id: str) -> list[dict]:
     """Undelivered local Claude recipients. Message bodies remain sourced from the private ledger."""
     local = [s for s in sessions if s.get("host") == host_id and s.get("kind") == "claude"]
+    receipts = _receipt_states(evs)              # broadcasts have no pinned list: receipts must be checked directly
     out, seen = [], set()
     for m in messages(evs):
         pinned = (m.get("delivery") or {}).get("recipients") or []
@@ -185,6 +186,12 @@ def courier_jobs(evs: list[dict], sessions: list[dict], host_id: str) -> list[di
         for session in candidates:
             recipient = session.get("session_key") or session.get("native_id")
             state = state_by_key.get(recipient, {}).get("state", "published")
+            for k in (recipient, session.get("native_id")):
+                rec = receipts.get((m["id"], k))
+                if rec and RECEIPT_RANK.get(rec["state"], 0) > RECEIPT_RANK.get(state, 0):
+                    state = rec["state"]
+            if session.get("native_id") in m.get("acked_by", []):
+                state = "acked"
             key = (m["id"], recipient)
             if key in seen or state in ("delivered", "acked", "failed") or m["from_session"] == session.get("native_id"):
                 continue
@@ -359,7 +366,7 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
                 pass
             child_runs = [{k: r.get(k) for k in ("session_key", "native_id", "kind", "kind_icon", "name", "status",
                                                   "started_at", "age_s", "last_activity_at", "cwd_task", "model",
-                                                  "effort", "parent_confidence", "transport")}
+                                                  "effort", "parent_confidence", "transport", "tokens")}
                           for r in s.get("child_runs") or []]
             native.append({k: v for k, v in {
                 "session_key": s.get("session_key"), "native_id": sid, "alias": f"{h}·{s.get('name')}",

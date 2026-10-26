@@ -51,6 +51,11 @@ Everything you record is pushed to the shared ledger immediately; the dashboard 
 polls canonical regions conditionally (bodyless 304 when unchanged), so filters, rows, and open drawers stay put.
 `board setup` installs `board serve --ensure` as a one-minute single-instance watchdog alongside sync.
 
+**Tokens and advice:** the Team tab separates indexed lifetime/session tokens, last-hour usage, and current context
+pressure. Keep/watch/rotate/unblock advice is deterministic, explains its thresholds, and never acts automatically.
+Task token totals are qualified by attribution coverage. Spend remains `cost unavailable` unless private pricing and
+authoritative token/model data support an estimate; never interpret unknown as `$0`.
+
 | Want | Command |
 |---|---|
 | What to do next / who owns what | `board` (`--wide`, `--all`, `--group owner`) |
