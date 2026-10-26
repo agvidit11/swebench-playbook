@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
-# workboard shim: run from anywhere.
+# workboard shim: run from anywhere, with a Python new enough for the package (3.11+, tomllib).
+# Cron runs with a minimal PATH where plain `python3` can be an old system Python, so look further.
 here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m workboard "$@"
+py=""
+for cand in "${WORKBOARD_PYTHON:-}" python3.13 python3.12 python3.11 \
+            /usr/local/fbcode/platform010/bin/python3.12 /usr/local/bin/python3.12 /usr/local/bin/python3.11 python3; do
+  [ -n "$cand" ] || continue
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
+    py="$cand"; break
+  fi
+done
+if [ -z "$py" ]; then
+  echo "workboard: needs Python 3.11+ (found none; set WORKBOARD_PYTHON=/path/to/python3.12)" >&2
+  exit 3
+fi
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "$py" -m workboard "$@"
