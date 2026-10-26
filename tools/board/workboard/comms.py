@@ -165,6 +165,16 @@ def ack_event(msg_id: str, actor: dict) -> dict:
     return events.new_event("ack", None, {"msg_id": msg_id}, actor=actor, commit=None, source="comms")
 
 
+def _broadcast_target(session: dict, sent_at: str | None) -> bool:
+    if session.get("session_kind") not in (None, "interactive") or str(session.get("name") or "").startswith("mcdaemon"):
+        return False
+    try:
+        return not session.get("started_at") or not sent_at or \
+            datetime.fromisoformat(session["started_at"]) <= datetime.fromisoformat(sent_at)
+    except (TypeError, ValueError):
+        return True
+
+
 def courier_jobs(evs: list[dict], sessions: list[dict], host_id: str) -> list[dict]:
     """Undelivered local Claude recipients. Message bodies remain sourced from the private ledger."""
     local = [s for s in sessions if s.get("host") == host_id and s.get("kind") == "claude"]
@@ -176,7 +186,9 @@ def courier_jobs(evs: list[dict], sessions: list[dict], host_id: str) -> list[di
             candidates = [s for s in local if any(s.get("session_key") == r.get("session_key") or
                                                   s.get("native_id") == r.get("native_id") for r in pinned)]
         elif m["to"] == "all" or m["to"] == f"host:{host_id}":
-            candidates = local
+            # Broadcasts reach interactive sessions that existed when it was sent: daemons and sessions started later
+            # (e.g. short-lived mcdaemon-NN workers) never receive old broadcasts.
+            candidates = [s for s in local if _broadcast_target(s, m.get("at"))]
         elif m["to"].startswith("session:"):
             key = m["to"].split(":", 1)[1]
             candidates = [s for s in local if key in (s.get("session_key"), s.get("native_id"))]

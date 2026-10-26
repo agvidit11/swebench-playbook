@@ -72,3 +72,17 @@ class BroadcastReceiptTest(unittest.TestCase):
         rec = comms.receipt_event(msg["event_id"], jobs[0]["recipient"], "delivered", actor)
         rec.update(host_id="h", seq=2, recorded_at=rec["occurred_at"])
         self.assertEqual(comms.courier_jobs([msg, rec], sessions, "h"), [])
+
+
+    def test_broadcast_skips_daemons_and_later_sessions(self):
+        from workboard import comms
+        actor = {"session_id": "sender", "alias": "h·me", "kind": "claude"}
+        msg = comms.new_message("hello", {"to": "all", "to_label": "everyone"}, actor)
+        msg.update(host_id="h", seq=1, recorded_at=msg["occurred_at"])
+        early, late = "2020-01-01T00:00:00+00:00", "2099-01-01T00:00:00+00:00"
+        sessions = [{"host": "h", "kind": "claude", "session_key": "k1", "native_id": "a", "name": "agvidit-0b", "started_at": early},
+                    {"host": "h", "kind": "claude", "session_key": "k2", "native_id": "b", "name": "mcdaemon-17", "started_at": early},
+                    {"host": "h", "kind": "claude", "session_key": "k3", "native_id": "c", "name": "new-one", "started_at": late},
+                    {"host": "h", "kind": "claude", "session_key": "k4", "native_id": "d", "name": "bg", "started_at": early,
+                     "session_kind": "daemon"}]
+        self.assertEqual([j["name"] for j in comms.courier_jobs([msg], sessions, "h")], ["agvidit-0b"])

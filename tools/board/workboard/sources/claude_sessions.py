@@ -133,6 +133,7 @@ def discover(host_id: str, *, root: Path | None = None, uid: int | None = None,
             "name": (data.get("name") if isinstance(data.get("name"), str) else "")[:80]
                     or f"Claude {native_id[:8]}",
             "started_at": _iso(data.get("startedAt")),
+            "session_kind": data.get("kind") if isinstance(data.get("kind"), str) else None,     # interactive | daemon ...
             "age_s": int(max(0, now - started)) if started is not None else None,
             "status": status,
             "status_since": _iso(data.get("statusUpdatedAt") or data.get("nameSince") or data.get("startedAt")),
