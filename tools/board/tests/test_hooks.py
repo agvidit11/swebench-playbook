@@ -309,3 +309,20 @@ class BareTaskNameTest(unittest.TestCase):
     def test_session_start_intro(self):
         res = hooks._with_inbox(hooks.HookResult(0), {"session_id": "s"}, Path(tempfile.mkdtemp()), "h", "SessionStart", intro=True)
         self.assertIn("board here", json.loads(res.stdout)["hookSpecificOutput"]["additionalContext"])
+
+
+class WeakTouchTest(unittest.TestCase):
+    def test_board_commands_and_bare_names_never_auto_claim(self):
+        import tempfile
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "cancancan-limited-ability").mkdir()
+            cfg = SimpleNamespace(repositories=[SimpleNamespace(path=d)])
+            mk = lambda c: {"tool_name": "Bash", "cwd": "/tmp", "tool_input": {"command": c}}
+            self.assertEqual(hooks.task_strength(mk("board msg --task cancancan-limited-ability hi"), cfg), (None, False))
+            self.assertEqual(hooks.task_strength(mk("echo cancancan-limited-ability"), cfg), ("cancancan-limited-ability", True))
+            self.assertEqual(hooks.task_strength(mk(f"ls {d}/cancancan-limited-ability/tests"), cfg), ("cancancan-limited-ability", False))
+        from workboard import sync
+        weak = json.dumps({"type": "touch", "entity": {"kind": "task", "id": "t"}, "actor": {"session_id": "s", "kind": "claude"},
+                           "payload": {"weak": True}}).encode()
+        self.assertEqual(sync._touched([weak]), [])

@@ -170,6 +170,23 @@ def _candidates(data: dict) -> list[Path]:
     return resolved
 
 
+BOARD_CMD = re.compile(r"(^|[;&|]\s*|\s)(\S*/)?(board|workboard)\s+[a-z]")
+
+
+def task_strength(data: dict, cfg) -> tuple[str | None, bool]:
+    """(task, weak). Board's own CLI calls are never task activity; a bare task name in a command line is weak
+    evidence (presence/focus only — it must not auto-claim)."""
+    ti = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
+    cmd = ti.get("command") if data.get("tool_name") == "Bash" and isinstance(ti.get("command"), str) else ""
+    if cmd and BOARD_CMD.search(cmd):
+        return None, False
+    task = task_of(data, cfg)
+    if not task:
+        return None, False
+    strong = any(p.parts[:1] != ("@name",) and task in p.parts for p in _candidates(data))
+    return task, not strong
+
+
 def task_of(data: dict, cfg) -> str | None:
     cands = _candidates(data)
     for p in cands:
@@ -284,7 +301,7 @@ def _record_presubmit_async(res: dict) -> None:
 
 def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
     now = time.time()
-    task = task_of(data, cfg)
+    task, weak = task_strength(data, cfg)
     ti = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
     cmd = ti.get("command") if data.get("tool_name") == "Bash" and isinstance(ti.get("command"), str) else ""
     build_model = _build_target(cmd)[0] if cmd else None
@@ -299,7 +316,8 @@ def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
             key = f"{task}|{actor['session_id']}"
             if now - state.setdefault("touch", {}).get(key, 0) >= TOUCH_WINDOW_S:
                 state["touch"][key] = now
-                out.append(("touch", task, {"tool": data.get("tool_name")}, actor))
+                out.append(("touch", task, dict({"tool": data.get("tool_name")}, **({"weak": True} if weak else {})),
+                            actor))
             if build_model:
                 out.append(("build_action", task, {"model": build_model}, actor))
         return out

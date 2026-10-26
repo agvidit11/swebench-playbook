@@ -1300,6 +1300,13 @@ def cmd_msg(args, cfg):
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return 2
+    if args.reply_to and target.get("to") in ("all",) or (args.reply_to and str(target.get("to", "")).startswith("host:")):
+        orig = next((m for m in comms.messages(snap.events) if m["id"].startswith(args.reply_to)), None)
+        if orig and orig.get("from_session"):           # a reply goes back to the sender, never a broadcast
+            target = {"to": f"session:{orig['from_session']}", "to_label": orig.get("from") or "original sender",
+                      "resolved_recipients": [{"session_key": orig["from_session"], "native_id": orig["from_session"],
+                                               "host": orig.get("from_host"), "name": orig.get("from")}]}
+            print(f"↩ reply pinned to the original sender: {target['to_label']}", file=sys.stderr)
     ev = comms.new_message(" ".join(args.text), target, coord.actor_for(cfg), task=args.task, reply_to=args.reply_to)
     if not ev_mod.spool_append(state, ev):
         print("could not queue the message", file=sys.stderr)

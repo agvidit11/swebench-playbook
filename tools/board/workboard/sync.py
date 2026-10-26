@@ -202,7 +202,8 @@ def _touched(lines: list[bytes]) -> list[tuple[str, dict]]:
             continue
         if isinstance(ev, dict) and ev.get("type") == "touch" and isinstance(ev.get("entity"), dict):
             key = (ev["entity"].get("id"), ev.get("actor", {}).get("session_id"))
-            if key not in seen and key[0] and key[1] and ev["actor"].get("kind") != "human":
+            if key not in seen and key[0] and key[1] and ev["actor"].get("kind") != "human" and \
+                    not (ev.get("payload") or {}).get("weak"):       # name-in-command evidence never auto-claims
                 seen.add(key)
                 out.append((key[0], ev["actor"]))
     return out

@@ -200,8 +200,8 @@ def courier_jobs(evs: list[dict], sessions: list[dict], host_id: str) -> list[di
             state = state_by_key.get(recipient, {}).get("state", "published")
             for k in (recipient, session.get("native_id")):
                 rec = receipts.get((m["id"], k))
-                if rec and RECEIPT_RANK.get(rec["state"], 0) > RECEIPT_RANK.get(state, 0):
-                    state = rec["state"]
+                if rec and (rec["state"] == "failed" or RECEIPT_RANK.get(rec["state"], 0) > RECEIPT_RANK.get(state, 0)):
+                    state = rec["state"]                 # failed is terminal for the courier (no retry loop)
             if session.get("native_id") in m.get("acked_by", []):
                 state = "acked"
             key = (m["id"], recipient)

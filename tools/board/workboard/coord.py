@@ -91,6 +91,32 @@ def claim(cfg, task, *, state_dir, actor=None, to_actor=None, steal=False, sourc
     return res
 
 
+RELEASED = "released-recent.json"
+
+
+def _note_release(state_dir, task, session_id) -> None:
+    """Remember who released what, so auto-claim does not grab it straight back for that session."""
+    path = Path(state_dir) / RELEASED
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        data = {}
+    now = _now().timestamp()
+    data = {k: v for k, v in data.items() if now - v < 24 * 3600}
+    data[f"{task}|{session_id}"] = now
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data))
+    os.replace(tmp, path)
+
+
+def _released_recently(state_dir, task, session_id) -> bool:
+    try:
+        data = json.loads((Path(state_dir) / RELEASED).read_text())
+    except (OSError, ValueError):
+        return False
+    return _now().timestamp() - data.get(f"{task}|{session_id}", 0) < 24 * 3600
+
+
 def release(cfg, task, reason, *, state_dir, actor=None) -> claims.ClaimResult:
     """Owner release. A human shell releasing their own agent's claim goes through release_own_agent."""
     actor = actor or actor_for(cfg)
@@ -104,6 +130,7 @@ def release(cfg, task, reason, *, state_dir, actor=None) -> claims.ClaimResult:
     if res.status == "RELEASED":
         with local_claims(state_dir) as local:
             local.pop(task, None)
+        _note_release(state_dir, task, (actor or actor_for(cfg)).get("session_id"))
         if not record(state_dir, "release", task, actor, {"reason": reason, "was": cur.owner.get("alias", "")}):
             res.detail += " (warning: audit event could not be queued)"
     return res
@@ -123,6 +150,7 @@ def release_own_agent(cfg, task, reason, *, state_dir, actor, current=None) -> c
     if res.status == "RELEASED":
         with local_claims(state_dir) as local:
             local.pop(task, None)
+        _note_release(state_dir, task, (actor or actor_for(cfg)).get("session_id"))
         if not record(state_dir, "release", task, actor, {"reason": reason, "override": True,
                                                          "released_owner": {"session_id": cur.owner.get("session_id"),
                                                                             "alias": cur.owner.get("alias", "")}}):
@@ -142,6 +170,8 @@ def auto_claims(cfg, state_dir, touched: list[tuple[str, dict]]) -> list[str]:
             mine = local.get(task)
         if not (mine and mine.get("session_id") == actor.get("session_id")):
             cur = claims.read(cfg, task, state_dir=state_dir)
+            if cur.status == "FREE" and _released_recently(state_dir, task, actor.get("session_id")):
+                continue                                 # this session released it: only `board here`/claim re-takes it
             if cur.status == "FREE":
                 res = claims.acquire(cfg, task, actor, state_dir=state_dir)
                 if res.status == "ACQUIRED":

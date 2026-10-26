@@ -86,3 +86,14 @@ class BroadcastReceiptTest(unittest.TestCase):
                     {"host": "h", "kind": "claude", "session_key": "k4", "native_id": "d", "name": "bg", "started_at": early,
                      "session_kind": "daemon"}]
         self.assertEqual([j["name"] for j in comms.courier_jobs([msg], sessions, "h")], ["agvidit-0b"])
+
+    def test_failed_receipt_is_terminal_for_broadcast(self):
+        from workboard import comms
+        actor = {"session_id": "sender", "alias": "h·me", "kind": "claude"}
+        msg = comms.new_message("hi", {"to": "all", "to_label": "everyone"}, actor)
+        msg.update(host_id="h", seq=1, recorded_at=msg["occurred_at"])
+        sessions = [{"host": "h", "kind": "claude", "session_key": "k1", "native_id": "a", "name": "s1",
+                     "started_at": "2020-01-01T00:00:00+00:00"}]
+        rec = comms.receipt_event(msg["event_id"], "k1", "failed", actor, reason="unreachable")
+        rec.update(host_id="h", seq=2, recorded_at=rec["occurred_at"])
+        self.assertEqual(comms.courier_jobs([msg, rec], sessions, "h"), [])
