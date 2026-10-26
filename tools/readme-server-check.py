@@ -101,8 +101,8 @@ def trial_problems(task, commit8):
     jobs = subprocess.run(["codimango", "job", "list", task], capture_output=True, text=True).stdout
     out = []
     for line in jobs.splitlines():
-        if f"commit={commit8}" not in line:
-            continue
+        if f"commit={commit8}" not in line or ("[current]" in jobs and "[current]" not in line):
+            continue  # only the current validation generation counts (older reruns are superseded)
         jid = line.split()[0]
         trials = subprocess.run(["codimango", "trial", "list", jid], capture_output=True, text=True).stdout
         for tl in trials.splitlines():

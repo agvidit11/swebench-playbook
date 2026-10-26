@@ -47,9 +47,10 @@ def server_commit(task):
 
 def trials_at(task, commit8):
     rows = []
-    for line in sh("codimango", "job", "list", task).splitlines():
-        if f"commit={commit8}" not in line:
-            continue
+    jobs = sh("codimango", "job", "list", task)
+    for line in jobs.splitlines():
+        if f"commit={commit8}" not in line or ("[current]" in jobs and "[current]" not in line):
+            continue  # only the current validation generation counts
         jid = line.split()[0]
         for tl in sh("codimango", "trial", "list", jid).splitlines():
             st = re.search(r"stage=(\S+)", tl)
