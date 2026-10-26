@@ -582,16 +582,30 @@ def _actor_ids(event: dict) -> set[str]:
     return {str(sid)} if sid else set()
 
 
-def _attribution(sample: dict, evs: list[dict], at: float) -> tuple[str | None, str]:
+def _event_index(evs: list[dict]) -> dict[str, list]:
+    """session id -> [(epoch, event)] sorted; built once per aggregate instead of scanning all events per sample."""
+    idx: dict[str, list] = {}
+    for event in evs or []:
+        sid = (event.get("actor") or {}).get("session_id")
+        when = _seconds(event.get("occurred_at"))
+        if sid and when is not None:
+            idx.setdefault(str(sid), []).append((when, event))
+    for rows in idx.values():
+        rows.sort(key=lambda r: r[0])
+    return idx
+
+
+def _attribution(sample: dict, evs: list[dict], at: float, idx: dict | None = None) -> tuple[str | None, str]:
     key = sample.get("session", "")
     native = key.split(":", 1)[1] if ":" in key else key
+    idx = idx if idx is not None else _event_index(evs)
+    import bisect
     relevant = []
-    for event in evs:
-        if native not in _actor_ids(event) and key not in _actor_ids(event):
-            continue
-        when = _seconds(event.get("occurred_at"))
-        if when is not None and when <= at:
-            relevant.append((when, event))
+    for sid in {native, key}:
+        rows = idx.get(sid) or []
+        lo = bisect.bisect_left(rows, at - 24 * 3600, key=lambda r: r[0])   # nothing older than a day matters
+        hi = bisect.bisect_right(rows, at, key=lambda r: r[0])
+        relevant.extend(rows[lo:hi])
     checkins = [(when, event) for when, event in relevant if event.get("type") == "checkin"
                 and 0 <= at - when <= 24 * 3600]
     if checkins:
@@ -654,6 +668,7 @@ def aggregate(state: dict, cfg, evs: list[dict], *, now: float | None = None) ->
         sessions[key]["spend"] = estimate(raw.get("model"), counters, cfg, kind=raw.get("kind"))
     tasks, accounting = {}, {"exact": 0, "medium": 0, "ambiguous": 0, "unattributed": 0}
     daily = {}
+    ev_idx = _event_index(evs)
     for sample in state.get("samples", []):
         at = _seconds(sample.get("at"))
         if at is None:
@@ -662,7 +677,7 @@ def aggregate(state: dict, cfg, evs: list[dict], *, now: float | None = None) ->
         key = sample.get("session")
         if key in sessions and 0 <= now - at <= 3600:
             sessions[key]["last_hour"] += total
-        task, confidence = _attribution(sample, evs, at)
+        task, confidence = _attribution(sample, evs, at, ev_idx)
         accounting[confidence] += total
         kind = str(sample.get("kind") or "unknown")
         day = datetime.fromtimestamp(at, timezone.utc).date().isoformat()

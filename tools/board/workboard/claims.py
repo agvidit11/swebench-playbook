@@ -320,7 +320,7 @@ def release(cfg, entity_id, actor, *, expected_oid, state_dir=None, override_per
             return refusal
     p = _push(cfg, repo, [f"--force-with-lease={ref}:{expected_oid}", f":{ref}"], TIMEOUT)
     if p.returncode == 0:
-        return ClaimResult("RELEASED", None, "deleted")
+        return ClaimResult("RELEASED", None, "claim released (the task itself is untouched)")
     try:
         now_oid = _remote_oid(cfg, repo, ref)
     except Offline as exc:

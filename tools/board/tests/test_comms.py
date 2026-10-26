@@ -113,3 +113,12 @@ class CheckinTest(unittest.TestCase):
                          ("👤", "human-shell", ["alpha"]))
         self.assertEqual(actor["restart"]["state"], "not-applicable")
         self.assertIsNone(actor["restart"]["command"])
+
+
+class SessionIdAddressTest(unittest.TestCase):
+    def test_history_id_resolves(self):
+        from workboard import comms
+        t = comms.target_for("session:3b403eb5-5715-42e6-8a68-bed6f2d1ea56", {"3b403eb5-5715-42e6-8a68-bed6f2d1ea56": "h·x"}, ["h"])
+        self.assertEqual(t["to"], "session:3b403eb5-5715-42e6-8a68-bed6f2d1ea56")
+        t = comms.target_for("3b403eb5", {"3b403eb5-5715-42e6-8a68-bed6f2d1ea56": "h·x"}, ["h"])
+        self.assertEqual(t["to_label"], "h·x")

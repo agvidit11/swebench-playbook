@@ -248,6 +248,9 @@ def read_events(paths: list[Path]) -> tuple[list[dict], list[Finding]]:
                     bad.append(f"{path.name}:{lineno} unparseable")
                     continue
                 why = validate_committed(ev)
+                if why == "commit":                      # keep the event; only its malformed commit is dropped
+                    ev = dict(ev, commit=None)
+                    why = validate_committed(ev)
                 if why == "type":
                     continue                              # written by a newer workboard: skip quietly
                 if why:

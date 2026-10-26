@@ -58,7 +58,8 @@ def cmd_watch(args, cfg):
 
 def _gather(args, cfg):
     from .app import gather
-    return gather(cfg, refresh=args.refresh, do_sync=not args.no_sync)
+    return gather(cfg, refresh=args.refresh, do_sync=not args.no_sync,
+                  light=getattr(args, "cmd", "") not in ("stats", "html"))
 
 
 def _envelope(snap, result) -> dict:

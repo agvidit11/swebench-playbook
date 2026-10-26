@@ -98,7 +98,12 @@ def refresh_claims_cache(cfg, state_dir, cres=None) -> None:
                                  "renewed_at": o.fields.get("claims.renewed_at")} for o in cres.observations}})
 
 
-def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: float = 8) -> Snapshot:
+class _SkipUsage(Exception):
+    pass
+
+
+def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: float = 8, light: bool = False) -> Snapshot:
+    """light=True (CLI reads and check-ins): skip token accounting and run linkage, which only the dashboard needs."""
     now = datetime.now(timezone.utc)
     cdir = cache_dir()
     health, findings, obs = {}, [], []
@@ -142,8 +147,10 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
         from . import session_inventory
         host_id = sync_mod.safe_host(sync_mod.host_id_for(cfg))
         native_sessions, session_diagnostics = session_inventory.discover(
-            cfg, evs, host_id, now=now.timestamp())
+            cfg, evs, host_id, now=now.timestamp(), link_runs=not light)
         try:
+            if light:
+                raise _SkipUsage()
             from . import usage
             usage_summary = usage.collect(cfg, evs, host_id, sessions=native_sessions, cache_dir=cdir,
                                           now=now.timestamp(), byte_budget=16 * 1024 * 1024,
@@ -157,6 +164,8 @@ def gather(cfg, *, refresh: bool = False, do_sync: bool = True, sync_timeout: fl
                                            f"{cycle.get('bytes_read', 0)} bytes; "
                                            f"{len(usage_summary.get('sessions', {}))} indexed session(s)" +
                                            (f"; {', '.join(cycle['errors'])}" if cycle.get("errors") else ""))
+        except _SkipUsage:
+            pass                                       # light read: no token accounting
         except Exception as exc:
             session_diagnostics.append({"host": host_id, "classification": "source-error",
                                         "reason": f"usage collector: {exc.__class__.__name__}"})

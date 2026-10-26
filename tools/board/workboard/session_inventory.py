@@ -79,7 +79,7 @@ def _task_from_cwd(cwd: str | None, cfg) -> str | None:
 def discover(cfg, evs: list[dict], host_id: str, *, now: float | None = None,
              claude_root: Path | None = None, codex_root: Path | None = None,
              muse_db: Path | None = None, proc_root: Path = Path("/proc"), pid_domain: str | None = None,
-             claude_projects_root: Path | None = None) -> tuple[list[dict], list[dict]]:
+             claude_projects_root: Path | None = None, link_runs: bool = True) -> tuple[list[dict], list[dict]]:
     now = datetime.now(timezone.utc).timestamp() if now is None else now
     settings = Path(os.environ.get("CLAUDE_SETTINGS", "~/.claude/settings.json")).expanduser()
     diagnostics = []
@@ -146,7 +146,7 @@ def discover(cfg, evs: list[dict], host_id: str, *, now: float | None = None,
         parents.append(session)
     runs = codex + muse
     try:
-        launches = agent_runs.transcript_launches(parents, root=claude_projects_root, now=now)
+        launches = agent_runs.transcript_launches(parents, root=claude_projects_root, now=now) if link_runs else []
     except Exception as exc:
         launches = []
         diagnostics.append({"host": host_id, "classification": "source-error",

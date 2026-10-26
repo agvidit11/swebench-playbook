@@ -109,6 +109,14 @@ def _stream(argv, timeout, out, err):
     return code, stdout_tail.text()
 
 
+def _resolve_commit(cfg, ref: str) -> str | None:
+    for repo in cfg.repositories:
+        p = gitutil.run(Path(repo.path).expanduser(), "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", timeout=10)
+        if p.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", p.stdout.strip()):
+            return p.stdout.strip()
+    return None
+
+
 def fail_lines(text: str, n: int = 3) -> str:
     """The first FAIL lines of a gate's output, as the 'what to fix' summary shown on the board."""
     rows = [re.sub(r"\s+", " ", l.strip()) for l in text.splitlines() if re.match(r"\s*FAIL\b", l)]
@@ -153,6 +161,8 @@ def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.
 def record_check(cfg, task: str, *, passed: int, warn: int, fail: int, summary: str = "", state_dir,
                  actor=None, commit: str | None = None, source: str = "manual", role: str | None = None) -> tuple[bool, str]:
     """Record a presubmit result run elsewhere (another session, a batch run). Bound to the task's current commit."""
+    if commit and not re.fullmatch(r"[0-9a-f]{40}", commit):
+        commit = _resolve_commit(cfg, commit)           # short SHA / ref -> full SHA, else the task head
     commit = commit or task_head(cfg, task)
     payload = {"pass": passed, "warn": warn, "fail": max(fail, 0), "parsed": True, "exit": 1 if fail else 0,
                "summary": summary[:300], "imported_from": source}

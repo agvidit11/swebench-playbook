@@ -178,7 +178,7 @@ def _next(f, findings):
         return "VALIDATING", "WAIT import"
     if valid == "FAIL":
         return "ATTENTION", ("RERUN validation" if f.get("infra_only") else "FIX validation")
-    if "NONOWNER_EDIT" in codes:
+    if "NONOWNER_EDIT" in codes or "CLAIMS_DRIFT" in codes:
         return "ATTENTION", "RESOLVE ownership"
     if "CLOCK_SKEW" in codes:
         return "ATTENTION", "CHECK clock"
@@ -357,6 +357,17 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                     machine = last["legacy_owner"]
                     short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
                     owner, claim_health = f"{short} (CLAIMS.md)", "LEGACY"
+        legacy_rows = [e for e in tev if e["type"] == "note" and isinstance(e["payload"].get("legacy_owner"), str)]
+        if claim_health in ("OWNED", "EXPIRED") and legacy_rows:      # CLAIMS.md says another machine has it
+            last = legacy_rows[-1]["payload"]
+            machine = last.get("legacy_owner") or ""
+            short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
+            active = last.get("status") in __import__("workboard.legacy", fromlist=["x"]).ACTIVE
+            if active and short and not str(owner).startswith(f"{short}·") and last.get("live") is not False:
+                findings.append(Finding("CLAIMS_DRIFT", "warn",
+                                        f"CLAIMS.md says {machine} has it ({last.get('status')}, {last.get('updated')}) "
+                                        f"but the board claim is {owner}",
+                                        "agree who owns it before pushing; release one side"))
         pres = {}
         for e in tev:
             if e["type"] == "presence":

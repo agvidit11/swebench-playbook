@@ -13,6 +13,8 @@ attempts the atomic claim, so there is a short window before ownership is real �
 `board claim <task>` when it matters. Edits to a task another live session owns are blocked
 ("owned by … — run: workboard show <task>").
 
+If `board` is not found (non-login shells, Codex shells), use `~/.local/bin/board` — same command.
+
 **Check in (keeps owners correct on the board):** when you start or switch to a task, `board here <task>`
 (claims it, or renews your claim); when you have no task, `board here --idle`. A roll call from the board
 ("📋 roll call …" in your context) means: run `board here` with your current tasks now, then `board ack`.

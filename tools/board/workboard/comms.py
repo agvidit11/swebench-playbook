@@ -59,7 +59,12 @@ def target_for(spec: str, aliases: dict[str, str], servers: list[str], *, views=
     labels = dict(aliases)
     for session in sessions:
         labels[session.get("session_key") or session.get("native_id")] = session.get("name") or "unnamed session"
-    hits = {sid: a for sid, a in labels.items() if spec.lower() in a.lower() or spec == sid}
+    if spec.startswith("session:"):                     # ids copied from message history / receipts
+        spec = spec[len("session:"):]
+        labels = {sid: a for sid, a in labels.items() if sid == spec or sid.endswith(spec) or
+                  (len(spec) >= 6 and (sid.startswith(spec) or sid.rsplit(":", 1)[-1].startswith(spec)))}
+    hits = {sid: a for sid, a in labels.items() if spec.lower() in a.lower() or spec == sid or
+            (len(spec) >= 6 and sid.rsplit(":", 1)[-1].startswith(spec))}
     if len(hits) == 1:
         sid, alias = next(iter(hits.items()))
         session = next((s for s in sessions if sid in (s.get("session_key"), s.get("native_id"))), None)

@@ -88,10 +88,17 @@ class ClaimHardeningTest(unittest.TestCase):
             claims.probe(cfg, state_dir=st)
 
     def test_busy_sync_fails_closed(self):
-        sync.sync(self.c1, host_id="h1", state_dir=self.s1)     # leaves last_pull_ok=True on disk
-        with mock.patch.object(sync, "sync", return_value=sync.SyncState(last_pull_ok=True, last_push_ok=True, busy=True)):
+        sync.sync(self.c1, host_id="h1", state_dir=self.s1)     # leaves a fresh good sync on disk
+        busy = sync.SyncState(last_pull_ok=True, last_push_ok=True, busy=True)
+        with mock.patch.object(sync, "sync", return_value=busy), mock.patch("workboard.coord.time.sleep"):
+            ok, _ = coord.ledger_fresh(self.c1, self.s1)
+        self.assertTrue(ok)                                      # another process just synced: fresh enough
+        import itertools
+        with mock.patch.object(sync, "sync", return_value=busy), mock.patch("workboard.coord.time.sleep"), \
+                mock.patch.object(sync, "load_state", return_value=sync.SyncState(at="2000-01-01T00:00:00+00:00")), \
+                mock.patch("workboard.coord.time.monotonic", side_effect=itertools.count(0, 5)):
             ok, err = coord.ledger_fresh(self.c1, self.s1)
-        self.assertFalse(ok)
+        self.assertFalse(ok)                                     # stale and still busy: fail closed after retrying
         self.assertIn("another sync", err)
 
     def test_pull_ok_push_failed_fails_closed(self):

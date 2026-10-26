@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
+import time
 import os
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -57,9 +58,21 @@ def record(state_dir, type_, task, actor, payload, commit=None) -> bool:
 
 def ledger_fresh(cfg, state_dir, timeout=15) -> tuple[bool, str]:
     """Coordination writes fail closed unless this run pulled AND pushed with no error."""
+    import random
+    deadline = time.monotonic() + max(timeout, 20)
     st = sync_mod.sync(cfg, state_dir=state_dir, timeout_seconds=timeout)
+    while st.busy and time.monotonic() < deadline:
+        last = sync_mod.load_state(state_dir)        # another process (cron / dashboard) is syncing right now
+        try:
+            age = (_now() - datetime.fromisoformat(last.at)).total_seconds() if last and last.at else None
+        except (TypeError, ValueError):
+            age = None
+        if age is not None and age <= 180 and last.last_pull_ok and (last.last_push_ok or not last.pending):
+            return True, ""                           # it just completed a good sync: that is fresh enough
+        time.sleep(1 + random.random())
+        st = sync_mod.sync(cfg, state_dir=state_dir, timeout_seconds=timeout)
     if st.busy:
-        return False, "another sync is running; try again in a moment"
+        return False, "another sync kept the ledger busy for 20s; your change is not lost — retry the command"
     if not (st.last_pull_ok and st.last_push_ok) or (st.error and not st.error.startswith("auto-claim")):
         return False, st.error or "ledger push did not complete"
     return True, ""
