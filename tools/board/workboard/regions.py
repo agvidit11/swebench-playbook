@@ -38,7 +38,7 @@ ROW_KEYS = {
     "task", "group", "next", "age_level", "owner", "valid", "sync", "tag", "status_raw", "validated",
     "age_label", "ownership_state", "owner_last_at", "kind", "vp", "vsum", "older_results",
     "entered_pool_at", "review_history_stale",
-    "local_usage",
+    "local_usage", "primary",
 }
 
 WIRE_KEYS = {
@@ -47,7 +47,7 @@ WIRE_KEYS = {
     "age_label": "ag", "ownership_state": "os", "owner_last_at": "oa",
     "kind": "k", "vp": "vp", "vsum": "vs", "older_results": "old",
     "entered_pool_at": "ep", "review_history_stale": "rhs", "state_since": "ss", "assignment": "ax",
-    "activity": "ac", "pipeline": "pp", "last_push": "lp", "gate_summary": "gs", "rsum": "rs",
+    "activity": "ac", "pipeline": "pp", "last_push": "lp", "gate_summary": "gs", "rsum": "rs", "primary": "pa",
     "revision_count": "rc", "latest_decision": "ld", "finding_codes": "fc", "sync_summary": "sy",
     "tags": "ta", "legacy_summary": "lg", "kind_line": "kl", "detail_version": "dv", "row_version": "rv",
     "local_usage": "lu",

@@ -270,6 +270,7 @@ def payload(snap, cfg) -> dict:
         t["steps"] = insights.next_steps(t, flow)
         t["assignee"] = insights.assignee(t, load, live_hosts)
         t["tags"] = task_tags(t)
+        t["primary"] = insights.primary_action(t)
         views.append(t)
     team = _team_payload(snap, cfg, servers)
     weekly = st.weekly(snap.observations, cfg, snap.now, 10)

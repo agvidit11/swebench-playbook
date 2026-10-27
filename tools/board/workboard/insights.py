@@ -323,3 +323,114 @@ def assignee(t: dict, load: dict[str, int], live_hosts: set[str] | None = None) 
         return f"any free session (`board claim {t['task']}`)"
     host = min(live, key=lambda h: live[h])
     return f"a free session on {host} ({live[host]} tasks in progress there) · `board claim {t['task']}` from it"
+
+
+# ------------------------------------------------------------------------------ primary action ("what now")
+CHECK_ACTIONS = [  # (short check name from short_check, emoji, self-explaining label)
+    ("oracle", "🔧", "Fix oracle · gold solution fails"),
+    ("structure", "🔧", "Fix task structure"),
+    ("test-patch", "🔧", "Fix test patch · does not apply/run"),
+    ("build", "🐳", "Fix Docker build"),
+    ("calibration", "🎚", "Calibrate difficulty"),
+    ("reward-hack detector", "🛡", "Harden grader · reward hack possible"),
+    ("agentic review", "🔍", "Fix agentic-review findings"),
+    ("deep review", "🔍", "Fix deep-review findings"),
+    ("provenance", "✍️", "Re-author flagged files · provenance"),
+    ("contamination", "🧬", "Prove novelty · contamination flagged"),
+    ("TBR", "🔁", "Rerun TBR on this commit"),
+    ("eval GT", "🔧", "Fix eval ground truth"),
+    ("AI check", "🔍", "Fix AI-assessment findings"),
+]
+
+
+def _check_action(issue: dict) -> tuple[str, str]:
+    for name, emoji, label in CHECK_ACTIONS:
+        if issue.get("check") == name:
+            if name == "calibration" and re.search(r"step \d+ too (hard|easy)", issue.get("why", "")):
+                return emoji, f"Calibrate · {re.search(r'step \d+ too (hard|easy)', issue['why']).group(0)}"
+            return emoji, label
+    return "🔧", f"Fix {issue.get('check', 'validation')}"
+
+
+def done_when(t: dict) -> list[list[str]]:
+    """The gates a task passes on its way to acceptance: [state, label]; state ok | bad | wait | todo."""
+    g, raw, vs = gates(t), t.get("status_raw"), t.get("vsum") or {"issues": []}
+    fails = [i for i in vs["issues"] if i["severity"] == "fail" and not i["why"].startswith("infra error")]
+    sync_ok = t.get("sync") in ("OK", "OK·doc") and not t.get("older_results")
+    st = lambda s: {"ok": "ok", "bad": "bad", "old": "todo", "none": "todo"}.get(s, "todo")
+    submitted = raw in ("needs_reviewers_assigned", "being_reviewed", "accepted", "used_in_training")
+    return [
+        ["ok" if sync_ok and t.get("valid") != "RUN" else "wait" if t.get("valid") == "RUN" or t.get("sync") == "IMPORTING"
+         else "todo", "server has the latest push and validated it"],
+        ["ok" if t.get("valid") == "PASS" and not fails else "bad" if fails else "wait" if t.get("valid") == "RUN"
+         else "todo", "server validation green"],
+        [st(g["author"]["check"]["state"]), "presubmit · owner (building session) clean on this commit"],
+        [st(g["independent"]["check"]["state"]), "presubmit · 3P (fresh independent agent) clean on this commit"],
+        [st(g["author"]["review"]["state"]), "agent approval · owner"],
+        [st(g["independent"]["review"]["state"]), "agent review · 3P approves"],
+        ["ok" if submitted else "todo", "submitted for human review"],
+        ["ok" if raw in ("accepted", "used_in_training") else "bad" if raw == "needs_revision"
+         else "wait" if submitted else "todo", "human review accepted"],
+    ]
+
+
+def primary_action(t: dict) -> dict:
+    """The one thing to do now, named so it explains itself: {emoji, label, tone, why, done_when}.
+    tone: block (broken) | act (your move) | ship | wait | done."""
+    n, raw, g = t.get("next") or "", t.get("status_raw"), gates(t)
+    vs = t.get("vsum") or {"issues": []}
+    fails = [i for i in vs["issues"] if i["severity"] == "fail" and not i["why"].startswith("infra error")]
+    warns = [i for i in vs["issues"] if i["severity"] == "warn" and not i["why"].startswith("infra error")]
+    role = lambda kind: next((r for r in ("author", "independent") if g[r][kind]["state"] == "bad"), "author")
+    who = {"author": "owner", "independent": "3P"}
+    def pa(emoji, label, tone, why):
+        return {"emoji": emoji, "label": label, "tone": tone, "why": why, "done_when": done_when(t)}
+    if t.get("group") == "DONE" or n == "—":
+        return pa("🏁", {"used_in_training": "Done · in training", "archived": "Done · archived"}.get(raw, "Done · accepted"),
+                  "done", "nothing left to do")
+    if n.startswith("RESOLVE") or n.startswith("CHECK clock"):
+        return pa("🤺", "Resolve ownership" if n.startswith("RESOLVE") else "Fix host clock", "block",
+                  "two sessions/claims disagree about who owns this task" if n.startswith("RESOLVE") else "event times are in the future")
+    if n == "RERUN server":
+        return pa("🔁", "Revalidate on server · latest push not validated", "block",
+                  "server results are for an older commit; run `codimango task rerun` (free)")
+    if n == "WAIT import":
+        return pa("📥", "Server importing latest push", "wait", "auto-import normally finishes within minutes")
+    if n == "RERUN validation":
+        return pa("🔁", "Revalidate on server · infra error", "block", "a check errored on infrastructure, not the task")
+    if n == "FIX validation":
+        first = fails[0] if fails else (vs["issues"][0] if vs["issues"] else {"check": "validation", "why": ""})
+        emoji, label = _check_action(first)
+        more = f" (+{len(fails) - 1} more)" if len(fails) > 1 else ""
+        return pa(emoji, label + more, "block", first.get("why", ""))
+    if n == "WAIT validation":
+        return pa("⏳", "Server validating", "wait", "codimango is running checks on the latest push")
+    if n.startswith("WAIT reviewer"):
+        return pa("👀" if raw == "being_reviewed" else "⌛",
+                  "Human review · in progress" if raw == "being_reviewed" else "Human review · waiting for a reviewer",
+                  "wait", "submitted; nothing to do until the reviewer decides")
+    if n == "ADDRESS review":
+        return pa("📝", "Revise · address human review", "act", "reviewer asked for a revision; nothing pushed since")
+    if n.startswith("IMPORT"):
+        return pa("📦", "Import task into codimango", "act", "the task exists only locally")
+    if n.startswith("ADDRESS agent"):
+        r = role("review")
+        return pa("📝", f"Fix agent-review findings · {who[r]}", "block", (g[r]["review"].get("note") or "")[:160])
+    if n.startswith("FIX check"):
+        r = role("check")
+        return pa("🧪", f"Fix presubmit findings · {who[r]}", "block", (g[r]["check"].get("summary") or "")[:160])
+    if warns and any("verify" in (w.get("fix") or "") or "reviewer action" in w.get("why", "") for w in warns):
+        w = next(w for w in warns if "verify" in (w.get("fix") or "") or "reviewer action" in w.get("why", ""))
+        return pa("▲", f"Verify flagged check · {w['check']}", "act", w.get("why", ""))
+    if g["author"]["check"]["state"] != "ok":
+        return pa("🧪", "Presubmit · owner (building session)", "act", "run `board check run <task> --role author`")
+    if g["independent"]["check"]["state"] != "ok":
+        return pa("🧪", "Presubmit · 3P (fresh independent agent)", "act",
+                  "a fresh agent with no build context runs the full presubmit and records it with --role independent")
+    if g["author"]["review"]["state"] != "ok":
+        return pa("👍", "Agent approval · owner", "act", "`board review add <task> --verdict ready --role author`")
+    if g["independent"]["review"]["state"] != "ok":
+        return pa("👀", "Agent review · 3P (fresh independent agent)", "act", "independent reviewer records --role independent")
+    if n.startswith("RESUBMIT") or raw == "needs_revision":
+        return pa("🚀", "Resubmit for human review", "ship", "every gate above is green on this commit")
+    return pa("🚀", "Submit for human review", "ship", "every gate above is green on this commit")
