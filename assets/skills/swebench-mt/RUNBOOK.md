@@ -178,6 +178,20 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    selected files, hidden-test paths, before_repo_set_cmd etc. live only in `steps/*/tests/config.json`.
    `readme-server-check.py` R8 enforces it. Never push a fix to a task that is in review unless asked —
    any push pulls it back to draft.
+4d. **Definition of READY — mandatory before telling Vidit a task can be (re)submitted (Vidit 2026-10-27).**
+   All of these on the task's current commit, with the server validation passing on the validated commit:
+   1. `python3 ~/swebench/revision-gate/gate.py <task> --repo <checkout> --only presubmit,provenance,carry,review`
+      → presubmit 0 FAIL, reviewer agent Accept (state any Medium to Vidit).
+   2. `python3 <playbook>/tools/readme-server-check.py <repo> <task>` → PASS (R1–R8).
+   3. `python3 <playbook>/tools/failure-audit.py <task> --repo <checkout> --judge` → PASS, or every
+      non-genuine trial disclosed in the README with the band shown to hold either way.
+   4. README-only push with the server commit, rates and per-trial analysis (does not retrigger validation).
+   5. Board updated: `board here <task>`; `board check record <task> --role author --pass N --warn N --fail N
+      --summary "<one line>"`; `board review add <task> --verdict ready --role author --note "<reviewer reply
+      summary>"`; ledger row READY TO (RE)SUBMIT. The independent check/review must come from a different
+      session (§5d); ask for it with `board msg task:<task>`.
+   6. Give Vidit the reviewer reply text, matching the README and the board review note.
+   Only then say "ready". After Vidit submits, the board picks up the review state on its next sync.
 5. **Before submit** — human review, preceded by a **deep-review pass**.
    Green gates are not enough. Calibration, provenance and the AI assessment do
    not check sourcing or duplication; only the server's deep review (Validation
