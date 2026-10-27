@@ -201,7 +201,7 @@ def compact_task(task: dict, *, now=None, detail_version: str | None = None) -> 
     assignment, activity, pipeline, last_push = (task.get("assignment") or {}, task.get("activity") or {},
                                                  task.get("pipeline") or {}, task.get("last_push") or {})
     row["assignment"] = {k: assignment.get(k) for k in ("state", "owner", "reason") if assignment.get(k) is not None}
-    row["activity"] = {k: activity.get(k) for k in ("state", "last_at", "reason") if activity.get(k) is not None}
+    row["activity"] = {k: activity.get(k) for k in ("state", "last_at", "reason", "aliases") if activity.get(k) is not None}
     row["pipeline"] = {k: pipeline.get(k) for k in ("state", "since", "reason") if pipeline.get(k) is not None}
     row["last_push"] = {k: last_push.get(k) for k in ("at", "time_kind", "session_alias") if last_push.get(k) is not None}
     row["gate_summary"] = _compact_gate((task.get("rsum") or {}).get("gates") or task.get("gates") or {})

@@ -178,7 +178,7 @@ def _next(f, findings):
         return "VALIDATING", "WAIT import"
     if valid == "FAIL":
         return "ATTENTION", ("RERUN validation" if f.get("infra_only") else "FIX validation")
-    if "NONOWNER_EDIT" in codes or "CLAIMS_DRIFT" in codes:
+    if "NONOWNER_EDIT" in codes:
         return "ATTENTION", "RESOLVE ownership"
     if "CLOCK_SKEW" in codes:
         return "ATTENTION", "CHECK clock"
@@ -364,10 +364,10 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
             active = last.get("status") in __import__("workboard.legacy", fromlist=["x"]).ACTIVE
             if active and short and not str(owner).startswith(f"{short}·") and last.get("live") is not False:
-                findings.append(Finding("CLAIMS_DRIFT", "warn",
+                findings.append(Finding("CLAIMS_DRIFT", "info",        # the machine (claim + activity) wins
                                         f"CLAIMS.md says {machine} has it ({last.get('status')}, {last.get('updated')}) "
                                         f"but the board claim is {owner}",
-                                        "agree who owns it before pushing; release one side"))
+                                        "the board claim is authoritative; update the CLAIMS.md row if it is stale"))
         pres = {}
         for e in tev:
             if e["type"] == "presence":

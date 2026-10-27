@@ -140,8 +140,10 @@ def scan(tasks: set[str], *, now: float | None = None, window_s: int = WINDOW_S)
             m = re.search(rb'"cwd"\s*:\s*"([^"]+)"', head)
             if not m:
                 continue
+            mm = re.search(rb'"model"\s*:\s*"([^"]{2,40})"', head)
+            title = f"Codex {mm.group(1).decode('utf-8', 'replace')} {path.stem[-4:]}" if mm else "Codex run"
             for task in _path_hits(m.group(1).decode("utf-8", "replace") + "/", tasks):
-                found.append({"task": task, "session_id": "codex:" + path.stem[-12:], "title": "Codex run",
+                found.append({"task": task, "session_id": "codex:" + path.stem[-12:], "title": title,
                               "kind": "codex", "last_seen": mtime})
     return found
 

@@ -92,7 +92,8 @@ def discover_codex(cfg, host_id: str, *, root: Path | None = None, now: float | 
         out.append({
             "session_key": session_key("codex", host_id, os.getuid(), "local", native_id),
             "native_id": native_id, "kind": "codex", "kind_icon": "🟢", "host": host_id,
-            "name": f"Codex {native_id[-6:]}" + (f" · {task}" if task else ""),     # uuid7 heads collide; tails don't
+            "name": f"Codex {(context or {}).get('model') or ''} {native_id[-4:]}".replace("  ", " ")
+                    + (f" · {task}" if task else ""),     # model + id tail (uuid7 heads collide)
             "started_at": _iso(started), "age_s": int(max(0, now - started)), "last_activity_at": _iso(mtime),
             "status": state, "status_since": _iso(mtime), "live": state in ("busy", "idle"),
             "cwd": cwd, "cwd_task": task, "model": (context or {}).get("model"),

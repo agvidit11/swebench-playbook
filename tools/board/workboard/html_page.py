@@ -176,8 +176,9 @@ function ownerIdle(t){return elapsed(t.owner_last_at)}
 function ownState(t){return t.ownership_state||(t.claim_health==='DONE'?'done':t.claim_health==='ACTIVE'?'actively_working':t.claim_health==='OWNED'||t.claim_health==='LEGACY'?'assigned_idle':t.claim_health==='CONFLICT'?'conflict':t.claim_health==='PIPELINE'?'in_pipeline':t.claim_health==='RECENT'?'worked_recently':t.claim_health==='UNSEEN'?'never_seen':'available')}
 function ownReason(t){return t.ownership_reason||({done:'task lifecycle is complete',conflict:'more than one assignment is live',actively_working:'recent task activity',in_pipeline:'server work is in progress',assigned_idle:'assignment is live with no recent activity',worked_recently:'remote change within 72 hours',available:'no assignment, activity, pipeline, or recent change',never_seen:'insufficient fresh evidence'}[ownState(t)]||'')}
 function assigneeText(t){const s=ownState(t);if(s==='done'||s==='in_pipeline')return'nobody needed right now';if(s==='worked_recently')return'check with '+((t.last_push||{}).session_alias||'the last session')+' first';if(s==='assigned_idle')return(t.owner||'assigned owner')+' — message or take over';if(s==='actively_working')return'keep with '+(t.owner||'the active session');if(s==='available')return'any free session can claim it';return'inspect the three ownership axes first'}
+function worker(t,full){const a=((t.activity||{}).aliases||[]).find(x=>x&&!full.includes(String(x).split('·').pop()));return a?` <span class="dim" title="${esc(a)}">· ${esc(String(a).split('·').pop())} working</span>`:''}
 function owner(t){const s=ownState(t),full=String(t.owner||''),o=esc(shortName(full));if(s==='done')return'';if(s==='available')return'<span class="info">🔓 free</span>';
- if(s==='actively_working'){const a=((t.active||[])[0]||{}),at=a.at||(t.activity||{}).last_at;return`<span style="color:var(--violet)" title="${esc(full)}">✍ working (${o||'active session'})</span> <span class="dim">· <span class="clock" data-at="${esc(at||'')}" data-fallback="${a.ago_s??''}">—</span> ago</span>`}
+ if(s==='actively_working'){const a=((t.active||[])[0]||{}),at=a.at||(t.activity||{}).last_at;return`<span style="color:var(--violet)" title="${esc(full)}">✍ working (${o||'active session'})</span>${worker(t,full)} <span class="dim">· <span class="clock" data-at="${esc(at||'')}" data-fallback="${a.ago_s??''}">—</span> ago</span>`}
  if(s==='in_pipeline')return`<span class="info">⏳ in pipeline</span>${o?' <span class="dim" title="'+esc(full)+'">· '+o+'</span>':''}`;
  if(s==='worked_recently'){const p=(t.last_push||{}).at;return`<span class="run">🛠 pushed <span class="clock" data-at="${esc(p||'')}">—</span> ago</span>`}
  if(s==='never_seen')return'<span class="dim">❔ never seen</span>';
@@ -402,8 +403,8 @@ document.addEventListener('mouseover',e=>{if(tip.contains(e.target)){clearTimeou
  if(th){showTip(`<h4>${esc(th.textContent.replace(/ [▲▼]$/,''))}</h4>${esc(HEAD[th.dataset.h])}<div class="hint">click to sort within each group</div>`,e.clientX,e.clientY);return}
  if(!td){hideSoon();return}const t=D.tasks.find(x=>x.task===td.parentElement.dataset.t);if(t)showTip(TIPS[td.dataset.tip](t),e.clientX,e.clientY)});
 tip.addEventListener('mouseleave',hideSoon);
-document.addEventListener('click',e=>{const dr=document.getElementById('drawer');   // click outside the card closes it
- if(dr.classList.contains('open')&&!dr.contains(e.target)&&!e.target.closest('tr.row,tr.srow,#tip,button,select,input,textarea,a,label,.chip,[data-msgtask],[data-msgsession],#grip'))dr.classList.remove('open');
+document.addEventListener('click',e=>{const dr=document.getElementById('drawer');   // any click outside an open card closes it
+ if(dr.classList.contains('open')&&!dr.contains(e.target)&&!e.target.closest('#tip,select,input,textarea,#grip,[data-msgtask],[data-msgsession]')){dr.classList.remove('open');S.open=null;e.stopPropagation();return}
  const g=e.target.closest('[data-g]'),dd=e.target.closest('[data-d]'),o=e.target.closest('[data-o]'),r=e.target.closest('tr.row'),sr=e.target.closest('tr.srow'),tb=e.target.closest('[data-tab]'),th=e.target.closest('th[data-k]');
  if(tip.contains(e.target))return;
  if(g){const k=g.dataset.g;if(S.gfirst){S.groups=new Set([k]);S.gfirst=false}else{S.groups.has(k)?S.groups.delete(k):S.groups.add(k);if(!S.groups.size)S.groups.add(k)}
