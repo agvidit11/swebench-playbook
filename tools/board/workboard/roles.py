@@ -37,6 +37,16 @@ def role_of(event: dict, task_events: list[dict], owner_session: str | None = No
     return "independent"
 
 
+def _older_run(payload: dict, generation: str | None) -> bool:
+    """Recorded against an earlier server validation run of the same commit (codimango revalidated since)."""
+    rec = payload.get("validation_generation")
+    return bool(generation and rec and str(rec) != str(generation))
+
+
+def _provisional(payload: dict) -> bool:
+    return str(payload.get("validation_status") or "").lower() in ("pending", "running", "in_progress", "queued")
+
+
 def _chrono(task_events: list[dict]) -> list[dict]:
     return sorted(task_events, key=lambda e: (e.get("occurred_at") or "", e.get("host_id") or "", e.get("seq") or 0))
 
@@ -47,7 +57,8 @@ def _as_set(current) -> set:
     return {current} if current else set()
 
 
-def gates(task_events: list[dict], current, owner_session: str | None = None) -> dict:
+def gates(task_events: list[dict], current, owner_session: str | None = None,
+          generation: str | None = None) -> dict:
     """{author|independent: {check: {...state}, review: {...state}}}; state is ok | bad | old | none.
 
     check: the role's latest presubmit (chronological across servers). ok = clean on a current commit, bad = failures
@@ -65,11 +76,13 @@ def gates(task_events: list[dict], current, owner_session: str | None = None) ->
         if role == "independent" and (e.get("actor") or {}).get("session_id") in author_sessions:
             continue                                   # the building session cannot also be the independent check
         p = e.get("payload") or {}
-        here = e.get("commit") in cur
+        here = e.get("commit") in cur and not _older_run(p, generation)
         out[role]["check"] = dict(p, at=e.get("occurred_at"), current=here, commit=(e.get("commit") or "")[:8],
                                   who=(e.get("actor") or {}).get("alias", ""),
                                   session=(e.get("actor") or {}).get("session_id"),
-                                  state="old" if not here else "bad" if p.get("fail") else "ok")
+                                  state="old" if not here else "bad" if p.get("fail") else "ok",
+                                  older_run=e.get("commit") in cur and _older_run(p, generation),
+                                  provisional=here and _provisional(p))
     latest = {}
     for e in evs:
         if e["type"] == "review":
@@ -81,7 +94,7 @@ def gates(task_events: list[dict], current, owner_session: str | None = None) ->
                     if e.get("commit") in cur and (e.get("payload") or {}).get("verdict") == "ready"}
     for role in ROLES:
         rs = sorted(by_role[role], key=lambda e: e.get("occurred_at") or "")
-        here = [e for e in rs if e.get("commit") in cur]
+        here = [e for e in rs if e.get("commit") in cur and not _older_run(e.get("payload") or {}, generation)]
         ready = [e for e in here if (e.get("payload") or {}).get("verdict") == "ready"
                  and not (role == "independent" and (e.get("actor") or {}).get("session_id") in author_ready)]
         changes = [e for e in here if (e.get("payload") or {}).get("verdict") == "changes"]

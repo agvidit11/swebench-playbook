@@ -42,3 +42,14 @@ class RolesHardeningTest(unittest.TestCase):
         claim = ev("claim", {}, session="b", at="2026-10-23T09:00:00+00:00")
         self.assertEqual(role_of(ev("check", {"summary": "not an independent review"}, session="b"), [claim]), "author")
         self.assertEqual(role_of(ev("check", {"summary": "independent: clean"}, session="b"), [claim]), "independent")
+
+
+class ValidationGenerationTest(unittest.TestCase):
+    def test_new_validation_run_makes_same_commit_check_stale(self):
+        chk = ev("check", {"fail": 2, "validation_generation": "gen-1", "validation_status": "pending"})
+        g = gates([chk], {"a" * 40}, generation="gen-2")
+        self.assertEqual(g["independent"]["check"]["state"], "old")
+        self.assertTrue(g["independent"]["check"]["older_run"])
+        g = gates([chk], {"a" * 40}, generation="gen-1")
+        self.assertEqual(g["independent"]["check"]["state"], "bad")
+        self.assertTrue(g["independent"]["check"]["provisional"])

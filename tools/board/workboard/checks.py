@@ -109,6 +109,19 @@ def _stream(argv, timeout, out, err):
     return code, stdout_tail.text()
 
 
+def validation_context(task: str) -> dict:
+    """The server validation run a check/review is made against (generation id + status), from the cached list."""
+    try:
+        from .app import cache_dir
+        import json as _json
+        rows = (_json.loads((cache_dir() / "codimango-last-good.json").read_text()).get("rows") or [])
+    except (OSError, ValueError):
+        return {}
+    row = next((r for r in rows if r.get("name") == task), None) or {}
+    return {k: v for k, v in (("validation_generation", row.get("validation_generation")),
+                              ("validation_status", row.get("validation_status"))) if v}
+
+
 def task_dirty(cfg, task: str) -> bool:
     """Uncommitted changes under <repo>/<task>/ in the local checkout: a check of those bytes is not a check of HEAD."""
     for repo in cfg.repositories:
@@ -163,6 +176,7 @@ def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.
         payload["note"] = note
     if fail_lines(tail):
         payload["summary"] = fail_lines(tail)
+    payload.update(validation_context(task))
     if role in ("author", "independent"):
         payload["role"] = role
     if code != 0 or not counts:
@@ -186,6 +200,7 @@ def record_check(cfg, task: str, *, passed: int, warn: int, fail: int, summary: 
                "summary": summary[:300], "imported_from": source}
     if dirty:
         payload["uncommitted"] = True
+    payload.update(validation_context(task))
     if role in ("author", "independent"):
         payload["role"] = role
     actor = actor or coord.actor_for(cfg)
@@ -227,7 +242,7 @@ def add_review(cfg, task: str, verdict: str, confidence: int | None, note: str, 
     if not commit:
         return False, "cannot find the task's current commit; a review must be bound to one"
     actor = actor or coord.actor_for(cfg)
-    payload = {"verdict": verdict, "note": note[:500]}
+    payload = {"verdict": verdict, "note": note[:500], **validation_context(task)}
     if role in ("author", "independent"):
         payload["role"] = role
     if confidence is not None:

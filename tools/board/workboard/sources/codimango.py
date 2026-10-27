@@ -28,7 +28,7 @@ KEEP = {
     "oraclePassCount": "oracle_pass", "oracleTotalCount": "oracle_total", "avocadoPassCount": "avocado_pass",
     "avocadoTotalCount": "avocado_total", "codexPassCount": "codex_pass", "codexTotalCount": "codex_total",
     "category": "category", "categorySubdomain": "subdomain", "categoryUsecase": "usecase", "difficulty": "difficulty",
-    "programmingLanguages": "languages",
+    "programmingLanguages": "languages", "currentValidationGenerationId": "validation_generation",
 }
 
 

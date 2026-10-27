@@ -185,7 +185,7 @@ def _compact_gate(gate: dict) -> dict:
         check = value.get("check") or {"state": "none"}
         review = value.get("review") or {"state": "none"}
         out[role] = {
-            "check": {k: check.get(k) for k in ("state", "fail", "warn", "at", "summary")
+            "check": {k: check.get(k) for k in ("state", "fail", "warn", "at", "summary", "older_run", "provisional")
                       if check.get(k) is not None},
             "review": {k: review.get(k) for k in ("state",)
                        if review.get(k) is not None},

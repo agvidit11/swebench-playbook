@@ -198,7 +198,7 @@ function review(t){const raw=t.status_raw,n=t.revision_count??(t.decisions||[]).
  return n?`<span class="dim">· draft (↩${n}×)</span>`:'<span class="dim">· not submitted</span>'}
 const TK=(st,glyph)=>st==='ok'?'<span class="tk g">✓</span>':st==='bad'?'<span class="tk r">✘</span>':st==='amber'?'<span class="tk a">✓</span>':st==='none'?'<span class="tk d">○</span>':`<span class="tk d">${glyph||'✓'}</span>`;
 function gate(t){return t.gate_summary||(t.rsum&&t.rsum.gates)||{author:{check:{state:'none'},review:{state:'none'}},independent:{check:{state:'none'},review:{state:'none'}}}}
-function check(t){const g=gate(t);return ['author','independent'].map(r=>{const c=g[r].check;return TK(c.state,c.state==='old'&&c.fail?'✘':'✓')}).join('')}
+function check(t){const g=gate(t);return ['author','independent'].map(r=>{const c=g[r].check;return c.provisional&&c.state!=='old'?TK('amber',c.fail?'✘':'✓'):TK(c.state,c.state==='old'&&c.fail?'✘':'✓')}).join('')}
 function sync(t){const s=t.sync,codes=t.finding_codes||(t.findings||[]).map(f=>f.code);
  // 1st tick: does codimango have your latest push?  2nd tick: is the validation result for that commit?
  const imp=s==='OK'||s==='OK·doc'||s==='STALE_VALID'?'ok':s==='IMPORTING'?'grey':s==='HEAD≠SERVER'?'amber':'none';
@@ -242,7 +242,7 @@ function tipReview(t){let h=`<h4>human review · ${esc(t.rsum.human)}</h4><ul>`;
 function tipCheck(t){const g=gate(t);let h='<h4>presubmit · building session + independent agent</h4><ul>';
  [['author','① building session','board check run '+t.task+' --role author'],['independent','② independent agent','fresh agent: board check record '+t.task+' --role independent …']].forEach(([r,l,how])=>{const c=g[r].check;
   if(c.state==='none'){h+=L('dim','·',`${l}: not run <span class="dim">→ ${esc(how)}</span>`);return}
-  h+=L(c.state==='ok'?'ok':c.state==='bad'?'bad':'dim',c.fail?'✘':'●',`${l}: ${c.fail?c.fail+' failure(s)':'clean'}${c.warn?', '+c.warn+' warning(s)':''} · ${fdate(c.at)}${c.state==='old'?' · <b>older commit — re-run</b>':''}`);
+  h+=L(c.state==='ok'?'ok':c.state==='bad'?'bad':'dim',c.fail?'✘':'●',`${l}: ${c.fail?c.fail+' failure(s)':'clean'}${c.warn?', '+c.warn+' warning(s)':''} · ${fdate(c.at)}${c.state==='old'?(c.older_run?' · <b>older validation run (codimango revalidated since) — re-run</b>':' · <b>older commit — re-run</b>'):''}${c.provisional?' · <span class="run">provisional: recorded while validation was still running</span>':''}`);
   if(c.summary)h+=L('info','💡','suggested: '+esc(c.summary))});return h+'</ul>'}
 function tipSync(t){const s=t.sync,codes=t.finding_codes||(t.findings||[]).map(f=>f.code);let h='<h4>server · 1st tick imported · 2nd tick validated</h4><ul>';
  if(codes.includes('VALID≠SERVER'))h+=L('pend','↻','validation results are for an older server commit (grey 2nd tick)');

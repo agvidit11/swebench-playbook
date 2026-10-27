@@ -327,7 +327,7 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             current.add(server_sha)                     # doc-only commits since the server commit keep reviews current
         f["equiv_commits"] = sorted(current)
         from .roles import gates as _gates
-        gts = _gates(tev, current)
+        gts = _gates(tev, current, generation=cm.get("codimango.validation_generation"))
         f["gates"] = gts
         f["review"], f["confidence"], f["confidence_stale"], f["dissent"] = _reviews(tev, current, gts)
         f["check"], f["check_stale"], check_payload = _check(tev, current)
