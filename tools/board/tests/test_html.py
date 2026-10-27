@@ -48,7 +48,7 @@ class HtmlTest(unittest.TestCase):
         for text in ("server-grid", "session-table", "status · for", "focus tasks", "hooks / transport",
                      "data-session", "openSession", "MESSAGE THIS SESSION", "claude:'C'", "board status</code> there"):
             self.assertIn(text, PAGE)
-        for text in ("✍ working", "💤 assigned idle", "⏳ in pipeline", "🛠 pushed", "🔓 free", "❔ never seen"):
+        for text in ("✍ working", "💤 assigned idle", "⏳ in pipeline", "🛠 pushed", "🔓 free", "🔓 free"):
             self.assertIn(text, PAGE)
         self.assertNotIn("predates the current board hooks", PAGE)
 

@@ -187,6 +187,16 @@ def _team_payload(snap, cfg, servers=None) -> dict:
                                     "host": server["id"], "kind": session.get("kind"),
                                     "kind_icon": session.get("kind_icon"), "tasks": session.get("tasks") or [],
                                     "transport": session.get("transport")})
+            for run in session.get("child_runs") or []:     # live Codex/Muse jobs: reachable through their parent
+                if run.get("status") != "busy":             # only jobs running right now; finished ones are history
+                    continue
+                session_targets.append({"session_key": session.get("session_key") or session.get("native_id"),
+                                        "native_id": session.get("native_id"),
+                                        "name": f"{run.get('name') or run.get('kind')} (via {session.get('name')})",
+                                        "host": server["id"], "kind": run.get("kind"),
+                                        "kind_icon": run.get("kind_icon") or {"codex": "🟢", "muse": "🟠"}.get(run.get("kind"), "❔"),
+                                        "tasks": [run["cwd_task"]] if run.get("cwd_task") else (session.get("tasks") or []),
+                                        "via": session.get("name"), "transport": session.get("transport")})
     names = short_names(servers)
     msgs = comms.messages(snap.events)[-80:]
     for m in msgs:                                    # one name per session everywhere: the registry name

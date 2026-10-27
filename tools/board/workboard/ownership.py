@@ -104,6 +104,6 @@ def reduce_ownership(assignment: dict, activity: dict, pipeline: dict, last_push
     elif actionable and sources_fresh:
         state, reason = "available", "no assignment, recent activity, pipeline, or recent remote change"
     else:
-        state, reason = "never_seen", "insufficient fresh evidence to call this task free"
+        state, reason = "never_seen", "nobody has claimed, worked on, or pushed it recently — free to take"
     return {"assignment": assignment, "activity": activity, "pipeline": pipeline, "last_push": last_push,
-            "availability": {"state": state, "reason": reason, "free": state == "available"}}
+            "availability": {"state": state, "reason": reason, "free": state in ("available", "never_seen")}}

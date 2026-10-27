@@ -316,7 +316,7 @@ def assignee(t: dict, load: dict[str, int], live_hosts: set[str] | None = None) 
         return f"{owner} (idle {idle}) — message or take over"
     if state == "actively_working" and t.get("owner"):
         return f"keep with {t['owner']}"
-    if state != "available":
+    if state not in ("available", "never_seen"):                  # never worked = free too
         return "ownership unclear — inspect the three axes before assigning"
     live = {h: n for h, n in load.items() if live_hosts is None or h in live_hosts}
     if not live:
