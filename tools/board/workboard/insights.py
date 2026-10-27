@@ -272,7 +272,7 @@ def review_summary(t: dict) -> dict:
         rv, ck = g[role]["review"], g[role]["check"]
         word = {"ok": "approved", "bad": "asked for changes", "old": "reviewed an older commit", "none": "no review yet"}[rv["state"]]
         bullets.append(({"ok": "ok", "bad": "bad", "old": "dim", "none": "pend"}[rv["state"]],
-                        f"{ROLE_LABEL[role]}: {word}" + (f" — {rv['note'][:160]}" if rv["state"] in ("bad", "old") and rv.get("note") else "")))
+                        f"{ROLE_LABEL[role]}: {word}" + (f" (confidence {rv['confidence']}/5)" if rv.get("confidence") else "") + (f" — {rv['note'][:160]}" if rv["state"] in ("bad", "old") and rv.get("note") else "")))
         cword = {"ok": "presubmit clean", "bad": f"presubmit {ck.get('fail')} failure(s)", "old": "presubmit on an older commit",
                  "none": "presubmit not recorded"}[ck["state"]]
         bullets.append(({"ok": "ok", "bad": "bad", "old": "dim", "none": "pend"}[ck["state"]], f"{ROLE_LABEL[role]}: {cword}"))
@@ -419,6 +419,9 @@ def primary_action(t: dict) -> dict:
     if n.startswith("FIX check"):
         r = role("check")
         return pa("🧪", f"Fix presubmit findings · {who[r]}", "block", (g[r]["check"].get("summary") or "")[:160])
+    known = ("RUN check", "GET R", "SUBMIT", "RESUBMIT", "FIX check", "ADDRESS")
+    if n and not n.startswith(known):                    # a state this board does not model yet: say so plainly
+        return pa("❔", f"Check task state · {n.lower()}", "act", "unrecognised state — open the task in codimango")
     if warns and any("verify" in (w.get("fix") or "") or "reviewer action" in w.get("why", "") for w in warns):
         w = next(w for w in warns if "verify" in (w.get("fix") or "") or "reviewer action" in w.get("why", ""))
         return pa("▲", f"Verify flagged check · {w['check']}", "act", w.get("why", ""))

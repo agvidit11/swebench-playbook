@@ -104,6 +104,7 @@ def gates(task_events: list[dict], current, owner_session: str | None = None,
         state = "bad" if changes else "ok" if ready else "old" if not here else "none"
         p = pick.get("payload") or {}
         out[role]["review"] = {"state": state, "verdict": p.get("verdict"), "note": p.get("note", ""),
+                               "confidence": p.get("confidence"),
                                "at": pick.get("occurred_at"), "current": pick.get("commit") in cur,
                                "who": (pick.get("actor") or {}).get("alias", ""),
                                "session": (pick.get("actor") or {}).get("session_id")}
