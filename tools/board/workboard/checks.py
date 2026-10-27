@@ -109,6 +109,16 @@ def _stream(argv, timeout, out, err):
     return code, stdout_tail.text()
 
 
+def task_dirty(cfg, task: str) -> bool:
+    """Uncommitted changes under <repo>/<task>/ in the local checkout: a check of those bytes is not a check of HEAD."""
+    for repo in cfg.repositories:
+        path = Path(repo.path).expanduser()
+        if (path / task).is_dir():
+            p = gitutil.run(path, "status", "--porcelain", "--", f"{task}/", timeout=15)
+            return p.returncode == 0 and bool(p.stdout.strip())
+    return False
+
+
 def _resolve_commit(cfg, ref: str) -> str | None:
     for repo in cfg.repositories:
         p = gitutil.run(Path(repo.path).expanduser(), "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", timeout=10)
@@ -127,10 +137,17 @@ def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.
     """Run the configured gate with live output, keep its exit code, then record the result.
     Anything other than a clean, parsed run is recorded as failing (fail >= 1)."""
     if not cfg.checks.presubmit:
-        print("check run: set [checks] presubmit in your config", file=err)
+        from .config import default_path
+        print(f"check run: no presubmit gate configured. Add to {default_path()}:\n"
+              '[checks]\npresubmit = ["python3", "<playbook>/review/presubmit-<date>/presubmit.py", "{task}", '
+              '"--repo", "<task repo>", "--ref", "origin/<branch>", "--color", "never"]\n'
+              "or run `board setup`, which wires the playbook's gate automatically.", file=err)
         return 2
     argv = [a.replace("{task}", task) for a in cfg.checks.presubmit]
-    commit = task_head(cfg, task)
+    dirty = task_dirty(cfg, task)
+    commit = None if dirty else task_head(cfg, task)
+    if dirty:
+        print("check run: the task has uncommitted changes — this result will not count for any commit", file=err)
     note = ""
     try:
         code, tail = _stream(argv, cfg.checks.timeout_seconds, out, err)
@@ -163,14 +180,19 @@ def record_check(cfg, task: str, *, passed: int, warn: int, fail: int, summary: 
     """Record a presubmit result run elsewhere (another session, a batch run). Bound to the task's current commit."""
     if commit and not re.fullmatch(r"[0-9a-f]{40}", commit):
         commit = _resolve_commit(cfg, commit)           # short SHA / ref -> full SHA, else the task head
-    commit = commit or task_head(cfg, task)
+    dirty = commit is None and task_dirty(cfg, task)
+    commit = None if dirty else (commit or task_head(cfg, task))
     payload = {"pass": passed, "warn": warn, "fail": max(fail, 0), "parsed": True, "exit": 1 if fail else 0,
                "summary": summary[:300], "imported_from": source}
+    if dirty:
+        payload["uncommitted"] = True
     if role in ("author", "independent"):
         payload["role"] = role
     actor = actor or coord.actor_for(cfg)
     if not coord.record(state_dir, "check", task, actor, payload, commit=commit):
         return False, "could not queue the result"
+    if dirty:
+        return True, "uncommitted changes in the task: recorded without a commit (shows as stale) — commit, then record again"
     return True, commit or "no commit (shows as stale)"
 
 

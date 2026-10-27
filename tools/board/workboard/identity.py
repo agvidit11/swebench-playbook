@@ -56,5 +56,46 @@ def current_actor(host_id: str, env=None, person: str = "") -> dict:
         title = tab_title(sid) or f"session {sid[:8]}"
         return {"session_id": sid, "alias": f"{host_id}·{title}", "kind": "claude", "host": host_id, "person": person}
     user = env.get("USER") or getpass.getuser()
-    return {"session_id": f"human:{user}@{host_id}", "alias": f"{host_id}·{user} (shell)", "kind": "human",
+    codex = _codex_ancestor() if env is os.environ else None
+    if codex:                                         # a Codex session not started from Claude: its own identity
+        pid, start, cwd = codex
+        return {"session_id": f"codex:{host_id}:{pid}:{start}", "alias": f"{host_id}·Codex {Path(cwd).name or pid}",
+                "kind": "codex", "host": host_id, "person": person}
+    tty = _tty()
+    sid = f"human:{user}@{host_id}" + (f":{tty}" if tty else "")   # separate terminals are separate actors
+    return {"session_id": sid, "alias": f"{host_id}·{user} (shell{' ' + tty if tty else ''})", "kind": "human",
             "host": host_id, "person": person}
+
+
+def _codex_ancestor(max_depth: int = 12):
+    """(pid, start_ticks, cwd) of the nearest `codex` ancestor process, if any (Linux /proc only)."""
+    pid = os.getppid()
+    for _ in range(max_depth):
+        if pid <= 1:
+            return None
+        try:
+            cmd = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+            stat = Path(f"/proc/{pid}/stat").read_text()
+        except OSError:
+            return None
+        exe = os.path.basename(cmd[0].decode(errors="replace")) if cmd and cmd[0] else ""
+        if exe == "codex" or (exe.startswith("codex") and len(cmd) > 1):
+            try:
+                cwd = os.readlink(f"/proc/{pid}/cwd")
+            except OSError:
+                cwd = ""
+            return pid, stat.rsplit(")", 1)[1].split()[19], cwd
+        try:
+            pid = int(stat.rsplit(")", 1)[1].split()[1])
+        except (IndexError, ValueError):
+            return None
+    return None
+
+
+def _tty() -> str:
+    for fd in (0, 1, 2):
+        try:
+            return os.ttyname(fd).replace("/dev/", "")
+        except OSError:
+            continue
+    return ""

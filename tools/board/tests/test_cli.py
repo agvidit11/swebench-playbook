@@ -204,10 +204,11 @@ class ClaimCommandTest(unittest.TestCase):
         self.assertIn("audit event is not in the ledger", out)
 
     def test_claim_and_release_refuse_when_ledger_stale(self):
-        for argv in (["claim", "alpha"], ["release", "alpha-task", "--reason", "x"]):
-            code, out, _ = self.drive(argv, fresh=(False, "push failed"))
-            self.assertEqual(code, 2, argv)
-            self.assertIn("refusing", out)
+        code, out, _ = self.drive(["claim", "alpha"], fresh=(False, "push failed"))
+        self.assertEqual(code, 2)                       # claims wait for a fresh ledger ...
+        self.assertIn("refusing", out)
+        code, out, _ = self.drive(["release", "alpha-task", "--reason", "x"], fresh=(False, "push failed"))
+        self.assertNotIn("refusing", out)               # ... releases do not (targeted waiting only)
 
 
 class SyncCommandTest(unittest.TestCase):
@@ -288,10 +289,9 @@ class ReviewAddCommandTest(unittest.TestCase):
             return cli.main(["review", "add", "alpha-task", "--verdict", "ready", "--confidence", "4"]), err.getvalue()
 
     def test_busy_or_failed_pull_refused(self):
-        for why in ("another sync is running", "pull failed: x"):
+        for why in ("another sync is running", "pull failed: x"):   # reviews record locally; no pre-wait
             code, err = self.code((False, why), SyncState(last_pull_ok=True, last_push_ok=True))
-            self.assertEqual(code, 2)
-            self.assertIn("refusing", err)
+            self.assertNotIn("refusing", err)
 
     def test_push_left_pending_reports_queued(self):
         code, err = self.code((True, ""), SyncState(last_pull_ok=True, last_push_ok=False, pending=1, error="push failed"))

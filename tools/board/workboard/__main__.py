@@ -459,12 +459,8 @@ def cmd_claim(args, cfg):
 def cmd_release(args, cfg):
     from . import coord, sync as s
     state = s.default_state_dir()
-    ok, err = coord.ledger_fresh(cfg, state)
-    if not ok:
-        print(f"refusing to release: ledger did not sync ({err})", file=sys.stderr)
-        return 2
     res = coord.release(cfg, args.task, args.reason, state_dir=state)
-    st = s.sync(cfg, state_dir=state)
+    st = s.sync(cfg, state_dir=state, timeout_seconds=6)
     audit_ok = "audit event could not be queued" not in res.detail and st.last_push_ok and not st.pending
     if args.json:
         print(json.dumps(dict(asdict(res), audit_recorded=audit_ok)))
@@ -603,7 +599,7 @@ def cmd_check(args, cfg):
         for task, result in checks.import_dir(cfg, Path(args.target), state_dir=state, known=known or None, role=args.role):
             print(f"  {task:<50} {result}")
         code = 0
-    st = s.sync(cfg, state_dir=state, timeout_seconds=15)
+    st = s.sync(cfg, state_dir=state, timeout_seconds=6)
     if args.action != "run" and not (st.last_push_ok and not st.pending):
         print("results queued locally; run `workboard sync` to publish them", file=sys.stderr)
     return code
@@ -629,16 +625,12 @@ def cmd_review(args, cfg):
         print("review add needs --verdict ready|changes|comment", file=sys.stderr)
         return 2
     from . import coord
-    fresh, why = coord.ledger_fresh(cfg, state)
-    if not fresh:
-        print(f"refusing to add review: ledger did not sync ({why})", file=sys.stderr)
-        return 2
     ok, detail = checks.add_review(cfg, args.task, args.verdict, args.confidence, args.note or "", state_dir=state,
                                    role=args.role)
     if not ok:
         print(f"review refused: {detail}", file=sys.stderr)
         return 2
-    st = s.sync(cfg, state_dir=state, timeout_seconds=10)
+    st = s.sync(cfg, state_dir=state, timeout_seconds=6)
     if not (st.last_pull_ok and st.last_push_ok and not st.pending):
         print(f"review on {detail[:8]} is queued locally but NOT yet in the ledger ({st.error or 'push pending'}); "
               "run `workboard sync`", file=sys.stderr)
@@ -979,6 +971,16 @@ def cmd_setup(args, cfg):
         print(f"config error: {exc}", file=sys.stderr)
         return 2
     board = board_path()
+    if not cfg.checks.presubmit and cfg.repositories:              # wire the playbook's presubmit gate once
+        found = sorted(Path(board).resolve().parent.parent.parent.glob("review/presubmit-*/presubmit.py"))
+        if found:
+            repo = cfg.repositories[0]
+            line = json.dumps(["python3", str(found[-1]), "{task}", "--repo", str(Path(repo.path).expanduser()),
+                               "--ref", f"origin/{repo.branch}", "--color", "never"])
+            with open(target, "a") as fh:
+                fh.write(f"\n[checks]\npresubmit = {line}\n")
+            print(f"presubmit gate configured: {found[-1]}")
+            cfg = cfgmod.load_config()
     def link(dest: Path, src: Path, what: str):
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -1151,7 +1153,7 @@ def build_parser():
     hp.add_argument("--out", default="~/.cache/workboard/board.html")
     sv = sub.add_parser("serve", help="serve the live HTML dashboard on localhost")
     sv.add_argument("--port", type=int, default=8765)
-    sv.add_argument("--interval", type=int, default=30, help="seconds between refreshes (each one pulls the shared ledger)")
+    sv.add_argument("--interval", type=int, default=60, help="seconds between refreshes (each one pulls the shared ledger)")
     sv.add_argument("--ensure", action="store_true", help="exit 0 if serving; otherwise start one detached instance")
     s = sub.add_parser("show", parents=[common], help="one task in full")
     s.add_argument("task")
@@ -1266,7 +1268,10 @@ def cmd_serve(args, cfg):
         snap = gather(cfg, do_sync=False)
         target = comms.target_for(to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers],
                                   views=snap.views, sessions=getattr(snap, "sessions", []))
-        actor = dict(coord.actor_for(cfg), alias=f"{s.safe_host(s.host_id_for(cfg))}·dashboard", kind="human")
+        host = s.safe_host(s.host_id_for(cfg))
+        user = os.environ.get("USER", "user")
+        actor = {"session_id": f"human:{user}@{host}:dashboard", "alias": f"{host}·you (dashboard)", "kind": "human",
+                 "host": host, "person": cfg.user.id}          # never the session that happened to start `serve`
         if not ev_mod.spool_append(s.default_state_dir(), comms.new_message(text, target, actor, task=task)):
             raise ValueError("could not queue the message")
         st = s.sync(cfg, state_dir=s.default_state_dir(), timeout_seconds=20)
@@ -1312,7 +1317,7 @@ def cmd_msg(args, cfg):
     if not ev_mod.spool_append(state, ev):
         print("could not queue the message", file=sys.stderr)
         return 2
-    st = s.sync(cfg, state_dir=state, timeout_seconds=20)
+    st = s.sync(cfg, state_dir=state, timeout_seconds=6)
     ok = st.last_push_ok and not st.pending
     print(f"💬 published for {target['to_label']} — waiting for courier/hook delivery"
           if ok else f"💬 queued for {target['to_label']} (publishes on the next sync)")
@@ -1334,16 +1339,16 @@ def cmd_here(args, cfg):
         mine = [v for v in snap.views if v.fields.get("owner_session") == me["session_id"]]
         last = next((e for e in reversed(snap.events) if e["type"] == "checkin"
                      and e["actor"].get("session_id") == me["session_id"]), None)
+        if getattr(args, "json", False):
+            print(json.dumps({"session": me, "owns": [v.entity_id for v in mine],
+                              "last_checkin": ({"at": last["occurred_at"], **last["payload"]} if last else None)}))
+            return 0
         print(f"🧭 {me['alias']}")
         print("  owns: " + (", ".join(v.entity_id for v in mine) or "nothing"))
         print("  last check-in: " + (f"{last['occurred_at'][:16]} · {last['payload'].get('status')} · "
                                      f"{', '.join(last['payload'].get('tasks') or []) or '—'}" if last else "never"))
         print("  check in: board here <task> [<task> ...]   ·   nothing to do: board here --idle")
         return 0
-    ok, err = coord.ledger_fresh(cfg, state)
-    if not ok:
-        print(f"refusing to check in: ledger did not sync ({err})", file=sys.stderr)
-        return 2
     tasks, lines, others = [], [], {}
     for name in args.tasks:
         exact = [v.entity_id for v in snap.views if v.entity_id == name]
@@ -1373,9 +1378,14 @@ def cmd_here(args, cfg):
     for task in tasks:                                   # counts as activity on each task (owner shows as working)
         ev_mod.spool_append(state, ev_mod.new_event("presence", task, {"last_seen": time.time(), "checkin": True},
                                                     actor=me, commit=None, source="checkin"))
-    st = s.sync(cfg, state_dir=state, timeout_seconds=20)
-    print(f"🧭 {me['alias']} checked in — {'idle 💤' if args.idle else 'working on ' + str(len(tasks)) + ' task(s)'}"
-          + ("" if st.last_push_ok and not st.pending else " (queued; publishes on next sync)"))
+    st = s.sync(cfg, state_dir=state, timeout_seconds=6)
+    if not getattr(args, "json", False):
+        print(f"🧭 {me['alias']} checked in — {'idle 💤' if args.idle else 'working on ' + str(len(tasks)) + ' task(s)'}"
+              + ("" if st.last_push_ok and not st.pending else " (queued; publishes on next sync)"))
+    if getattr(args, "json", False):
+        print(json.dumps({"session": me, "status": payload["status"], "tasks": tasks, "owned_by_others": others,
+                          "published": bool(st.last_push_ok and not st.pending), "results": lines}))
+        return 0
     for line in lines:
         print(line)
     return 0
@@ -1423,9 +1433,20 @@ def cmd_ack(args, cfg):
     pick = msgs if args.id == "all" else [m for m in msgs if m["id"].startswith(args.id)]
     for m in pick:
         ev_mod.spool_append(state, comms.ack_event(m["id"], me))
-    s.sync(cfg, state_dir=state, timeout_seconds=15)
-    print(f"acked {len(pick)} message(s)")
-    return 0 if pick else 1
+    if pick:
+        st = s.sync(cfg, state_dir=state, timeout_seconds=6)
+        print(f"acknowledged {len(pick)} message(s)" + ("" if st.last_push_ok and not st.pending
+                                                         else " (queued locally; publishes on the next sync)"))
+        return 0
+    if args.id != "all":
+        every = comms.inbox(snap.events, me["session_id"], s.safe_host(s.host_id_for(cfg)), include_acked=True)
+        if any(m["id"].startswith(args.id) for m in every):
+            print(f"already acknowledged: {args.id}")
+            return 0
+        print(f"not found: no message for you starts with {args.id!r}", file=sys.stderr)
+        return 1
+    print("nothing to acknowledge")
+    return 0
 
 
 def _courier_data(cfg):

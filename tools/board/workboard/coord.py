@@ -135,7 +135,8 @@ def release(cfg, task, reason, *, state_dir, actor=None) -> claims.ClaimResult:
     actor = actor or actor_for(cfg)
     cur = claims.read(cfg, task, state_dir=state_dir)
     if cur.status != "HELD":
-        return claims.ClaimResult("RELEASED" if cur.status == "FREE" else cur.status, None, cur.detail or "not claimed")
+        return claims.ClaimResult("RELEASED" if cur.status == "FREE" else cur.status, None,
+                                      "already released (nobody held the claim)" if cur.status == "FREE" else (cur.detail or "not claimed"))
     owner_sid = cur.owner.get("session_id") if isinstance(cur.owner, dict) else None
     if actor["kind"] == "human" and owner_sid != actor["session_id"]:
         return release_own_agent(cfg, task, reason, state_dir=state_dir, actor=actor, current=cur)

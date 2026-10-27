@@ -36,7 +36,8 @@ def target_for_task(task: str, views, sessions: list[dict] | None = None) -> dic
     if not native:
         raise ValueError(f"{task} has no resolved owner — choose a server or everyone")
     sessions = sessions or []
-    session = next((s for s in sessions if native in (s.get("native_id"), s.get("session_key"))), None)
+    matches = [s for s in sessions if native in (s.get("native_id"), s.get("session_key"))]
+    session = max(matches, key=lambda s: (bool(s.get("live")), str(s.get("status_since") or "")), default=None)
     target_id = session.get("session_key") if session else native
     label = session.get("name") if session else f.get("owner") or native
     host = session.get("host") if session else (label.split("·", 1)[0] if "·" in label else None)
@@ -371,8 +372,27 @@ def _talking(row: dict, last_seen: dict, now: float) -> bool:
     return raw == "idle" and (row.get("status_ago_s") or 10 ** 9) <= 24 * 3600
 
 
+def _dedupe_sessions(rows: list[dict]) -> list[dict]:
+    """One row per native session id: a resumed session can leave several registry entries (different names)."""
+    best, order = {}, []
+    for r in rows:
+        nid = r.get("native_id")
+        if not nid or r.get("is_summary") or r.get("is_actor"):
+            order.append(r)
+            continue
+        cur = best.get(nid)
+        rank = (bool(r.get("live")), -(r.get("status_ago_s") if r.get("status_ago_s") is not None else 10 ** 9))
+        if cur is None:
+            best[nid] = r
+            order.append(nid)
+        elif rank > (bool(cur.get("live")), -(cur.get("status_ago_s") if cur.get("status_ago_s") is not None else 10 ** 9)):
+            best[nid] = r
+    return [best[x] if isinstance(x, str) else x for x in order]
+
+
 def _fold_dormant(rows: list[dict], host: str, last_seen: dict, now: float) -> list[dict]:
     """Keep the sessions we talk to; fold dormant interactive sessions into one row; make names unique per host."""
+    rows = _dedupe_sessions(rows)
     keep, dormant = [], []
     rows = [r for r in rows if not str(r.get("alias") or r.get("name") or "").endswith("CLAIMS.md")]   # importer, not a session
     for r in rows:
