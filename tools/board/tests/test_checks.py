@@ -56,6 +56,20 @@ class ChecksTest(unittest.TestCase):
         self.assertEqual((p["fail"], p["warn"], p["pass"], p["parsed"]), (0, 3, 23, True))
         self.assertEqual(self.spool()[-1]["commit"], HEAD)
 
+    def test_ref_pinned_gate_ignores_dirty_checkout(self):
+        self.cfg.checks.presubmit = script(self.tmp, 'print("0 FAIL · 0 WARN · 5 PASS")\n') + ["--ref", "origin/main"]
+        with mock.patch.object(checks, "task_dirty", return_value=True) as dirty, \
+             mock.patch.object(checks, "_ref_head", return_value="e" * 40):
+            checks.run_check(self.cfg, "alpha", state_dir=self.state, actor=ACTOR, out=io.StringIO(), err=io.StringIO())
+        dirty.assert_not_called()
+        self.assertEqual(self.spool()[-1]["commit"], "e" * 40)
+
+    def test_unpinned_gate_on_dirty_checkout_binds_no_commit(self):
+        with mock.patch.object(checks, "task_dirty", return_value=True):
+            _, _, err, _ = self.run_gate('print("0 FAIL · 0 WARN · 5 PASS")\n')
+        self.assertIsNone(self.spool()[-1]["commit"])
+        self.assertIn("uncommitted", err)
+
     def test_exit_and_output_preserved(self):
         code, out, err, p = self.run_gate('import sys\nprint("1 FAIL · 2 WARN · 21 PASS")\nprint("note", file=sys.stderr)\nsys.exit(1)\n')
         self.assertEqual(code, 1)

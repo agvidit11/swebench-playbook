@@ -54,6 +54,15 @@ class ClaimCliTest(unittest.TestCase):
         self.assertEqual(coord.release(self.c1, "task-c", "done", state_dir=self.s1, actor=A1).status, "RELEASED")
         self.assertEqual(claims.read(self.c1, "task-c", state_dir=self.s1).status, "FREE")
 
+    def test_release_of_expired_claim_points_to_steal(self):
+        coord.claim(self.c1, "task-x", state_dir=self.s1, actor=A1)
+        later = datetime.now(timezone.utc) + timedelta(hours=self.c2.claims.expire_after_hours + 1)
+        with mock.patch.object(coord, "_now", return_value=later):
+            res = coord.release(self.c2, "task-x", "x", state_dir=self.s2, actor=A2)
+        self.assertEqual(res.status, "REFUSED")
+        self.assertIn("--steal", res.detail)
+        self.assertNotIn("--steal", coord.release(self.c2, "task-x", "x", state_dir=self.s2, actor=A2).detail)
+
     def test_auto_claim_from_touch_event(self):
         events.spool_append(self.s1, events.new_event("touch", "task-d", {}, actor=A1, commit=None, source="hook"))
         st = sync.sync(self.c1, host_id="h1", state_dir=self.s1)

@@ -1300,15 +1300,18 @@ def cmd_msg(args, cfg):
     from . import comms, coord, events as ev_mod, sync as s
     state = s.default_state_dir()
     snap = _snap_for_comms(args, cfg)
+    orig = next((m for m in comms.messages(snap.events) if m["id"].startswith(args.reply_to)), None) \
+        if args.reply_to else None
     try:
         target = comms.target_for(args.to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers],
                                   views=snap.views, sessions=getattr(snap, "sessions", []))
     except ValueError as exc:
-        print(exc, file=sys.stderr)
-        return 2
-    if args.reply_to and target.get("to") in ("all",) or (args.reply_to and str(target.get("to", "")).startswith("host:")):
-        orig = next((m for m in comms.messages(snap.events) if m["id"].startswith(args.reply_to)), None)
-        if orig and orig.get("from_session"):           # a reply goes back to the sender, never a broadcast
+        if not (orig and orig.get("from_session")):     # an ambiguous name is fine when replying: pin to the sender
+            print(exc, file=sys.stderr)
+            return 2
+        target = {"to": "all"}
+    if orig and (target.get("to") == "all" or str(target.get("to", "")).startswith("host:")):
+        if orig.get("from_session"):                    # a reply goes back to the sender, never a broadcast
             target = {"to": f"session:{orig['from_session']}", "to_label": orig.get("from") or "original sender",
                       "resolved_recipients": [{"session_key": orig["from_session"], "native_id": orig["from_session"],
                                                "host": orig.get("from_host"), "name": orig.get("from")}]}

@@ -122,6 +122,15 @@ def validation_context(task: str) -> dict:
                               ("validation_status", row.get("validation_status"))) if v}
 
 
+def _ref_head(cfg, task: str, ref: str) -> str | None:
+    """Last commit touching <task>/ at the ref the gate reads."""
+    for repo in cfg.repositories:
+        p = gitutil.run(Path(repo.path).expanduser(), "log", "-1", "--format=%H", ref, "--", f"{task}/", timeout=20)
+        if p.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", p.stdout.strip()):
+            return p.stdout.strip()
+    return task_head(cfg, task)
+
+
 def task_dirty(cfg, task: str) -> bool:
     """Uncommitted changes under <repo>/<task>/ in the local checkout: a check of those bytes is not a check of HEAD."""
     for repo in cfg.repositories:
@@ -157,8 +166,9 @@ def run_check(cfg, task: str, *, state_dir, actor=None, out=sys.stdout, err=sys.
               "or run `board setup`, which wires the playbook's gate automatically.", file=err)
         return 2
     argv = [a.replace("{task}", task) for a in cfg.checks.presubmit]
-    dirty = task_dirty(cfg, task)
-    commit = None if dirty else task_head(cfg, task)
+    pinned = argv[argv.index("--ref") + 1] if "--ref" in argv[:-1] else None
+    dirty = not pinned and task_dirty(cfg, task)    # a gate pinned to a ref never reads the local checkout
+    commit = None if dirty else _ref_head(cfg, task, pinned) if pinned else task_head(cfg, task)
     if dirty:
         print("check run: the task has uncommitted changes — this result will not count for any commit", file=err)
     note = ""

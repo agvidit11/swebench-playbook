@@ -130,6 +130,14 @@ def _released_recently(state_dir, task, session_id) -> bool:
     return _now().timestamp() - data.get(f"{task}|{session_id}", 0) < 24 * 3600
 
 
+def _expired(cfg, owner) -> bool:
+    try:
+        renewed = datetime.fromisoformat(str((owner or {}).get("renewed_at")).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return _now() - renewed > timedelta(hours=cfg.claims.expire_after_hours)
+
+
 def release(cfg, task, reason, *, state_dir, actor=None) -> claims.ClaimResult:
     """Owner release. A human shell releasing their own agent's claim goes through release_own_agent."""
     actor = actor or actor_for(cfg)
@@ -141,6 +149,8 @@ def release(cfg, task, reason, *, state_dir, actor=None) -> claims.ClaimResult:
     if actor["kind"] == "human" and owner_sid != actor["session_id"]:
         return release_own_agent(cfg, task, reason, state_dir=state_dir, actor=actor, current=cur)
     res = claims.release(cfg, task, actor, expected_oid=cur.oid, state_dir=state_dir)
+    if res.status == "REFUSED" and owner_sid != actor.get("session_id") and _expired(cfg, cur.owner):
+        res.detail += f"; that claim is expired, so take it over instead: board claim {task} --steal (run it again after the grace period)"
     if res.status == "RELEASED":
         with local_claims(state_dir) as local:
             local.pop(task, None)
