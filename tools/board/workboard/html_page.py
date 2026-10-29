@@ -82,6 +82,7 @@ aside .xx{position:absolute;top:14px;right:46px;cursor:pointer;color:var(--dim);
 .session-table{overflow:auto;border:1px solid var(--line);border-radius:10px}.session-table table{font-size:12.5px}.session-table th{padding:7px 8px}.session-table td{padding:6px 8px;white-space:normal;vertical-align:top}.session-table td:first-child{width:30px;text-align:center;font-size:16px}.session-table .srow{cursor:pointer}.session-table .srow:hover td{background:#232735}.session-table .sgroup td{background:#151820;color:var(--dim);font-weight:700}.session-table .focus{max-width:280px}.session-table .advice{max-width:300px}.session-detail .line{margin:5px 0}.session-detail b{color:var(--text)}.route{font-size:11.5px;margin-top:3px}.diag{margin-top:8px}
 @media(max-width:900px){.server-grid,.team{grid-template-columns:1fr}.team-side{position:static}}
 @media(max-width:900px){.keyhelp{display:none}}
+.pa-status{display:none;margin-top:3px}@media(max-width:1200px){.c-status{display:none}.pa-status{display:block}}
 aside .x:hover{transform:rotate(90deg);color:var(--pink)}
 .card-title{font-size:16px;font-weight:800;word-break:break-all;padding-right:34px;margin:0}
 .kind{color:var(--dim);margin:4px 0 10px}
@@ -120,7 +121,7 @@ code{background:#0e1016;border:1px solid var(--line);border-radius:5px;padding:0
 <div class="controls" id="chips"></div>
 <div class="controls"><div class="seg" id="owner"></div><select class="kind" id="kind" title="task type"><option value="">🧩 all types</option><option value="multi-turn">🔁 multi-turn</option><option value="single-turn">① single-turn</option></select><input type="search" id="q" placeholder="🔍 search tasks  ( / )"><span class="health" id="health"></span></div>
 <div class="tbl"><table><thead><tr>
-<th data-k="task" data-h="task">Task</th><th data-k="next" data-h="next">Primary action</th><th data-k="tag" data-h="tag">Status</th>
+<th data-k="task" data-h="task">Task</th><th data-k="next" data-h="next">Primary action</th><th data-k="tag" data-h="tag" class="c-status">Status</th>
 <th data-k="owner" data-h="owner">Owner</th><th data-k="valid" data-h="valid">Validation</th>
 <th data-k="check" data-h="check">Presubmit</th><th data-k="sync" data-h="sync">Server</th><th data-h="tags">Tags</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="legend"><span><span class="spark">✦</span> changed</span><span><span style="color:#ff4d4d">▌</span> red edge = fix first</span><span>Presubmit: <span class="tk g">✓</span><span class="tk d">○</span> building · independent (○ not run)</span>
@@ -264,7 +265,7 @@ function visible(){return D.tasks.filter(t=>S.groups.has(dg(t))&&(!S.tags.size||
  (!S.q||t.task.includes(S.q.toLowerCase())))}
 function setHTML(id,html){if(S.blocks[id]!==html){S.blocks[id]=html;document.getElementById(id).innerHTML=html}}
 function rowHtml(t){return `<tr class="row" data-t="${esc(t.task)}" style="--s:${t.group==='ATTENTION'?'#ff4d4d':G[dg(t)][0]}"><td class="task" data-tip="task">${changed(t)?'<span class="spark">✦</span> ':''}${esc(t.task)}${taskTokens(t)}</td>
-  <td data-tip="next" class="primary-action">${next(t)}</td><td data-tip="tag">${tag(t)}</td><td data-tip="owner" class="own">${owner(t)}</td><td data-tip="valid">${valid(t)}</td><td data-tip="check">${check(t)}</td><td data-tip="sync">${sync(t)}</td><td data-tip="tags">${tagsCell(t)}</td></tr>`}
+  <td data-tip="next" class="primary-action">${next(t)}<div class="pa-status">${tag(t)}</div></td><td data-tip="tag" class="c-status">${tag(t)}</td><td data-tip="owner" class="own">${owner(t)}</td><td data-tip="valid">${valid(t)}</td><td data-tip="check">${check(t)}</td><td data-tip="sync">${sync(t)}</td><td data-tip="tags">${tagsCell(t)}</td></tr>`}
 function rowSig(t){return [t.next,t.tag,t.valid,t.review,t.owner,t.claim_health,t.ownership_state,t.sync,check(t),sync(t),JSON.stringify(t.local_usage||{})].join('|')}   // flash only on real changes, not ticking ages
 function renderBoard(){const counts={};D.tasks.forEach(t=>{if(!S.kind||t.kind===S.kind)counts[dg(t)]=(counts[dg(t)]||0)+1});
  let chips=Object.entries(G).map(([g,[c,e,l]])=>`<button class="chip ${S.groups.has(g)?'':'off'}" data-g="${g}" title="${esc(GHELP[g])}"><span class="c" style="background:${c}"></span><span class="e">${e}</span> ${l} <b>${counts[g]||0}</b></button>`).join('');
