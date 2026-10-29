@@ -176,9 +176,11 @@ def _parked(legacy_rows, tev, state, claim_health, head_time):
     last = legacy_rows[-1]["payload"]
     if last.get("status") not in PARKED:
         return None
-    since = ts((last.get("updated") or "")[:10] + "T23:59:59+00:00") or ts(legacy_rows[-1].get("occurred_at"))
-    if since is None:
+    dates = [d for d in (ts((last.get("updated") or "")[:10] + "T23:59:59+00:00"),
+                         ts(legacy_rows[-1].get("occurred_at"))) if d]   # the row date, or when the board read it
+    if not dates:
         return None
+    since = max(dates)
     later = [e for e in tev if e["type"] in ("claim", "renew", "steal", "touch", "presence", "build_action", "check")
              and (ts(e.get("occurred_at")) or since) > since]
     if later or (head_time and head_time > since):
