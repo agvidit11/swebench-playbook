@@ -506,6 +506,15 @@ def check_server(name, task_dir):
                              "every flagged test must trace to the step wording or be dropped")
                     else:
                         ok("fairness gate", "no Critical findings")
+                # a red signal (e.g. reward_hack_detector_gate) hides under a stage that reads "passed"
+                # (pact 09e87f8)
+                if o.get("name") == "configerable-signals" and (not sha or str(o.get("commitSha", "")) == sha):
+                    red = [(p.get("label") or "?", p.get("status")) for p in o.get("policies") or []
+                           if p.get("status") in ("FAIL", "ERROR")]
+                    if red:
+                        fail("configurable signals", f"{red} — fix each, or write an override justification")
+                    else:
+                        ok("configurable signals", "no FAIL/ERROR policy")
                 for v in o.values():
                     _walk(v)
             elif isinstance(o, list):
