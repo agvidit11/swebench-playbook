@@ -535,6 +535,17 @@ def cmd_sync(args, cfg):
                                                if r.get("entered_pool_at") and r.get("status") != "archived"])
     except Exception as exc:
         print(f"review history refresh skipped: {exc}", file=sys.stderr)
+    try:                                           # Stats history: snapshot transitions + review/submission events
+        from . import facts
+        from .sources.codimango import CodimangoSource as _CS2
+        doc = _CS2(cfg, cache_dir=app.cache_dir())._read_cache() or {}
+        store = facts.Store(app.cache_dir())
+        if doc.get("total_exact", True):
+            facts.observe_snapshot(store, doc.get("rows", []), doc.get("fetched_at"))
+        facts.seed_personal_snapshots(store, Path("~/swebench/task-snapshots"))
+        facts.hydrate(cfg, store, doc.get("rows", []))
+    except Exception as exc:
+        print(f"stats history skipped: {exc}", file=sys.stderr)
     hb = s.default_state_dir() / "heartbeat-at"
     if not hb.exists() or time.time() - hb.stat().st_mtime > 600:      # prove this host syncs, at most every 10 min
         from . import coord as _c, events as _e

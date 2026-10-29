@@ -111,7 +111,7 @@ code{background:#0e1016;border:1px solid var(--line);border-radius:5px;padding:0
 .tgutter{cursor:col-resize;align-self:stretch;border-radius:4px;background:linear-gradient(90deg,transparent 4px,var(--line) 4px,var(--line) 6px,transparent 6px)}
 .tgutter:hover,.tgutter.drag{background:linear-gradient(90deg,transparent 3px,var(--pink) 3px,var(--pink) 7px,transparent 7px)}.session-table{overflow-x:auto}
 @media(max-width:900px){.tgutter{display:none}}
-</style></head><body>
+__STATS_CSS__</style></head><body>
 <header><span class="logo">🧭</span><h1>workboard</h1><span class="sub">your tasks across every server and session</span>
 <span class="live"><span class="dot" id="dot"></span><span id="when"></span></span></header>
 <div class="wrap">
@@ -295,7 +295,7 @@ function renderBoard(){const counts={};D.tasks.forEach(t=>{if(!S.kind||t.kind===
 }
 function renderSummary(){const W=D.week||{};setHTML('week',`📈 W${W.week??'—'}: <b>${W.this_week??'—'}</b> accepted · last week at this point ${W.same_point_last_week??'—'} · 4-week median ${W.median_4wk??'—'}`);const h=D.health||{};setHTML('health',Object.entries(h).map(([k,v])=>`<span class="${v.ok?'ok':'bad'}">${v.ok?'✔':'✘'} ${k}</span>`).join(' · ')+(D.ledger_ok==null?'':` · <span class="${D.ledger_ok?'ok':'bad'}">${D.ledger_ok?'✔':'✘'} ledger${D.ledger_at?' '+age(elapsed(D.ledger_at))+' ago':''}</span>`)+(D.refresh_error?` · <span class="bad">refresh failing: ${esc(D.refresh_error)}</span>`:''));const stale=D.codimango_at&&elapsed(D.codimango_at)>600;document.getElementById('dot').className='dot'+(Object.values(h).every(v=>v.ok)&&!D.refresh_error&&!stale&&D.ledger_ok!==false?'':' bad');renderWhen()}
 function countUp(el){const end=parseFloat(el.dataset.n);if(isNaN(end))return;let s=null;const step=ts=>{s=s||ts;const p=Math.min(1,(ts-s)/700);el.textContent=(end%1?(end*p).toFixed(1):Math.round(end*p));if(p<1)requestAnimationFrame(step)};requestAnimationFrame(step)}
-function renderStats(){const w=D.week||{},f=D.funnel||{},fl=D.flow||{},weekly=D.weekly||[],hr=x=>x==null?'—':x>=48?(x/24).toFixed(1)+'d':Math.round(x)+'h';
+function renderStats(){if(D.s2){s2wire();return renderStats2()}const w=D.week||{},f=D.funnel||{},fl=D.flow||{},weekly=D.weekly||[],hr=x=>x==null?'—':x>=48?(x/24).toFixed(1)+'d':Math.round(x)+'h';
  const top=Math.max(1,...weekly.map(r=>r.accepted));const ftop=Math.max(1,f.built||0,f.imported||0);const delta=(w.this_week||0)-(w.same_point_last_week||0),td=D.token_daily||[],ttop=Math.max(1,...td.map(r=>r.total||0)),acct=D.token_accounting||{};
  document.getElementById('stats').innerHTML=`<div class="cards">
  <div class="card"><div class="lbl">🏁 accepted this week</div><div class="big ok" data-n="${w.this_week}">${w.this_week}</div><div class="${delta>=0?'ok':'bad'}">${delta>=0?'▲':'▼'} ${Math.abs(delta)} vs last week at this point</div></div>
@@ -395,7 +395,7 @@ async function sendMsg(){const to=document.getElementById('mto').value,text=docu
 async function sendDrawerMsg(to){const text=document.getElementById('dmtext').value,rawTask=document.getElementById('dmtask').value,task=rawTask==='__all__'?'':rawTask,st=document.getElementById('dmstatus');
  if(!LIVE){st.innerHTML='<span class="bad">sending needs the live page (board serve)</span>';return}st.textContent='sending…';
  try{const r=await fetch('api/msg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,text,task})}),j=await r.json();st.innerHTML=j.ok?`<span class="sent">✓ ${esc(j.state||'queued')}</span>`:`<span class="bad">${esc(j.error)}</span>`;if(j.ok)document.getElementById('dmtext').value=''}catch(e){st.innerHTML='<span class="bad">failed</span>'}}
-function render(){renderSummary();renderBoard();if(!document.getElementById('stats').hidden&&Object.keys(D.funnel||{}).length)renderStats();if(!document.getElementById('team').hidden)renderTeam()}
+function render(){renderSummary();renderBoard();if(!document.getElementById('stats').hidden&&(D.s2||Object.keys(D.funnel||{}).length))renderStats();if(!document.getElementById('team').hidden)renderTeam()}
 function renderWhen(){const ageS=D.codimango_at?Math.max(0,(Date.now()-new Date(D.codimango_at))/1000):null;
  const exact=s=>s==null?'?':s<3600?Math.round(s/60)+'m':Math.floor(s/3600)+'h'+String(Math.round(s%3600/60)).padStart(2,'0')+'m';
  document.getElementById('when').textContent=(LIVE?'live · ':'')+'codimango data '+exact(ageS)+' old'+(D.codimango_detail&&D.health&&D.health.codimango&&!D.health.codimango.ok?' — '+D.codimango_detail:'')+' · last changed region '+exact(Math.max(0,(Date.now()-S.lastNetworkAt)/1000))+' ago';
@@ -457,5 +457,9 @@ if(LIVE){const vis=()=>!document.hidden;   // never poll a hidden tab; catch up 
  setInterval(()=>{if(vis()){pollRegion('summary');pollRegion('board')}},60000);setInterval(()=>{if(vis()&&!document.getElementById('team').hidden)pollRegion('team')},20000);setInterval(()=>{if(vis()&&!document.getElementById('team').hidden)pollRegion('activity')},30000);setInterval(()=>{if(vis()&&!document.getElementById('stats').hidden)pollRegion('stats')},300000);
  document.addEventListener('visibilitychange',()=>{if(vis()){pollRegion('summary');pollRegion('board');if(!document.getElementById('team').hidden){pollRegion('team');pollRegion('activity')}}})}
 setInterval(tickClocks,15000);
+__STATS_JS__
 </script></body></html>
 """
+
+from .stats_page import STATS_CSS, STATS_JS  # noqa: E402
+PAGE = PAGE.replace("__STATS_CSS__", STATS_CSS).replace("__STATS_JS__", STATS_JS)

@@ -297,6 +297,7 @@ def payload(snap, cfg) -> dict:
         "funnel": st.funnel(snap.observations), "flow": flow,
         "ages": st.pipeline_age(snap.views, snap.now), "load": load,
         "tasks": views,
+        "s2": _stats2(snap, cfg),
         "token_daily": (getattr(snap, "usage", {}) or {}).get("daily", []),
         "token_accounting": (getattr(snap, "usage", {}) or {}).get("accounting", {}),
         "usage_collector": (getattr(snap, "usage", {}) or {}).get("collector", {}),
@@ -305,6 +306,16 @@ def payload(snap, cfg) -> dict:
         "feed": [dict(f, who=short_names(servers).get(f.get("session") or "", f.get("who")))
                  for f in comms.feed(snap.events, since_s=24 * 3600, limit=150)],
     }
+
+
+def _stats2(snap, cfg):
+    """Stats v2 fact table; never let it break the rest of the dashboard."""
+    try:
+        from . import stats2
+        from .app import cache_dir
+        return stats2.build(snap, cfg, cache_dir())
+    except Exception as exc:
+        return {"error": f"{exc.__class__.__name__}: {exc}"[:200]}
 
 
 from .html_page import PAGE  # noqa: E402  (template lives in its own module)

@@ -26,7 +26,7 @@ REGION_INPUTS = {
     "board": ("codimango", "git", "ledger", "presence", "usage"),
     "team": ("ledger", "registry_runs", "presence", "usage"),
     "activity": ("ledger", "presence"),
-    "stats": ("codimango", "git", "ledger", "usage"),
+    "stats": ("codimango", "git", "ledger", "usage", "facts"),
 }
 
 DETAIL_KEYS = {
@@ -164,8 +164,9 @@ def source_generations(cfg, *, cache: Path | None = None, state: Path | None = N
     event_files = app_mod.ledger_event_files(cfg)
     presence = _tree_stamp(event_files + [state / "spool.jsonl"])
     usage = _tree_stamp([cache / "usage-v1.json"])
+    facts = _tree_stamp([cache / "facts" / "facts-v1.jsonl"])
     return {"codimango": codimango, "git": git, "ledger": ledger_gen,
-            "registry_runs": registry_runs, "presence": presence, "usage": usage}
+            "registry_runs": registry_runs, "presence": presence, "usage": usage, "facts": facts}
 
 
 def _state_since(task: dict, now) -> str | None:
@@ -366,7 +367,7 @@ def split_payload(full: dict, *, now=None, names=None) -> tuple[dict[str, dict],
     if "activity" in wanted:
         regions["activity"] = {"items": full.get("feed") or []}
     if "stats" in wanted:
-        regions["stats"] = {k: full.get(k) for k in ("weekly", "funnel", "flow", "ages", "load",
+        regions["stats"] = {k: full.get(k) for k in ("s2", "weekly", "funnel", "flow", "ages", "load",
                                                               "token_daily", "token_accounting", "usage_collector")}
     return regions, details
 
