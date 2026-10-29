@@ -134,7 +134,7 @@ function s2bar(D2){const repos=[...new Set(D2.tasks.map(t=>t.r))].sort(),opt=(v,
  <select data-s2="compare">${opt('same','compare at same point',SS.compare)}${opt('full','compare full periods',SS.compare)}</select>
  <button data-s2reset="1">Reset</button><span class="tz">${s2esc(S2TZ)}</span></div>`;
  const bases=[['accepted','✓ Accepted'],['submitted','◆ Submitted'],['worked_on','✎ Worked on'],['created','○ Created'],['revision','↩ Revisions requested']];
- const basis=['throughput','models','tasks'].includes(SS.view)?`<div class="s2bar s2basis"><span class="s2lab">Show</span>${bases.map(([v,l])=>`<button data-s2basis="${v}" class="${SS.basis===v?'on':''}">${l}</button>`).join('')}</div>`:'';
+ const basis=['throughput','models'].includes(SS.view)?`<div class="s2bar s2basis"><span class="s2lab">Show</span>${bases.map(([v,l])=>`<button data-s2basis="${v}" class="${SS.basis===v?'on':''}">${l}</button>`).join('')}</div>`:'';
  return `<div class="s2top">${views}${filters}${basis}</div>`}
 function s2quality(D2){const q=(D2.quality||[]).filter(x=>x.id!=='snapshot');return `<div class="s2qline">Data completeness: ${q.map(x=>{const p=x.eligible?Math.round(100*x.covered/x.eligible):0;const col=x.status==='exact'?'var(--green)':x.status==='unavailable'?'var(--dim)':'#fab219';
  return `<span title="${s2esc(x.reason||'complete')}" style="color:${col}">${s2esc(x.label.toLowerCase())} ${x.status==='unavailable'?'not connected':p+'%'}</span>`}).join(' · ')} <span class="dim">(hover for details)</span></div>`}
