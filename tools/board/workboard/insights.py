@@ -385,6 +385,11 @@ def primary_action(t: dict) -> dict:
     who = {"author": "owner", "independent": "3P"}
     def pa(emoji, label, tone, why):
         return {"emoji": emoji, "label": label, "tone": tone, "why": why, "done_when": done_when(t)}
+    if n == "PARKED":
+        pk = t.get("parked") or {}
+        return pa("🅿️", f"Parked · {str(pk.get('status', 'parked')).lower()} in CLAIMS.md", "done",
+                  f"CLAIMS.md parked it on {pk.get('updated', '?')} and nothing has touched it since; "
+                  "claim it to pick it back up")
     if t.get("group") == "DONE" or n == "—":
         return pa("🏁", {"used_in_training": "Done · in training", "archived": "Done · archived"}.get(raw, "Done · accepted"),
                   "done", "nothing left to do")

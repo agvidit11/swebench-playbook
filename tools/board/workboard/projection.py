@@ -165,11 +165,34 @@ def _state_since(state, cm):
     return ts(cm.get("codimango.created_at")), "created"
 
 
+PARKED = {"PARKED", "PARKED-TOO-EASY", "EXHAUSTED", "KILLED", "RETIRED", "ARCHIVED", "DROPPED", "ABANDONED"}
+
+
+def _parked(legacy_rows, tev, state, claim_health, head_time):
+    """A draft whose latest CLAIMS.md row parks it, with no machine evidence of work since that row: off the
+    to-do list (group DONE), not free. Any later claim, push, check or presence revives it (machine beats CLAIMS.md)."""
+    if state not in ("DRAFT", "NOT_IMPORTED") or not legacy_rows or claim_health == "OWNED":
+        return None
+    last = legacy_rows[-1]["payload"]
+    if last.get("status") not in PARKED:
+        return None
+    since = ts((last.get("updated") or "")[:10] + "T23:59:59+00:00") or ts(legacy_rows[-1].get("occurred_at"))
+    if since is None:
+        return None
+    later = [e for e in tev if e["type"] in ("claim", "renew", "steal", "touch", "presence", "build_action", "check")
+             and (ts(e.get("occurred_at")) or since) > since]
+    if later or (head_time and head_time > since):
+        return None
+    return {"status": last["status"], "updated": last.get("updated"), "machine": last.get("legacy_owner")}
+
+
 def _next(f, findings):
     codes = {x.code for x in findings}
     state, valid = f["state"], f["valid"]
     if state in ("ACCEPTED", "ARCHIVED"):
         return "DONE", "—"
+    if f.get("parked"):
+        return "DONE", "PARKED"
     if "CONFLICT" in codes:
         return "ATTENTION", "RESOLVE CONFLICT"
     if codes & {"HEAD≠SERVER", "STALE_VALID"}:            # results are for an older commit: refresh them first
@@ -358,6 +381,9 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                     short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
                     owner, claim_health = f"{short} (CLAIMS.md)", "LEGACY"
         legacy_rows = [e for e in tev if e["type"] == "note" and isinstance(e["payload"].get("legacy_owner"), str)]
+        f["parked"] = _parked(legacy_rows, tev, state, claim_health, head_time)
+        if f["parked"]:
+            f["tag"] = "Parked"
         if claim_health in ("OWNED", "EXPIRED") and legacy_rows:      # CLAIMS.md says another machine has it
             last = legacy_rows[-1]["payload"]
             machine = last.get("legacy_owner") or ""
@@ -433,7 +459,7 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         sources_fresh = bool(source_at and 0 <= (now - source_at).total_seconds() <= max_stale)
         from .ownership import reduce_ownership
         axes = reduce_ownership(assignment, activity, pipeline, last_change,
-                                done=state in ("ACCEPTED", "ARCHIVED"),
+                                done=state in ("ACCEPTED", "ARCHIVED") or bool(f["parked"]),
                                 actionable=state not in ("QUEUE", "REVIEW", "ACCEPTED", "ARCHIVED"),
                                 sources_fresh=sources_fresh, now=now.timestamp(),
                                 activity_window_s=window)
@@ -456,6 +482,8 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
             compat = "UNSEEN"
         else:
             compat = "EXPIRED" if assignment_state == "expired" else "FREE"
+        if display_state in ("available", "never_seen") and owner:
+            f["expired_owner"], owner = owner, ""     # free: an old claimant must not group or sort it as theirs
         f["claim_source"] = {"ACTIVE": "recent activity", "LEGACY": "CLAIMS.md (advisory)", "OWNED": "claim",
                              "FREE": "none", "EXPIRED": "expired claim", "CONFLICT": "conflicting claims",
                              "PIPELINE": "pipeline", "RECENT": "recent remote change", "UNSEEN": "insufficient evidence"}.get(compat, f.get("claim_source"))

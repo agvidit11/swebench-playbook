@@ -287,6 +287,19 @@ class LegacyOwnerTest(ProjectionTest):
         self.assertEqual(self.view([cm("t")], [old]).fields["claim_health"], "FREE")
 
 
+class ParkedTest(ProjectionTest):
+    def test_parked_draft_leaves_todo_and_is_not_free(self):
+        note = e("note", "t", {"legacy_owner": "host-b", "status": "PARKED", "updated": "2026-10-20"}, seq=1)
+        f = self.view([cm("t", valid="failed")], [note]).fields
+        self.assertEqual((f["group"], f["next"], f["tag"]), ("DONE", "PARKED", "Parked"))
+        self.assertNotIn(f["ownership_state"], ("available", "never_seen"))
+
+    def test_work_after_parking_revives_it(self):
+        note = e("note", "t", {"legacy_owner": "host-b", "status": "PARKED", "updated": "2026-10-20"}, seq=1)
+        touch = e("presence", "t", {"last_seen": NOW.timestamp() - 60}, seq=2, at="2026-10-23T19:59:00+00:00")
+        self.assertNotEqual(self.view([cm("t", valid="failed")], [note, touch]).fields["next"], "PARKED")
+
+
 class Step13ProjectionTest(ProjectionTest):
     def test_own_agent_release_frees_advisory_owner(self):
         evs = [e("claim", "t", seq=1),

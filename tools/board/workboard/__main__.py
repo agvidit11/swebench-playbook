@@ -1556,7 +1556,8 @@ def cmd_feed(args, cfg):
         last = render.fmt_age(sv["last_sync_ago_s"]) if sv["last_sync_ago_s"] is not None else "never"
         print(f"🖥  {sv['id']}: last sync {last} ago · {len(sv['sessions'])} active session(s) · owns {len(sv['owned'])}")
         for se in sv["sessions"][:6]:
-            print(f"     · {se['alias']} ({render.fmt_age(se['ago_s'])} ago)")
+            age = f" ({render.fmt_age(se['ago_s'])} ago)" if se.get("ago_s") is not None else ""
+            print(f"     · {se.get('alias') or se.get('name') or '?'}{age}")
     print(f"\n🕒 last {hours:g}h across servers:")
     for it in items[: args.limit]:
         print(f"  {it['at'][11:16]}  {it['host']:<6} {render.middle(it['who'], 34):<34} {it['task'] or '':<44} {it['what']}")
