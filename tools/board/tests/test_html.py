@@ -12,6 +12,13 @@ from tests.test_visual import realistic, snap
 
 class HtmlTest(unittest.TestCase):
     def setUp(self):
+        import os, tempfile
+        from unittest import mock
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        env = mock.patch.dict(os.environ, {"WORKBOARD_CACHE": td.name})   # never read the real facts store
+        env.start()
+        self.addCleanup(env.stop)
         self.cfg = load_config(Path("/nonexistent"))
 
     def test_page_embeds_valid_json_and_escapes(self):

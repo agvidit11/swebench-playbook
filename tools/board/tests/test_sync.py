@@ -225,3 +225,18 @@ class SyncTest(unittest.TestCase):
         finally:
             sync._push = orig
         self.assertEqual(len((state / events.SPOOL_NAME).read_text().splitlines()), 1)
+
+
+class StaleLockTest(unittest.TestCase):
+    def test_old_ref_locks_are_cleared_fresh_ones_kept(self):
+        import os, tempfile, time
+        from workboard import sync as s
+        with tempfile.TemporaryDirectory() as d:
+            led = Path(d)
+            old = led / ".git" / "refs" / "remotes" / "origin" / "main.lock"
+            new = led / ".git" / "index.lock"
+            old.parent.mkdir(parents=True)
+            old.write_text(""); new.write_text("")
+            os.utime(old, (time.time() - 600, time.time() - 600))
+            self.assertEqual(s._clear_stale_locks(led), [".git/refs/remotes/origin/main.lock"])
+            self.assertTrue(new.exists())

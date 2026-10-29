@@ -424,7 +424,7 @@ document.addEventListener('click',e=>{const dr=document.getElementById('drawer')
  if(o){S.owner=o.dataset.o;renderBoard()}if(r)openDrawer(r.dataset.t);if(sr)openSession(sr.dataset.session);
  if(th){const k=th.dataset.k;if(S.sort!==k){S.sort=k;S.dir=1}else if(S.dir>0)S.dir=-1;else S.sort=null;renderBoard()}
  if(tb){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===tb));['board','team','stats'].forEach(k=>document.getElementById(k).hidden=tb.dataset.tab!==k);
-  if(tb.dataset.tab==='stats'){document.getElementById('stats').innerHTML='<div class="empty">loading stats…</div>';pollRegion('stats')}if(tb.dataset.tab==='team'){renderTeam();pollRegion('team');pollRegion('activity')}}
+  if(tb.dataset.tab==='stats'){if(D.s2)renderStats();else document.getElementById('stats').innerHTML='<div class="empty">loading stats…</div>';pollRegion('stats')}if(tb.dataset.tab==='team'){renderTeam();pollRegion('team');pollRegion('activity')}}
  if(e.target.id==='msend')sendMsg();
  const ds=e.target.closest('[data-dsend]');if(ds)sendDrawerMsg(ds.dataset.dsend);
  if(e.target.id==='expand'){const d=document.getElementById('drawer');d.style.width='';localStorage.removeItem('wb-w');d.classList.toggle('wide');localStorage.setItem('wb-wide',d.classList.contains('wide')?'1':'')}

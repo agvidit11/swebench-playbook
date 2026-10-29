@@ -26,7 +26,7 @@ REGION_INPUTS = {
     "board": ("codimango", "git", "ledger", "presence", "usage"),
     "team": ("ledger", "registry_runs", "presence", "usage"),
     "activity": ("ledger", "presence"),
-    "stats": ("codimango", "git", "ledger", "usage", "facts"),
+    "stats": ("codimango", "git", "ledger", "usage", "facts", "registry_runs", "presence"),
 }
 
 DETAIL_KEYS = {
@@ -164,7 +164,7 @@ def source_generations(cfg, *, cache: Path | None = None, state: Path | None = N
     event_files = app_mod.ledger_event_files(cfg)
     presence = _tree_stamp(event_files + [state / "spool.jsonl"])
     usage = _tree_stamp([cache / "usage-v1.json"])
-    facts = _tree_stamp([cache / "facts" / "facts-v1.jsonl"])
+    facts = _tree_stamp([cache / "facts" / "facts-v1.jsonl", cache / "facts" / "facts-state.json"])
     return {"codimango": codimango, "git": git, "ledger": ledger_gen,
             "registry_runs": registry_runs, "presence": presence, "usage": usage, "facts": facts}
 

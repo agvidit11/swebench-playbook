@@ -133,7 +133,22 @@ def _ensure_clone(cfg, dl: Deadline) -> tuple[Path, str]:
     return led, ""
 
 
+def _clear_stale_locks(led: Path, older_than_s: float = 60) -> list[str]:
+    """A git killed mid-fetch (our timeout) leaves *.lock files that block every later fetch. We hold the sync
+    flock, so no other workboard git runs here; a lock older than a minute is debris."""
+    gone = []
+    for lk in list((led / ".git").glob("*.lock")) + list((led / ".git" / "refs").rglob("*.lock")):
+        try:
+            if time.time() - lk.stat().st_mtime > older_than_s:
+                lk.unlink()
+                gone.append(str(lk.relative_to(led)))
+        except OSError:
+            continue
+    return gone
+
+
 def _pull(led: Path, branch: str, dl: Deadline) -> str:
+    _clear_stale_locks(led)
     p = gitutil.run(led, "fetch", "-q", "origin", branch, timeout=dl.left())
     if p.returncode != 0:
         return f"pull failed: {gitutil.err(p)}"

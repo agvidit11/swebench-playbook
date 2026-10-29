@@ -105,7 +105,17 @@ def _windows(decisions, submits):
     return sorted(marks)
 
 
-def _phase_for_commit(c, at, marks, validation_fail_before: datetime | None) -> tuple[str, str]:
+def _failing_at(vals: list[tuple[datetime, bool]], at: datetime) -> bool:
+    """Validation state just before `at` from ordered (time, failing) observations."""
+    state = False
+    for when, failing in vals:
+        if when > at:
+            break
+        state = failing
+    return state
+
+
+def _phase_for_commit(c, at, marks, vals: list[tuple[datetime, bool]]) -> tuple[str, str]:
     """(phase, confidence) for a commit by timeline position, then content."""
     state = "draft"
     for when, kind in marks:
@@ -120,7 +130,7 @@ def _phase_for_commit(c, at, marks, validation_fail_before: datetime | None) -> 
         return "drafting" if state == "draft" else "unclassified", "low"
     if CALIBRATE.search(c["subject"]) and groups & {"tests", "spec", "config", "solution"}:
         return "calibration", "medium"
-    if state == "draft" and validation_fail_before and at >= validation_fail_before and FIX.search(c["subject"]):
+    if state == "draft" and _failing_at(vals, at) and FIX.search(c["subject"]):
         return "draft_fixing", "medium"
     if state == "draft":
         return "drafting", "medium"
@@ -140,12 +150,16 @@ def _agent_near(at: datetime, task_events: list[dict], runs: list[dict]) -> tupl
     kind = ((best[1].get("actor") or {}).get("kind") if best else None) or "unknown"
     if best and best[1]["type"] == "build_action":
         kind = (best[1].get("payload") or {}).get("model") or kind      # codex/muse launched on the task
-    model = None
+    model, cands = None, []
     for r in runs:
         st, la = ts(r.get("started_at")), ts(r.get("last_activity_at")) or ts(r.get("started_at"))
-        if st and la and st - WINDOW <= at <= la + WINDOW and (kind in ("unknown", r.get("kind"))):
-            kind, model = r.get("kind") or kind, r.get("model")
-            break
+        if st and la and st - WINDOW <= at <= la + WINDOW and kind in ("unknown", r.get("kind")):
+            gap = timedelta(0) if st <= at <= la else min(abs(at - st), abs(at - la))
+            cands.append((gap, r))
+    if cands:
+        cands.sort(key=lambda x: x[0])
+        if len(cands) == 1 or cands[0][0] < cands[1][0]:   # a tie between runs stays ambiguous: kind only
+            kind, model = cands[0][1].get("kind") or kind, _model_name(cands[0][1].get("model"))
     conf = "high" if model else "medium" if best else "unknown"
     return kind if kind in ("claude", "codex", "muse", "human") else "unknown", model, conf
 
@@ -175,76 +189,110 @@ def build(snap, cfg, cache_dir: Path, *, facts_rows: list[dict] | None = None) -
                     runs_by_task.setdefault(t, []).append(r)
     commits = _git_commits(cfg, cache_dir)
     names = sorted({n for n, f in obs.items() if any(k.startswith("codimango.") for k in f)} |
-                   {t for t in commits if t in obs})
+                   {t for t in commits if t in obs} | set(by_task))           # historical-only tasks stay visible
+    cm_rows = [{"name": n, "updated_at": f.get("codimango.updated_at"), "entered_pool_at": f.get("codimango.entered_pool_at"),
+                "reviewed_at": f.get("codimango.reviewed_at"), "status": f.get("codimango.status")}
+               for n, f in obs.items() if any(k.startswith("codimango.") for k in f)]
+    cov = facts_mod.coverage(store, cm_rows)
     out_tasks, repo_cache = [], {}
-    sub_cov = dec_cov = eligible = 0
-    hyd = facts_mod.coverage(store).get("hydrated", {})
+    sub_cov = eligible = 0
     for name in names:
         cm = obs.get(name, {})
         fs = by_task.get(name, [])
-        subs = sorted(({"at": f["occurred_at"], "v": f["value"].get("version"), "ev": f["value"]["event"]}
-                       for f in fs if f["kind"] == "submission" and f["occurred_at"]), key=lambda x: x["at"])
-        submits = [s for s in subs if s["ev"] in ("first_submit", "resubmit")]
-        claimed = [s["at"] for s in subs if s["ev"] == "review_claimed"]
-        decisions = sorted(({"at": f["occurred_at"], "decision": f["value"]["decision"],
-                             "reason": f["value"].get("reason")} for f in fs if f["kind"] == "review_decision"),
-                           key=lambda x: x["at"])
+        subs = [{"at": f["occurred_at"], "v": f["value"].get("version"), "ev": f["value"]["event"]}
+                for f in facts_mod.latest(fs, "submission") if f["occurred_at"]]
+        submits = [x for x in subs if x["ev"] in ("first_submit", "resubmit")]
+        claimed = [x["at"] for x in subs if x["ev"] == "review_claimed"]
+        decisions = [{"at": f["occurred_at"], "decision": f["value"]["decision"], "reason": f["value"].get("reason")}
+                     for f in facts_mod.latest(fs, "review_decision") if f["occurred_at"]]
         pool = cm.get("codimango.entered_pool_at")
         status = cm.get("codimango.status") or ("archived" if cm.get("codimango.archived_at") else None)
+        last_status = max((f for f in fs if f["kind"] == "status"), key=lambda f: f["observed_at"], default=None)
+        if not status and last_status:
+            status = last_status["value"].get("status")
+        tc = cov["tasks"].get(name, {})
+        rc = bool(tc.get("current") and tc.get("complete") and not tc.get("error"))
         fallback_submit = not submits and bool(pool)
-        if pool or decisions:
+        if name in cov["tasks"]:
             eligible += 1
             sub_cov += bool(submits)
-            dec_cov += bool(hyd.get(name, {}).get("complete"))
         if fallback_submit:
             submits = [{"at": pool, "v": None, "ev": "first_submit"}]
         reviewed = cm.get("codimango.reviewed_at")
-        if not decisions and status in ("accepted", "used_in_training") and reviewed:
-            decisions = [{"at": reviewed, "decision": "accept", "reason": None, "fallback": True}]
-        marks = _windows(decisions, submits)
-        vfail = [ts(f["observed_at"]) for f in fs if f["kind"] == "validation" and
-                 str(f["value"].get("validation")).lower() in ("failing", "failed", "fail")]
+        if not any(d["decision"] in ("accept", "atr_accept") for d in decisions) and \
+                status in ("accepted", "used_in_training") and reviewed:
+            decisions.append({"at": reviewed, "decision": "accept_fb", "reason": None})   # not a human decision
+            decisions.sort(key=lambda d: d["at"])
+        marks = _windows([d for d in decisions if d["decision"] != "accept_fb"], submits)
+        vals = sorted(((ts(f["occurred_at"]) or ts((f.get("interval") or {}).get("at_or_before")) or ts(f["observed_at"]),
+                        str(f["value"].get("validation")).lower() in ("failing", "failed", "fail")) for f in fs
+                       if f["kind"] == "validation"), key=lambda x: x[0])
         tev = ev_by_task.get(name, [])
         runs = runs_by_task.get(name, [])
         episodes: dict[tuple, list] = {}
 
-        def add(at, phase, kind, model, conf, src):
+        def add(at, phase, kind, model, pconf, aconf, src):
             key = (_day(at, tz), phase, kind, model or "")
-            cur = episodes.setdefault(key, [0, conf, set()])
+            cur = episodes.setdefault(key, [0, pconf, set(), at, aconf])
             cur[0] += 1
             cur[2].add(src)
-            if conf == "high" or (conf == "medium" and cur[1] in ("low", "unknown")):
-                cur[1] = conf
+            cur[3] = min(cur[3], at)
+            rank = {"high": 3, "medium": 2, "low": 1, "unknown": 0}
+            if rank[pconf] > rank[cur[1]]:
+                cur[1] = pconf
+            if rank[aconf] > rank[cur[4]]:
+                cur[4] = aconf
 
         for c in commits.get(name, []):
             at = ts(c["at"])
             if not at:
                 continue
-            phase, conf = _phase_for_commit(c, at, marks, min(vfail) if vfail else None)
+            phase, pconf = _phase_for_commit(c, at, marks, vals)
             kind, model, aconf = _agent_near(at, tev, runs)
-            add(at, phase, kind, model, conf if aconf != "unknown" else ("low" if conf != "high" else "medium"), "commit")
+            add(at, phase, kind, model, pconf, aconf, "commit")
         for e in tev:
             at = ts(e.get("occurred_at"))
             if not at:
                 continue
             actor = e.get("actor") or {}
             kind = actor.get("kind") if actor.get("kind") in ("claude", "codex", "muse", "human") else "unknown"
-            p = e.get("payload") or {}
+            pl = e.get("payload") or {}
             if e["type"] in ("check", "review"):
                 from .roles import role_of
                 role = role_of(e, tev)
-                add(at, "independent_review" if role == "independent" else "presubmit", kind, None, "high", e["type"])
+                add(at, "independent_review" if role == "independent" else "presubmit", kind, None, "high", "high", e["type"])
             elif e["type"] == "build_action":
-                add(at, "unclassified", p.get("model") or kind, None, "medium", "build")
-            elif e["type"] == "touch" and not p.get("weak"):
-                add(at, "unclassified", kind, None, "low", "touch")
-            elif e["type"] == "note" and str(p.get("status") or "").upper() in SOURCING:
-                add(at, "sourcing", "unknown", None, "medium", "claims_md")
-        for s in submits:
-            at = ts(s["at"])
+                add(at, "unclassified", pl.get("model") or kind, None, "unknown", "medium", "build")
+            elif e["type"] == "touch" and not pl.get("weak"):
+                add(at, "unclassified", kind, None, "unknown", "high", "touch")
+            elif e["type"] == "note" and str(pl.get("status") or "").upper() in SOURCING:
+                add(at, "sourcing", "unknown", None, "medium", "unknown", "claims_md")
+        for x in submits:
+            at = ts(x["at"])
             if at:
-                add(at, "submit", "human", None, "high" if not fallback_submit else "low", "submission")
-        act = [[d, ph, k, m or None, v[0], v[1], sorted(v[2])] for (d, ph, k, m), v in sorted(episodes.items())]
+                add(at, "submit", "unknown", None, "high" if not fallback_submit else "low", "unknown", "submission")
+        act = [[d, ph, k, m or None, v[0], v[1], sorted(v[2]), v[3].isoformat(timespec="seconds"), v[4]]
+               for (d, ph, k, m), v in sorted(episodes.items())]
+        # when the task entered its current state (exact when a boundary event exists, else a labelled proxy)
+        se, se_exact = None, False
+        if status == "being_reviewed" and claimed and (not submits or claimed[-1] >= submits[-1]["at"]):
+            se, se_exact = claimed[-1], True
+        elif status in ("needs_reviewers_assigned", "being_reviewed") and submits:
+            se, se_exact = submits[-1]["at"], not fallback_submit
+        elif status == "needs_revision":
+            rev = [d["at"] for d in decisions if d["decision"] == "revision"]
+            se, se_exact = (rev[-1], True) if rev else (reviewed, False)
+        elif last_status and last_status["value"].get("status") == status:
+            se = last_status["occurred_at"] or (last_status.get("interval") or {}).get("at_or_before")
+            se_exact = bool(last_status["occurred_at"])
+        if not se:
+            se = cm.get("codimango.created_at")
+        vt = []                                    # validation failed / cleared transitions (interval-censored)
+        prev_fail = None
+        for when, failing in vals:
+            if prev_fail is not None and failing != prev_fail:
+                vt.append([when.isoformat(timespec="seconds"), "VF" if failing else "VP"])
+            prev_fail = failing
         repo = repo_cache.get(name)
         if repo is None:
             repo = _repo_of(cfg, name)
@@ -254,12 +302,10 @@ def build(snap, cfg, cache_dir: Path, *, facts_rows: list[dict] | None = None) -
             "t": name, "k": "mt" if "multi" in fmt else "st" if fmt else "unknown", "r": repo or "unknown",
             "c": cm.get("codimango.category") or "unknown", "s": status or "not_imported",
             "cr": cm.get("codimango.created_at") or (commits.get(name, [{}])[0].get("at")),
-            "ar": cm.get("codimango.archived_at"),
-            "sub": [[s["at"], s["v"]] for s in submits], "subfb": fallback_submit, "cl": claimed,
-            "dec": [[d["at"], d["decision"], (d.get("reason") or "")[:120], bool(d.get("fallback"))] for d in decisions],
+            "ar": cm.get("codimango.archived_at"), "rc": rc, "se": se, "sex": se_exact, "vt": vt,
+            "sub": [[x["at"], x["v"]] for x in submits], "subfb": fallback_submit, "cl": claimed,
+            "dec": [[d["at"], d["decision"], (d.get("reason") or "")[:120]] for d in decisions],
             "act": act,
-            "val": [cm.get("codimango.oracle_pass"), cm.get("codimango.oracle_total"), cm.get("codimango.avocado_pass"),
-                    cm.get("codimango.avocado_total"), cm.get("codimango.codex_pass"), cm.get("codimango.codex_total")],
         })
     usage = getattr(snap, "usage", {}) or {}
     acc = usage.get("accounting", {}) or {}
@@ -272,9 +318,9 @@ def build(snap, cfg, cache_dir: Path, *, facts_rows: list[dict] | None = None) -
                 models[key] = models.get(key, 0) + int(tok["total"])
     snap_at = snap.health.get("codimango").observed_at.isoformat() if snap.health.get("codimango") and \
         snap.health["codimango"].observed_at else None
-    phase_rows = sum(len(t["act"]) for t in out_tasks)
-    classified = sum(1 for t in out_tasks for a in t["act"] if a[1] != "unclassified")
-    model_rows = sum(1 for t in out_tasks for a in t["act"] if a[3])
+    phase_rows = sum(a[4] for t in out_tasks for a in t["act"] if a[1] != "submit")
+    classified = sum(a[4] for t in out_tasks for a in t["act"] if a[1] not in ("unclassified", "submit"))
+    model_rows = sum(a[4] for t in out_tasks for a in t["act"] if a[3])
     ledger_start = min((e.get("occurred_at") for e in snap.events if e.get("occurred_at")), default=None)
     return {
         "schema_version": 2, "generated_at": snap.now.isoformat(), "timezone": str(tz), "phases": list(PHASES),
@@ -287,11 +333,12 @@ def build(snap, cfg, cache_dir: Path, *, facts_rows: list[dict] | None = None) -
             {"id": "submissions", "label": "Submissions", "covered": sub_cov, "eligible": eligible,
              "status": "exact" if sub_cov == eligible else "partial",
              "reason": f"{eligible - sub_cov} tasks still use the latest enteredPoolAt" if sub_cov < eligible else ""},
-            {"id": "reviews", "label": "Reviews", "covered": dec_cov, "eligible": eligible,
-             "status": "exact" if dec_cov == eligible else "partial",
-             "reason": f"{eligible - dec_cov} review histories pending" if dec_cov < eligible else ""},
+            {"id": "reviews", "label": "Reviews", "covered": cov["covered"], "eligible": cov["eligible"],
+             "status": "exact" if cov["covered"] == cov["eligible"] else "partial",
+             "reason": ", ".join(x for x in (f"{cov['pending']} waiting for refresh" if cov["pending"] else "",
+                                             f"{cov['errors']} last refresh failed" if cov["errors"] else "") if x)},
             {"id": "phases", "label": "Phases", "covered": classified, "eligible": phase_rows, "status": "estimated",
-             "reason": f"{phase_rows - classified} activity rows unclassified; exact model on {model_rows}"},
+             "reason": f"{phase_rows - classified} of {phase_rows} activity records unclassified; exact model on {model_rows}"},
             {"id": "tokens", "label": "Tokens", "covered": acc.get("attributed", 0), "eligible": acc.get("total", 0),
              "status": "partial", "reason": f"{acc.get('coverage_pct', 0)}% of reported tokens linked to tasks"},
             _peers(cache_dir)],

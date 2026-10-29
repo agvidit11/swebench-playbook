@@ -60,7 +60,8 @@ class RegionTest(unittest.TestCase):
             cache.replace(self.full, now=self.snapshot.now, generations=dict(gens, registry_runs="two"))
         board_builder.assert_not_called()
         delta = {key: cache.build_counts[key] - before[key] for key in regions.NAMES}
-        self.assertEqual(delta, {"summary": 0, "board": 0, "team": 1, "activity": 0, "stats": 0})
+        # Stats also reads native runs (exact models), so it follows registry_runs; summary/board/activity do not
+        self.assertEqual(delta, {"summary": 0, "board": 0, "team": 1, "activity": 0, "stats": 1})
 
     def test_compatibility_view_reassembles_full_tasks(self):
         gens = {key: "one" for key in ("codimango", "git", "ledger", "registry_runs", "presence")}

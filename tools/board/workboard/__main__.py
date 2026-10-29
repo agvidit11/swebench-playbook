@@ -457,6 +457,10 @@ def cmd_claim(args, cfg):
             return 3
     elif res.status == "LOST":
         print(f"{task} is already owned by {res.owner.get('alias')} (since {res.owner.get('acquired_at')})")
+        from . import coord as _coord
+        if not args.steal and _coord._expired(cfg, res.owner):
+            print(f"that claim is EXPIRED (last renewed {res.owner.get('renewed_at')}): take it over with "
+                  f"`board claim {task} --steal`, then run the same command again after the grace period")
     else:
         print(f"{res.status}: {res.detail}")
     return 0 if res.status == "ACQUIRED" else 1

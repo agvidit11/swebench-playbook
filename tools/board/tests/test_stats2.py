@@ -55,7 +55,8 @@ class Stats2Test(unittest.TestCase):
         t = self.build([])
         self.assertTrue(t["subfb"])
         self.assertEqual(t["sub"][0][0], "2026-10-15T00:00:00Z")
-        self.assertTrue(t["dec"][0][3])            # accept from current status, flagged
+        self.assertEqual(t["dec"][0][1], "accept_fb")   # never a synthesized human accept
+        self.assertFalse(t["rc"])
 
     def test_model_name_normalised(self):
         self.assertEqual(stats2._model_name("{'model_id': 'muse-spark-1.4', 'provider_id': 'meta'}"), "muse-spark-1.4")
