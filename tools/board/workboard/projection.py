@@ -5,6 +5,7 @@ ledger owns claims/reviews/checks. Disagreements become findings; no source over
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 
 from . import events as ev_mod
@@ -165,27 +166,46 @@ def _state_since(state, cm):
     return ts(cm.get("codimango.created_at")), "created"
 
 
-PARKED = {"PARKED", "PARKED-TOO-EASY", "EXHAUSTED", "KILLED", "RETIRED", "ARCHIVED", "DROPPED", "ABANDONED"}
+PARKED = {"PARKED", "PARKED-TOO-EASY", "EXHAUSTED", "KILLED", "RETIRED", "ARCHIVED", "DROPPED", "ABANDONED",
+          "HOLD", "ON-HOLD", "ONHOLD"}
+PARK_REASON = re.compile(r"^\s*(parked|park|hold|on hold|retired|killed|abandoned)\b", re.I)
 
 
-def _parked(legacy_rows, tev, state, claim_health, head_time):
-    """A draft whose latest CLAIMS.md row parks it, with no machine evidence of work since that row: off the
-    to-do list (group DONE), not free. Any later claim, push, check or presence revives it (machine beats CLAIMS.md)."""
-    if state not in ("DRAFT", "NOT_IMPORTED") or not legacy_rows or claim_health == "OWNED":
+def _parked(legacy_rows, tev, state, claim_health, head_time, now=None, window_s=7200):
+    """A draft parked by its latest CLAIMS.md row (PARKED, HOLD, KILLED, ...) or by a release whose reason says so,
+    with no work since: off the to-do list (group DONE), not free. A later push, presubmit or build revives it for
+    good; a check-in or path touch only while it is fresh; a live claim always (machine beats CLAIMS.md)."""
+    if state not in ("DRAFT", "NOT_IMPORTED") or claim_health == "OWNED":
         return None
-    last = legacy_rows[-1]["payload"]
-    if last.get("status") not in PARKED:
+    marks = []
+    if legacy_rows and legacy_rows[-1]["payload"].get("status") in PARKED:
+        last = legacy_rows[-1]["payload"]
+        dates = [d for d in (ts((last.get("updated") or "")[:10] + "T23:59:59+00:00"),
+                             ts(legacy_rows[-1].get("occurred_at"))) if d]   # the row date, or when the board read it
+        if dates:
+            marks.append((max(dates), {"status": last["status"], "updated": last.get("updated"),
+                                       "machine": last.get("legacy_owner"), "source": "CLAIMS.md"}))
+    rel = [e for e in tev if e["type"] == "release" and PARK_REASON.match(str((e.get("payload") or {}).get("reason") or ""))]
+    if rel and ts(rel[-1].get("occurred_at")):
+        r = rel[-1]
+        marks.append((ts(r["occurred_at"]), {"status": "PARKED", "updated": r["occurred_at"][:10],
+                                             "machine": (r.get("actor") or {}).get("alias"), "source": "release",
+                                             "reason": str(r["payload"].get("reason"))[:160]}))
+    if not marks:
         return None
-    dates = [d for d in (ts((last.get("updated") or "")[:10] + "T23:59:59+00:00"),
-                         ts(legacy_rows[-1].get("occurred_at"))) if d]   # the row date, or when the board read it
-    if not dates:
+    since, info = max(marks, key=lambda m: m[0])
+    now = now or datetime.now(since.tzinfo)
+    for e in tev:
+        at = ts(e.get("occurred_at"))
+        if not at or at <= since:
+            continue
+        if e["type"] in ("check", "build_action", "release"):   # worked on since (a parking release is `since`)
+            return None
+        if e["type"] in ("presence", "touch") and (now - at).total_seconds() <= window_s:
+            return None
+    if head_time and head_time > since:
         return None
-    since = max(dates)
-    later = [e for e in tev if e["type"] in ("claim", "renew", "steal", "touch", "presence", "build_action", "check")
-             and (ts(e.get("occurred_at")) or since) > since]
-    if later or (head_time and head_time > since):
-        return None
-    return {"status": last["status"], "updated": last.get("updated"), "machine": last.get("legacy_owner")}
+    return info
 
 
 def _next(f, findings):
@@ -383,7 +403,8 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
                     short = next((sv.id for sv in cfg.servers if sv.host_alias and sv.host_alias == machine), machine)
                     owner, claim_health = f"{short} (CLAIMS.md)", "LEGACY"
         legacy_rows = [e for e in tev if e["type"] == "note" and isinstance(e["payload"].get("legacy_owner"), str)]
-        f["parked"] = _parked(legacy_rows, tev, state, claim_health, head_time)
+        f["parked"] = _parked(legacy_rows, tev, state, claim_health, head_time, now,
+                              cfg.claims.active_window_minutes * 60)
         if f["parked"]:
             f["tag"] = "Parked"
         if claim_health in ("OWNED", "EXPIRED") and legacy_rows:      # CLAIMS.md says another machine has it

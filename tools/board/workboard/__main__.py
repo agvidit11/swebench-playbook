@@ -355,8 +355,14 @@ def status_checks(cfg) -> list[dict]:
     except (OSError, ValueError) as exc:
         installed, detail = set(), f"settings unreadable: {exc.__class__.__name__}"
     need = {"SessionStart", "PreToolUse", "PostToolUse"}
-    out.append({"name": "Claude hooks installed", "ok": need <= installed,
-                "detail": detail or ("missing: " + ", ".join(sorted(need - installed)) if need - installed else "all three")})
+    locks = sorted(Path("~/.nwr-guard").expanduser().glob("*/lock"))
+    if need - installed and locks:                      # nwr-guard removes them during an NWR arm, on purpose
+        out.append({"name": "Claude hooks installed", "ok": True,
+                    "detail": f"hooks off: NWR arm locked ({locks[0]}); nwr-guard restores them on unlock. "
+                              "Do NOT run install-hooks"})
+    else:
+        out.append({"name": "Claude hooks installed", "ok": need <= installed,
+                    "detail": detail or ("missing: " + ", ".join(sorted(need - installed)) if need - installed else "all three")})
     cron = subprocess.run(["crontab", "-l"], capture_output=True, text=True).stdout if shutil.which("crontab") else ""
     expected = cron_line(board_path())
     good = [l for l in cron.splitlines() if l.strip() == expected]
@@ -568,6 +574,11 @@ def cmd_install_hooks(args, cfg):
         hooks.uninstall(settings)
         print(f"removed workboard hooks from {settings} (backup kept next to it)")
         return 0
+    locks = sorted(Path("~/.nwr-guard").expanduser().glob("*/lock"))
+    if locks and not args.dry_run and not getattr(args, "force", False):
+        print(f"refusing: an NWR arm is locked ({locks[0]}); nwr-guard removed the hooks on purpose and restores "
+              "them on unlock. Re-run with --force only if that lock is stale.", file=sys.stderr)
+        return 1
     text = hooks.install(settings, board, dry_run=args.dry_run)
     if args.dry_run:
         print(text)
@@ -1216,6 +1227,7 @@ def build_parser():
     ih.add_argument("--settings", default="~/.claude/settings.json")
     ih.add_argument("--dry-run", action="store_true")
     ih.add_argument("--uninstall", action="store_true")
+    ih.add_argument("--force", action="store_true", help="install even while an NWR arm lock exists")
     rl = sub.add_parser("release", parents=[common], help="give a task up")
     rl.add_argument("task")
     rl.add_argument("--reason", required=True)

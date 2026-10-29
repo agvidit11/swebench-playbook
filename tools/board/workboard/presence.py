@@ -13,6 +13,9 @@ import re
 import time
 from pathlib import Path
 
+from .hooks import review_scratch
+
+SCRATCH_TOKEN = re.compile(r"\S*(?:scratch/rev-|-revision\.|/p5d/)\S*")   # reviewer copies
 WINDOW_S = 6 * 3600          # transcripts modified within this window are scanned
 TAIL = 512 * 1024
 REEMIT_S = 600
@@ -104,6 +107,7 @@ def _tool_input_rows(data: bytes) -> list[tuple[float | None, str]]:
     board's own CLI calls are skipped: talking about a task is not working on it."""
     from .hooks import BOARD_CMD
     out = []
+    scratch = False
     for raw in data.split(b"\n")[-4000:]:
         if b'"tool_use"' not in raw and b'"cwd"' not in raw:
             continue
@@ -115,13 +119,17 @@ def _tool_input_rows(data: bytes) -> list[tuple[float | None, str]]:
             continue
         when = _ts(row)
         if isinstance(row.get("cwd"), str):
-            out.append((when, row["cwd"] + "/"))
+            scratch = review_scratch(row["cwd"])
+            if not scratch:
+                out.append((when, row["cwd"] + "/"))
+        if scratch:                                     # tool calls made from a reviewer's scratch copy
+            continue
         msg = row.get("message") if isinstance(row.get("message"), dict) else {}
         for part in msg.get("content", []) if isinstance(msg.get("content"), list) else []:
             if isinstance(part, dict) and part.get("type") == "tool_use" and isinstance(part.get("input"), dict):
                 for k, v in part["input"].items():
                     if k in PATH_KEYS and isinstance(v, str) and not (k == "command" and BOARD_CMD.search(v)):
-                        out.append((when, v[:4000]))
+                        out.append((when, SCRATCH_TOKEN.sub(" ", v[:4000])))
     return out
 
 
@@ -168,7 +176,10 @@ def scan(tasks: set[str], *, now: float | None = None, window_s: int = WINDOW_S)
                 continue
             mm = re.search(rb'"model"\s*:\s*"([^"]{2,40})"', head)
             title = f"Codex {mm.group(1).decode('utf-8', 'replace')} {path.stem[-4:]}" if mm else "Codex run"
-            for task in _path_hits(m.group(1).decode("utf-8", "replace") + "/", tasks):
+            cwd = m.group(1).decode("utf-8", "replace")
+            if review_scratch(cwd):                     # an independent judge / reviewer copy, not the owner
+                continue
+            for task in _path_hits(cwd + "/", tasks):
                 found.append({"task": task, "session_id": "codex:" + path.stem[-12:], "title": title,
                               "kind": "codex", "last_seen": mtime})
     return found

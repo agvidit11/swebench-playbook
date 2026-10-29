@@ -5,7 +5,7 @@ on its current commit before it is submitted.
 Role evidence, in order:
 1. explicit `role` in the payload (`--role author|independent` on `board check record|run|import` / `board review add`);
 2. independent-review markers in the text ("§5d", "independent");
-3. the recording session owns or claimed the task (claim, renew, steal, build_action events) -> author;
+3. the recording session (or the Claude session that launched it) owns or claimed the task -> author;
 4. otherwise independent.
 
 `gates()` is the one reducer used by the projection (Next / R-label), the dashboard ticks, the card and Next steps,
@@ -27,13 +27,14 @@ def role_of(event: dict, task_events: list[dict], owner_session: str | None = No
         return p["role"]
     if INDEPENDENT_MARK.match(p.get("summary") or "") or INDEPENDENT_MARK.match(p.get("note") or ""):
         return "independent"
-    sid = (event.get("actor") or {}).get("session_id")
-    if sid and owner_session and sid == owner_session:
-        return "author"
+    actor = event.get("actor") or {}
     at = event.get("occurred_at") or ""
-    if sid and any(e["type"] in AUTHOR_EVENTS and (e.get("actor") or {}).get("session_id") == sid
-                   and (e.get("occurred_at") or "") <= at for e in task_events):   # ownership at the time, not later
-        return "author"
+    for sid in (actor.get("session_id"), actor.get("parent_session")):   # a job the owner launched is the owner's
+        if sid and owner_session and sid == owner_session:
+            return "author"
+        if sid and any(e["type"] in AUTHOR_EVENTS and (e.get("actor") or {}).get("session_id") == sid
+                       and (e.get("occurred_at") or "") <= at for e in task_events):   # ownership at the time
+            return "author"
     return "independent"
 
 

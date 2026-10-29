@@ -294,6 +294,20 @@ class ParkedTest(ProjectionTest):
         self.assertEqual((f["group"], f["next"], f["tag"]), ("DONE", "PARKED", "Parked"))
         self.assertNotIn(f["ownership_state"], ("available", "never_seen"))
 
+    def test_hold_row_and_parking_release_both_park(self):
+        hold = e("note", "t", {"legacy_owner": "host-b", "status": "HOLD", "updated": "2026-10-20"}, seq=1)
+        self.assertEqual(self.view([cm("t", valid="failed")], [hold]).fields["next"], "PARKED")
+        rel = e("release", "t", {"reason": "parked: step 3 saturated"}, seq=1, at="2026-10-22T10:00:00+00:00")
+        self.assertEqual(self.view([cm("t", valid="failed")], [rel]).fields["next"], "PARKED")
+        plain = e("release", "t", {"reason": "done for today"}, seq=1, at="2026-10-22T10:00:00+00:00")
+        self.assertNotEqual(self.view([cm("t", valid="failed")], [plain]).fields["next"], "PARKED")
+
+    def test_stale_checkin_does_not_revive_parked(self):
+        note = e("note", "t", {"legacy_owner": "host-b", "status": "PARKED", "updated": "2026-10-20"}, seq=1)
+        old = e("presence", "t", {"last_seen": NOW.timestamp() - 9 * 3600, "checkin": True}, seq=2,
+                at="2026-10-23T11:00:00+00:00")
+        self.assertEqual(self.view([cm("t", valid="failed")], [note, old]).fields["next"], "PARKED")
+
     def test_work_after_parking_revives_it(self):
         note = e("note", "t", {"legacy_owner": "host-b", "status": "PARKED", "updated": "2026-10-20"}, seq=1)
         touch = e("presence", "t", {"last_seen": NOW.timestamp() - 60}, seq=2, at="2026-10-23T19:59:00+00:00")

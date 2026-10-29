@@ -16,6 +16,15 @@ class RolesTest(unittest.TestCase):
         self.assertEqual(role_of(ev("check", {"summary": "§5d READY"}, session="builder"), [claim]), "independent")
         self.assertEqual(role_of(ev("check", {"role": "author"}, session="other"), [claim]), "author")
 
+    def test_job_launched_by_owner_counts_as_author(self):
+        claim = ev("claim", {}, session="builder")
+        job = ev("check", {}, session="codex:h1:9:9")
+        job["actor"]["parent_session"] = "builder"
+        self.assertEqual(role_of(job, [claim]), "author")
+        judge = ev("check", {}, session="codex:h1:8:8")
+        judge["actor"]["parent_session"] = "reviewer-session"
+        self.assertEqual(role_of(judge, [claim]), "independent")
+
     def test_latest_check_is_chronological_across_servers(self):
         newer_on_a = ev("check", {"fail": 0}, host="a-host", seq=50, at="2026-10-23T12:00:00+00:00")
         older_on_z = ev("check", {"fail": 3}, host="z-host", seq=1, at="2026-10-23T09:00:00+00:00")

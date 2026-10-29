@@ -52,6 +52,11 @@ def current_actor(host_id: str, env=None, person: str = "") -> dict:
     release claims their own agent sessions hold."""
     env = os.environ if env is None else env
     sid = env.get("CLAUDE_CODE_SESSION_ID", "")
+    child = _codex_ancestor(stop_at_claude=True) if sid and env is os.environ else None
+    if child:                                         # a codex/muse job launched by a Claude session: its own actor,
+        pid, start, cwd = child                       # so it can never release or renew the parent's claims
+        return {"session_id": f"codex:{host_id}:{pid}:{start}", "alias": f"{host_id}·Codex {Path(cwd).name or pid}",
+                "kind": "codex", "host": host_id, "person": person, "parent_session": sid}
     if sid:
         title = tab_title(sid) or f"session {sid[:8]}"
         return {"session_id": sid, "alias": f"{host_id}·{title}", "kind": "claude", "host": host_id, "person": person}
@@ -67,8 +72,9 @@ def current_actor(host_id: str, env=None, person: str = "") -> dict:
             "host": host_id, "person": person}
 
 
-def _codex_ancestor(max_depth: int = 12):
-    """(pid, start_ticks, cwd) of the nearest `codex` ancestor process, if any (Linux /proc only)."""
+def _codex_ancestor(max_depth: int = 12, stop_at_claude: bool = False):
+    """(pid, start_ticks, cwd) of the nearest `codex`/`muse` ancestor process, if any (Linux /proc only). With
+    stop_at_claude, only one that is nearer than the first Claude Code process (i.e. launched by it)."""
     pid = os.getppid()
     for _ in range(max_depth):
         if pid <= 1:
@@ -79,7 +85,9 @@ def _codex_ancestor(max_depth: int = 12):
         except OSError:
             return None
         exe = os.path.basename(cmd[0].decode(errors="replace")) if cmd and cmd[0] else ""
-        if exe == "codex" or (exe.startswith("codex") and len(cmd) > 1):
+        if stop_at_claude and (exe == "claude" or "/claude_code/" in cmd[0].decode(errors="replace")):
+            return None
+        if exe in ("codex", "muse") or (exe.startswith("codex") and len(cmd) > 1):
             try:
                 cwd = os.readlink(f"/proc/{pid}/cwd")
             except OSError:

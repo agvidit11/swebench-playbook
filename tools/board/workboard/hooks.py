@@ -173,17 +173,35 @@ def _candidates(data: dict) -> list[Path]:
 BOARD_CMD = re.compile(r"(^|[;&|]\s*|\s)(\S*/)?(board|workboard)\s+[a-z]")
 
 
+WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+MUTATING_CMD = re.compile(r"\bgit\b[^|;&\n]*?\s(commit|push|add|apply|am|mv|rm|checkout|restore|reset|rebase|merge|cherry-pick|stash)\b"
+                          r"|\b(sed|perl)\s+(-\S*\s+)*-i|\b(mv|rm|cp|touch|mkdir|tee|patch|install)\s|(^|[^>&0-9])>>?\s*[^&\s]"
+                          r"|\b(codex|muse)\s+exec\b|\bmc2?\.sh\b|codex-step\.sh")
+REVIEW_SCRATCH = re.compile(r"(^|/)scratch/rev-[^/]*|^/tmp/[^/]*-revision\.|^/tmp/[^/]*/p5d/")
+
+
+def review_scratch(path: str) -> bool:
+    """A reviewer's private copy (~/scratch/rev-*, /tmp/*-revision.*, /tmp/<user>/p5d/...): reading or judging a
+    task there is review, never ownership."""
+    return bool(path and REVIEW_SCRATCH.search(os.path.expanduser(path)))
+
+
 def task_strength(data: dict, cfg) -> tuple[str | None, bool]:
-    """(task, weak). Board's own CLI calls are never task activity; a bare task name in a command line is weak
-    evidence (presence/focus only — it must not auto-claim)."""
+    """(task, weak). Board's own CLI calls are never task activity. Only changing the task can auto-claim it: an
+    edit, or a mutating command (git commit/push, sed -i, redirects, launching a builder) on its path. Reading,
+    grepping, plan mode and reviewer scratch copies are weak evidence (presence/focus only, never a claim)."""
     ti = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
     cmd = ti.get("command") if data.get("tool_name") == "Bash" and isinstance(ti.get("command"), str) else ""
     if cmd and BOARD_CMD.search(cmd):
         return None, False
+    if review_scratch(data.get("cwd") or ""):
+        return None, False
     task = task_of(data, cfg)
     if not task:
         return None, False
-    strong = any(p.parts[:1] != ("@name",) and task in p.parts for p in _candidates(data))
+    on_path = any(p.parts[:1] != ("@name",) and task in p.parts for p in _candidates(data))
+    mutating = data.get("tool_name") in WRITE_TOOLS or bool(cmd and MUTATING_CMD.search(cmd))
+    strong = on_path and mutating and data.get("permission_mode") != "plan"
     return task, not strong
 
 
@@ -313,7 +331,7 @@ def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
         if new_alias:
             out.append(("alias", None, {"alias": new_alias["alias"]}, actor))
         if task and actor["session_id"]:
-            key = f"{task}|{actor['session_id']}"
+            key = f"{task}|{actor['session_id']}" + ("|weak" if weak else "")   # a weak touch must not mask an edit
             if now - state.setdefault("touch", {}).get(key, 0) >= TOUCH_WINDOW_S:
                 state["touch"][key] = now
                 out.append(("touch", task, dict({"tool": data.get("tool_name")}, **({"weak": True} if weak else {})),

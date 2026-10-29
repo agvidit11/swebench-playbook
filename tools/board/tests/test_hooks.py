@@ -321,7 +321,18 @@ class WeakTouchTest(unittest.TestCase):
             mk = lambda c: {"tool_name": "Bash", "cwd": "/tmp", "tool_input": {"command": c}}
             self.assertEqual(hooks.task_strength(mk("board msg --task cancancan-limited-ability hi"), cfg), (None, False))
             self.assertEqual(hooks.task_strength(mk("echo cancancan-limited-ability"), cfg), ("cancancan-limited-ability", True))
-            self.assertEqual(hooks.task_strength(mk(f"ls {d}/cancancan-limited-ability/tests"), cfg), ("cancancan-limited-ability", False))
+            t = "cancancan-limited-ability"
+            self.assertEqual(hooks.task_strength(mk(f"ls {d}/{t}/tests"), cfg), (t, True))          # reading: weak
+            self.assertEqual(hooks.task_strength(mk(f"sed -i s/a/b/ {d}/{t}/tests/x.sh"), cfg), (t, False))
+            self.assertEqual(hooks.task_strength(mk(f"cd {d} && git commit -m x {t}/"), cfg)[1], False)  # committing it
+            self.assertEqual(hooks.task_strength(mk(f"git -C {d} add {d}/{t}/x"), cfg), (t, False))
+            edit = {"tool_name": "Edit", "cwd": d, "tool_input": {"file_path": f"{d}/{t}/x"}}
+            self.assertEqual(hooks.task_strength(edit, cfg), (t, False))
+            self.assertEqual(hooks.task_strength(dict(edit, permission_mode="plan"), cfg), (t, True))
+            read = {"tool_name": "Read", "cwd": d, "tool_input": {"file_path": f"{d}/{t}/x"}}
+            self.assertEqual(hooks.task_strength(read, cfg), (t, True))
+            scratch = dict(edit, cwd=str(Path.home() / "scratch/rev-pix"))
+            self.assertEqual(hooks.task_strength(scratch, cfg), (None, False))
         from workboard import sync
         weak = json.dumps({"type": "touch", "entity": {"kind": "task", "id": "t"}, "actor": {"session_id": "s", "kind": "claude"},
                            "payload": {"weak": True}}).encode()
