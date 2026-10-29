@@ -66,6 +66,13 @@ def target_for(spec: str, aliases: dict[str, str], servers: list[str], *, views=
                   (len(spec) >= 6 and (sid.startswith(spec) or sid.rsplit(":", 1)[-1].startswith(spec)))}
     hits = {sid: a for sid, a in labels.items() if spec.lower() in a.lower() or spec == sid or
             (len(spec) >= 6 and sid.rsplit(":", 1)[-1].startswith(spec))}
+    by_native = {}
+    for sid, a in hits.items():                         # a ledger alias and a registry entry for the same session
+        by_native.setdefault(sid.rsplit(":", 1)[-1], []).append(sid)
+    if len(by_native) == 1 and len(hits) > 1:
+        keys = {s.get("session_key") or s.get("native_id") for s in sessions}
+        sid = max(hits, key=lambda k: (k in keys, len(k)))
+        hits = {sid: hits[sid]}
     if len(hits) == 1:
         sid, alias = next(iter(hits.items()))
         session = next((s for s in sessions if sid in (s.get("session_key"), s.get("native_id"))), None)

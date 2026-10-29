@@ -79,12 +79,30 @@ def _agents_for(texts: list[str], task: str) -> list[str]:
     return sorted(found)
 
 
+PATH_KEYS = {"command", "file_path", "path", "notebook_path", "cwd", "workdir"}
+
+
 def _tool_inputs(data: bytes) -> str:
-    """Only the tool-use inputs and cwd fields of transcript lines (not assistant prose or tool output)."""
+    """Only path-bearing tool inputs and cwd fields of transcript lines (not prose, messages or tool output)."""
     return "\n".join(_tool_input_list(data))
 
 
 def _tool_input_list(data: bytes) -> list[str]:
+    return [t for _, t in _tool_input_rows(data)]
+
+
+def _ts(row: dict) -> float | None:
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(row.get("timestamp")).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _tool_input_rows(data: bytes) -> list[tuple[float | None, str]]:
+    """(when, text) for the cwd and path-bearing tool inputs of each line. Message bodies, agent prompts and the
+    board's own CLI calls are skipped: talking about a task is not working on it."""
+    from .hooks import BOARD_CMD
     out = []
     for raw in data.split(b"\n")[-4000:]:
         if b'"tool_use"' not in raw and b'"cwd"' not in raw:
@@ -95,15 +113,22 @@ def _tool_input_list(data: bytes) -> list[str]:
             continue
         if not isinstance(row, dict):
             continue
+        when = _ts(row)
         if isinstance(row.get("cwd"), str):
-            out.append(row["cwd"] + "/")
+            out.append((when, row["cwd"] + "/"))
         msg = row.get("message") if isinstance(row.get("message"), dict) else {}
         for part in msg.get("content", []) if isinstance(msg.get("content"), list) else []:
             if isinstance(part, dict) and part.get("type") == "tool_use" and isinstance(part.get("input"), dict):
-                for v in part["input"].values():
-                    if isinstance(v, str):
-                        out.append(v[:4000])
+                for k, v in part["input"].items():
+                    if k in PATH_KEYS and isinstance(v, str) and not (k == "command" and BOARD_CMD.search(v)):
+                        out.append((when, v[:4000]))
     return out
+
+
+def _last_hit(rows: list[tuple[float | None, str]], task: str, fallback: float) -> float:
+    """When the task was last touched: the newest matching line's timestamp, not the transcript's mtime."""
+    times = [w for w, t in rows if w and _path_hits(t, {task})]
+    return min(max(times), fallback) if times else fallback
 
 
 def scan(tasks: set[str], *, now: float | None = None, window_s: int = WINDOW_S) -> list[dict]:
@@ -119,10 +144,11 @@ def scan(tasks: set[str], *, now: float | None = None, window_s: int = WINDOW_S)
             if now - mtime > window_s:
                 continue
             data = _tail(path)
-            texts = _tool_input_list(data)
+            rows = _tool_input_rows(data)
+            texts = [t for _, t in rows]
             for task in _path_hits("\n".join(texts), tasks):
                 found.append({"task": task, "session_id": path.stem, "title": _title(data), "kind": "claude",
-                              "last_seen": mtime, "agents": _agents_for(texts, task)})
+                              "last_seen": _last_hit(rows, task, mtime), "agents": _agents_for(texts, task)})
     if CODEX.is_dir():
         for path in CODEX.glob("*/*/*/*.jsonl"):
             try:

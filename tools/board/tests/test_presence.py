@@ -44,6 +44,20 @@ class PresenceTest(unittest.TestCase):
         self.assertEqual({f["task"] for f in found}, {"alpha-task-one"})
         self.assertEqual(found[0]["title"], "Lane loop")
 
+    def test_messages_and_board_commands_are_not_work(self):
+        msg = json.dumps({"message": {"content": [{"type": "tool_use", "name": "SendMessage",
+                                                    "input": {"to": "x", "message": "re /r/alpha-task-one/tests"}}]}})
+        self.transcript("s4", [msg, tool_line(cmd="board release beta-task-two"),
+                               tool_line(cmd="~/.local/bin/board msg all --task gamma-task-three hi")])
+        self.assertEqual(presence.scan(self.tasks), [])
+
+    def test_last_seen_is_when_the_task_was_touched(self):
+        old = datetime.fromtimestamp(time.time() - 3 * 3600, timezone.utc).isoformat()
+        line = json.loads(tool_line(path="/r/alpha-task-one/x")); line["timestamp"] = old
+        self.transcript("s5", [json.dumps(line), tool_line(cmd="ls", cwd="/home/u")], age_s=10)
+        (f,) = presence.scan(self.tasks)
+        self.assertLess(f["last_seen"], time.time() - 2 * 3600)
+
     def test_codex_dash_c_and_cwd(self):
         self.transcript("s2", [tool_line(cmd="codex exec -s workspace-write -C gamma-task-three 'fix'"),
                                tool_line(cmd="ls", cwd="/home/u/repo/beta-task-two")])

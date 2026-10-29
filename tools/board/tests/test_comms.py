@@ -26,6 +26,14 @@ class CommsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             comms.target_for("nobody", aliases, ["h1"])
 
+    def test_session_id_with_old_ledger_alias_is_one_session(self):
+        sid = "ed539f4f-a5cc-4cf5-bb29-f7eff0820de3"
+        key = f"claude:6971:20504:linux:abc:pid:[1]:{sid}"
+        aliases = {sid: "6971·Multi-turn harness loop"}
+        sessions = [{"session_key": key, "native_id": sid, "name": "agvidit-d9", "host": "6971"}]
+        t = comms.target_for(f"session:{sid}", aliases, ["6971"], sessions=sessions)
+        self.assertEqual((t["to"], t["to_label"]), (f"session:{key}", "agvidit-d9"))
+
     def test_inbox_and_ack(self):
         m = stamp(comms.new_message("pick up pgmem", {"to": "session:s2", "to_label": "h2·harness"}, A, task="pgmem"))
         allm = stamp(comms.new_message("standup", {"to": "all", "to_label": "everyone"}, A), seq=2)
