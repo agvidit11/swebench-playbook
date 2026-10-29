@@ -199,7 +199,7 @@ def _parked(legacy_rows, tev, state, claim_health, head_time, now=None, window_s
         at = ts(e.get("occurred_at"))
         if not at or at <= since:
             continue
-        if e["type"] in ("check", "build_action", "release"):   # worked on since (a parking release is `since`)
+        if e["type"] in ("check", "build_action"):   # worked on since (releases and claims alone are not work)
             return None
         if e["type"] in ("presence", "touch") and (now - at).total_seconds() <= window_s:
             return None
