@@ -35,7 +35,20 @@ REVIEWERS=(
 # Known-unavailable. Named explicitly so its absence is a recorded gap, not a silent omission.
 MISSING_EXPECTED=(test-quality-verifier)
 
-OUT="$TASK/audit/review-gate"
+# Verdicts live OUTSIDE the task dir: Claude subagents write them, and Claude writes nothing
+# under <task>/ (00-ROUTER §5; PaperJS, ISSUES 2026-10-27).
+OUT="${REVIEW_GATE_OUT:-$HOME/swebench/audit/$(basename "$TASK")/review-gate}"
+# aai-code-review reviews a diff, so it only applies to a revision: REVIEW_GATE_REVISION=1.
+REVISION="${REVIEW_GATE_REVISION:-0}"
+
+# skip_reason <reviewer> -> prints a reason when the reviewer does not apply to this task
+skip_reason() {
+  case "$1" in
+    review-task-swebench-multiturn) [ "$IS_MT" = no ] && echo "single-turn task, reviewer is not applicable" ;;
+    review-task-swebench-v2) [ "$IS_MT" = yes ] && echo "multi-turn task: exactly one format reviewer (multiturn) runs" ;;
+    aai-code-review) [ "$REVISION" = 1 ] || echo "first push: diff reviewer runs on revisions only" ;;
+  esac
+}
 
 resolve() {  # $1=skill name -> prints path, or nothing
   local s="$1" p
@@ -57,8 +70,9 @@ if [ "$MODE" = plan ]; then
   # NO-SIGNAL checks on one run -- noise that buries the signal and burns a reviewer slot.
   IS_MT=no; [ -d "$TASK/steps" ] && IS_MT=yes
   for s in "${REVIEWERS[@]}"; do
-    if [ "$s" = review-task-swebench-multiturn ] && [ "$IS_MT" = no ]; then
-      printf '  %-34s SKIPPED — single-turn task, reviewer is not applicable\n' "$s"; continue
+    r="$(skip_reason "$s")"
+    if [ -n "$r" ]; then
+      printf '  %-34s SKIPPED — %s\n' "$s" "$r"; continue
     fi
     if p="$(resolve "$s")"; then
       printf '  %-34s %s\n' "$s" "$p"
@@ -100,8 +114,9 @@ declare -a EVIDENCE=()
 
 IS_MT=no; [ -d "$TASK/steps" ] && IS_MT=yes
 for s in "${REVIEWERS[@]}"; do
-  if [ "$s" = review-task-swebench-multiturn ] && [ "$IS_MT" = no ]; then
-    printf '  SKIP  %-34s not applicable to a single-turn task\n' "$s"; continue
+  r="$(skip_reason "$s")"
+  if [ -n "$r" ]; then
+    printf '  SKIP  %-34s %s\n' "$s" "$r"; continue
   fi
   f="$OUT/$s.json"
   if ! resolve "$s" >/dev/null 2>&1; then

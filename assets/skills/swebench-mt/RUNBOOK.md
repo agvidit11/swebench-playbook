@@ -128,23 +128,21 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    fresh for the exact bytes about to be calibrated; an older review or forge
    run is invalid after any instruction, test, verifier, solution, Dockerfile,
    or task metadata change.
-   - Build an atomic requirement ↔ graded-behavior matrix for every step.
-     Every instruction obligation has exactly one primary graded behavior and
-     every F2P/P2P/hidden behavior maps back to explicit instruction text.
-     Work at behavior-ID granularity, not physical test-file granularity.
-   - Prove the rows are **mutually exclusive and collectively exhaustive**:
-     no two rows grade the same obligation, no requirement is ungraded, no test
-     grades an unstated behavior, and cumulative/P2P rows map to an explicit
-     preservation requirement. A gap is `BAD_GRADING_WEAK`; an extra assertion
-     is `BAD_GRADING_WRONG`. Either one blocks calibration.
+   - The requirement ↔ test matrix: **`B-build/B3-grader.md` §9 ⓪** is the one
+     definition (behavior IDs, zero UNTESTED / UNSTATED / DUPLICATE / UNNECESSARY,
+     artifact at `~/swebench/audit/<task>/REQ-TEST-MATRIX.md` bound to the bundle
+     hash). It is built as B3's exit, right after tests + instruction are final.
+     A gap is `BAD_GRADING_WEAK`; an extra assertion is `BAD_GRADING_WRONG`.
+     Either one blocks calibration.
    - Run a positive control plus current fake-pass probes. Candidate crash,
      timeout/build failure, missing or extra IDs, forged output/JUnit, modified
      harness, source-hash mismatch, solver/solution-file shortcuts, null output,
      and relevant environment/config manipulation must all fail closed and earn
      zero reward. Record command, outcome, and evidence for each class.
-   - A fresh independent reviewer must report zero Critical/High/Medium
-     spec-test or reward-integrity findings. If anything changes while fixing a
-     finding, invalidate the proof and repeat this stop before calibration.
+   - A fresh independent reviewer must meet `B-build/B6-review-gate.md` "The bar"
+     (spec-test and reward-integrity Mediums block). Re-prove only what a fix
+     touched: a test or instruction edit rebuilds the matrix; a verifier/harness
+     edit re-runs the fake-pass probes; the final frozen bundle gets one full pass.
    **No green proof, no local K2N, no server calibration, and no push.**
 2. **Before push** — README check first (Vidit 2026-10-16; presubmit FAILs on it): the README has
    **no internal links** (internalmeta.com, workplace.com, fburl.com, internalfb.com), and its
@@ -181,7 +179,9 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
 4d. **Definition of READY — mandatory before telling Vidit a task can be (re)submitted (Vidit 2026-10-27).**
    All of these on the task's current commit, with the server validation passing on the validated commit:
    1. `python3 ~/swebench/revision-gate/gate.py <task> --repo <checkout> --only presubmit,provenance,carry,review`
-      → presubmit 0 FAIL, reviewer agent Accept (state any Medium to Vidit).
+      → presubmit 0 FAIL. NOTE: gate.py's `review` stage runs `review-task-swebench-v2` even on
+      multi-turn tasks (tooling gap, ISSUES 2026-10-29); the review that counts for READY is the
+      format reviewer in item 7.
    2. `python3 <playbook>/tools/readme-server-check.py <repo> <task>` → PASS (R1–R8).
    3. `python3 <playbook>/tools/failure-audit.py <task> --repo <checkout> --judge` → PASS, or every
       non-genuine trial disclosed in the README with the band shown to hold either way.
@@ -191,6 +191,9 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
       summary>"`; ledger row READY TO (RE)SUBMIT. The independent check/review must come from a different
       session (§5d); ask for it with `board msg task:<task>`.
    6. Give Vidit the reviewer reply text, matching the README and the board review note.
+   7. (F2) `C-drive/C7-revision-response.md` §5d line 4 on the validated SHA: exactly one format
+      reviewer (`review-task-swebench-multiturn` for MT, `review-task-swebench-v2` for ST) meets
+      B6 "The bar". Any task-file edit after it voids READY.
    Only then say "ready". After Vidit submits, the board picks up the review state on its next sync.
 5. **Before submit** — human review, preceded by a **deep-review pass**.
    Green gates are not enough. Calibration, provenance and the AI assessment do
@@ -213,9 +216,9 @@ Dockerfile, `task.toml`: cascade applies, oracle 3/3) and reports defects back t
    (new `codex exec` or a Claude subagent with no history) that did not build or revise the task runs
    the whole checklist on the pushed SHA, so the author's bias does not carry over: pull the playbook
    and re-read this RUNBOOK first, then server rows + `presubmit.py` without `--local-only`, the
-   README check (stop 4), the failure audit (stop 4b), `review-task-swebench-v2` to an Accept, and a
-   both-directions requirement <-> test coverage matrix per step (no untested requirement, no graded
-   behaviour the instruction does not state). Brief it with only the task, SHA and
+   README check (stop 4), the failure audit (stop 4b), the **format reviewer** (`review-task-swebench-multiturn`
+   for MT, `review-task-swebench-v2` for ST) to B6 "The bar", and an independent rebuild of the B3 ⓪
+   requirement <-> test matrix. The checklist itself is `C-drive/C7-revision-response.md` §5d. Brief it with only the task, SHA and
    `C-drive/C7-revision-response.md` §5d. No reviewer reply is drafted until it says READY.
 
 ---

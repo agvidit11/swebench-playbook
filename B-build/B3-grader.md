@@ -153,6 +153,11 @@ while step 2's own test passed in **5 of 5** trials.
 
 > **Step 1's `fail_to_pass` must NOT appear in step 2's `pass_to_pass`.** Use only controls that
 > pass at step-2 base regardless of the seed.
+>
+> **The revision gate's `carry` stage (`carry_forward.py`) also accepts a match in step N's
+> `pass_to_pass`. Never satisfy it that way** — satisfy it with step-N `fail_to_pass` interlock
+> tests or renamed copies (a step-2 file such as test_s2_prior_s1), per the fix below. A `carry` PASS earned by
+> copying step-1 `fail_to_pass` into step-2 `pass_to_pass` is this exact defect.
 
 **The correct fix — guard step 1 from inside step 2's own graded set.** Author step-2
 `fail_to_pass` tests whose expected result depends on step 1 still being correct; they live
@@ -449,8 +454,44 @@ a whole validation cycle. → `C-drive/C3-harden.md` for the mutant-is-a-floor c
 
 ## 9. CHECKLIST
 
+### ⓪ THE REQUIREMENT↔TEST MATRIX — the exit gate of this act (F1)
+
+`STATUS: LIVE`, 2026-10-29. **This is the single home of the instruction↔test linkage rule.**
+RUNBOOK stop 1b, C7 §5d and R-026 link here instead of restating it. It runs **the moment the
+contract and the graded set are both final, before `B4`** — not at presubmit, where a gap costs a
+push cycle.
+
+**Codex writes it while building the grader; Claude verifies every row before `B4`.** It lives
+outside the task dir: `~/swebench/audit/<task>/REQ-TEST-MATRIX.md`, headed by the bundle hash
+(`tools/bundle-hash.sh <task>`). One table per step:
+
+| behaviour ID | requirement (quoted from that step's `instruction.md`) | graded test / assertion IDs | necessity witness |
+|---|---|---|---|
+| `S1-B3` | "…exact sentence…" | `tests/test_x.py::test_y` | the mutant or omission that only this test catches |
+
+Exit requires **zero** rows in each failure class:
+
+| class | means | server verdict it prevents |
+|---|---|---|
+| `UNTESTED` | a stated obligation with no graded assertion | `BAD_GRADING_WEAK` (R06) |
+| `UNSTATED` | a graded assertion no sentence of that step's contract requires ("hints at" is not support) | `BAD_GRADING_WRONG` (R02) |
+| `DUPLICATE` | two rows grading the same obligation as if distinct | inflated test count, false branch count (④) |
+| `UNNECESSARY` | deleting the test removes no coverage of a stated behaviour or preservation regression | noise; R07 thin-grading cover |
+
+Preservation (`pass_to_pass`, cumulative step rows) maps to the step's explicit "keep working"
+requirement or to repository behaviour the change could break — not to nothing. One behaviour may
+need several assertions; "one primary behaviour per row" does not mean one assertion. **Any edit to
+an `instruction.md` or a graded test invalidates the matrix** (the bundle hash changes) — rebuild it
+before calibration or push. Contract-wording defects it finds go to Muse/Avocado (`Owner:
+Avocado/human`); grader defects go back into this act.
+
 ```
-[ ]  1. Requirement -> f2p mapping written, one row per requirement sentence (R06.3)
+[ ]  0. ⓪ REQUIREMENT↔TEST MATRIX at ~/swebench/audit/<task>/REQ-TEST-MATRIX.md for the
+        current bundle hash: zero UNTESTED / UNSTATED / DUPLICATE / UNNECESSARY rows, every
+        step, verified row-by-row by Claude. Subsumes the old R06.3 forward map and the 19b
+        reverse trace.
+        proof: the matrix path, its bundle hash, and the four zero counts
+[ ]  1. (folded into 0)
 [ ]  2. Executed-vs-configured set difference computed and EMPTY (R06.1)
 [ ]  3. Existing subsystem suite in pass_to_pass, not a spot-check (R06.2)
 [ ]  4. parser.py fails on a failing test in the EXECUTED set; fails closed on empty
@@ -487,9 +528,7 @@ a whole validation cycle. → `C-drive/C3-harden.md` for the mutant-is-a-floor c
         one that catches silent-contract + pinning-test (4 of 4 BAD_GRADING_WRONG)
         proof: `python3 ~/.claude/skills/swebench-mt/instruction-lint.py <task> <clone>`
                must report PASS, and must NOT print "no test_patch yet"
-[ ] 19b. REVERSE TRACE: every graded assertion quoted against the contract sentence
-        that requires it. "Hints at" is not support -- either Avocado states it or
-        the assertion is dropped. An unstated graded rule is R02            [R02]
+[ ] 19b. (folded into 0 — the UNSTATED class)
 [ ] 20a. ANTI-WRONG: >=1 independently-written CORRECT implementation PASSES the
         real graded set (not the A3 sketch). 0 of N = BAD_GRADING_WRONG, do not push
         proof: the per-implementation reward lines, and which layer any failure sits
@@ -514,7 +553,8 @@ a whole validation cycle. → `C-drive/C3-harden.md` for the mutant-is-a-floor c
 
 ```
 HANDOFF B3
-  EXIT:      base-commit set-difference output (§4); §2 alternative-spelling reward line
+  EXIT:      ⓪ matrix path + bundle hash with zero UNTESTED/UNSTATED/DUPLICATE/UNNECESSARY;
+             base-commit set-difference output (§4); §2 alternative-spelling reward line
   CHECKLIST: <n of 21 ticked; every waived line with its reason>
   ARTIFACTS: steps/<N>/tests/{config.json,parser.py,run_script.sh,test.sh}; top-level tests/config.json
   FACTS:     f2p and p2p sets per step; the R09 seeds; the executed-vs-configured set

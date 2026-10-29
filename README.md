@@ -51,8 +51,10 @@ ledger/           RUNS.md (evidence) · RULES.md (precedence) · PROVENANCE.md
                   POSTMORTEM-MT-2026-09.md (every MT task, per-task cause)
 ```
 
-**Build order is `B1 B2 B3 B4 → B7 → B6 → B5`, not numeric.** Calibrate and classify before you
-review, review before you push. The server's reviewer cannot see an unpushed tree, so `B6` is the
+**Build order is `B1 B2 B3(⓪ matrix) B4 → B7 → B6 → B5 → server → C7 §5d → Vidit submits`, not
+numeric.** B3 ends with the requirement↔test matrix; B7 is one exact-bundle K5 (advisory unless
+pathological); B6 runs one format reviewer; after validation passes, C7 §5d runs the final format
+review before READY. The server's reviewer cannot see an unpushed tree, so `B6` is the
 last place a rubric failure is cheap.
 
 ## Three rules that keep it from rotting

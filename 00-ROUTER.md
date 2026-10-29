@@ -63,18 +63,15 @@ S12–S15 name the *destination* `C1` will route you to, not a shortcut past it.
 | S1 | Repo picked, no candidate cards | `A-source/A2-idea-generate.md` | MetaCode |
 | S1b | Cards exist, no corpus verdict | `A-source/A4-corpus-prior.md` | Claude |
 | S2 | Cards carry a corpus verdict, no probe measured | `A-source/A3-idea-gate.md` | Claude + Codex |
-| S3 | Survivor card, no task dir | `B-build/B1-scaffold.md` | Claude |
-| S4 | Dir exists, no contract | `B-build/B2-contract.md` | MetaCode / 1P |
-| S5 | Contract written, no graded suite | `B-build/B3-grader.md` | Codex |
-| S6 | Suite exists, oracle not 3/3 local | `B-build/B4-solution-env.md` | Claude |
-| S6a | Oracle 3/3, no local band over VALID TERMINAL attempts | `A-source/A4-corpus-prior.md` | search the WHOLE org corpus by engineering concept. `task list --filter all` narrows to you; `gh repo list` caps at 1000 of 5,105. Both blind past our own work. |
-| `B-build/B7-local-calibration.md` | Claude |
-| S6b | Local band read, reviewers not yet run locally | `A-source/A4-corpus-prior.md` | search the WHOLE org corpus by engineering concept. `task list --filter all` narrows to you; `gh repo list` caps at 1000 of 5,105. Both blind past our own work. |
-| `B-build/B7-local-calibration.md` | forecast, freeze, ladder. Classify every failure and read WHY before the band counts. PROVISIONAL — contradicts A3 §399 on purpose. |
-| `assets/avocado/` + `tools/avocado-brief.sh` | the four Avocado prompt templates, a computed word cap, and a lint that refuses to send drafted prose. → `B2`. |
-| `B-build/B6-review-gate.md` | Claude + 1 subagent per reviewer |
-| S7 | Oracle 3/3 local, reviewers Accept, not pushed | `B-build/B5-preflight-push.md` | Claude |
+| S3 | Survivor card, no task dir | `B-build/B1-scaffold.md` | Codex scaffolds · Claude verifies |
+| S4 | Dir exists, no contract | `B-build/B2-contract.md` | Muse / Avocado (`mc2.sh`) or Vidit |
+| S5 | Contract written, no graded suite, or no requirement↔test matrix | `B-build/B3-grader.md` (exit: §9 matrix) | Codex |
+| S6 | Suite exists, oracle not 3/3 local | `B-build/B4-solution-env.md` | Codex builds · Claude verifies |
+| S6a | Oracle 3/3, no exact-bundle K5 read | `B-build/B7-local-calibration.md` | Claude orchestrates · Muse/Codex run |
+| S6b | K5 read, format reviewer not yet run on the exact bundle | `B-build/B6-review-gate.md` | Claude + 1 subagent per reviewer |
+| S7 | Oracle 3/3 local, format reviewer Accept, not pushed | `B-build/B5-preflight-push.md` | Claude verifies · push per `00-LANES.md` §0 |
 | S8 | Pushed, `validationStatus=pending`, sha matches yours | **wait** — see §3 | — |
+| S8b | Validation `passing` on the exact SHA, not yet submitted | `C-drive/C7-revision-response.md` §5d (final format review, F2), then RUNBOOK stop 4d READY → **Vidit submits** | Claude verifies · Vidit submits |
 | S9 | Any server verdict, not yet diagnosed | `C-drive/C1-read-verdict.md` | Claude |
 | S9b | `needs_revision`, or **any human review with scored rubrics** | `C1` for the diagnosis, then `C-drive/C7-revision-response.md` | Claude routes · Avocado owns the prose |
 | S10 | `Oracle validation` red | `C-drive/C2-repair-grading.md` | Codex |
@@ -83,7 +80,7 @@ S12–S15 name the *destination* `C1` will route you to, not a shortcut past it.
 | S13 | `BAD_GRADING_WEAK` | `C2` — **add a test** | Codex |
 | S14 | Step gate "too easy" / avocado >3/5 on any step | `C-drive/C3-harden.md` | MetaCode + Codex |
 | S15 | Step gate "too hard" / 0 on every model | `C-drive/C4-loosen-salvage.md` | Codex |
-| S16 | All five done-criteria green (§4) | **park it. Do not re-open.** | — |
+| S16 | All five done-criteria green (§4) **and submitted** | **park it. Do not re-open.** Green but not submitted → S8b. | — |
 | S16c | >10 commits, or a terminal condition | `C-drive/C8-retire.md` | Claude proposes · **Vidit decides** |
 | S16b | A change to any graded artifact is proposed but unverified | `C-drive/C6-replay-verify.md` | Claude pulls, Codex runs |
 | S17 | More than one task in flight | `C-drive/C5-cohort-loop.md` | Claude |
@@ -297,16 +294,24 @@ on an already-acceptable task has pushed it from `BAD_GRADING_WEAK` to `BAD_GRAD
 > **Only Avocado (MetaCode) or Vidit by hand may write those files. There is no exception
 > and no override.**
 
-> **Supersedes the per-path ownership table below and in `R4`.** Any row granting Claude
-> `solution/`, `environment/`, `task.toml` or `README.md` is retired as of 2026-09-30 — an
-> audit found the two files still disagreed. `audit/**` is the only Claude-writable path.
+> **The one ownership table is `00-LANES.md` §1.** It supersedes every other ownership line in
+> this playbook — any act-file `OWNER:` header naming Claude for a task file, and the per-path
+> rows in `R4`.
+>
+> **`audit/` — what is settled and what is not.** Settled (`LIVE`): review-gate verdicts and the
+> B3 ⓪ matrix live at `~/swebench/audit/<task>/`, never inside the task (PaperJS, ISSUES
+> 2026-10-27: a reviewer JSON written into `audit/` crossed the boundary). **Open, needs Vidit**:
+> `C1` plans, the review ledger and the drive log are still specified at `<task>/audit/` and
+> written by Claude, which `00-LANES.md` §1 forbids. The proposed resolution is to read each as
+> `~/swebench/audit/<task>/<file>` (same name and format) and copy into the tree only via Codex.
+> Until Vidit rules, those three keep their per-act paths.
 
 ### THE SECOND IRON-CLAD RULE — Claude writes NOTHING in a task directory
 
 `STATUS: LIVE`, 2026-09-29. Set after two tasks died of it.
 
 > **Claude does not write any file under `<task>/`. Not `tests/`, not `solution/`, not
-> `environment/`, not `task.toml`, not `README.md`. The one carve-out is `<task>/audit/**`.**
+> `environment/`, not `task.toml`, not `README.md`.** `audit/` → the settled/open split above.
 >
 > **Codex makes every change except `instruction.md`. Claude validates, triggers runs, reads,
 > routes and dispatches. That is the whole of Claude's role inside a task.**
@@ -356,12 +361,9 @@ artifacts are now suspect → `B-build/B2-contract.md` §contract-change re-audi
 
 ### The rest of the matrix
 
-| Artifact | Who may write it |
-|---|---|
-| `instruction.md`, `steps/*/instruction.md` | **Avocado (MetaCode) or Vidit only.** Never Claude. Never Codex. Never any 3P model. |
-| **Everything under `tests/`** — `config.json`, `test.sh`, `run_script.sh`, `parser.py`, test patches | Codex or 1P/human. Provenance scores by **path**; one `claude_code` write there retires a task. |
-| `solution/*`, `environment/Dockerfile`, `task.toml`, `README.md`, `audit/*` | Claude |
-| Diagnosis, verification, mutants, git, pushes | Claude |
+→ `00-LANES.md` §1 (Claude orchestrates and verifies; Codex writes every task file except
+`instruction.md`; Muse/Avocado or Vidit writes `instruction.md`). It is not restated here so the
+two cannot drift again.
 
 The guard fires on Edit/Write only — **script-written files slip through.** Ownership is
 yours to honour, not the guard's to enforce. Violation protocol → `reference/R4-ownership.md`.
@@ -370,36 +372,49 @@ yours to honour, not the guard's to enforce. Violation protocol → `reference/R
 
 ## 6. Concurrency
 
-### The Docker mutex — the actual protocol
+### The Docker slot pool — the actual protocol
 
-`STATUS: LIVE`. "One at a time" without a mechanism cost three repos their harness timing on
-2026-09-22, because two acts both believed they were allowed to proceed.
+`STATUS: LIVE`, 2026-10-29 (replaces the single global mutex). "One at a time" without a mechanism
+cost three repos their harness timing on 2026-09-22, because two acts both believed they were
+allowed to proceed. The real ceiling was never memory: **Docker caps near 15 bridge networks on
+this host and one `k=5` job creates 5** (`ledger/RUNS.md` "Where this actually jams") — over that,
+jobs die with `all predefined address pools have been fully subnetted` and the dead trials score as
+real failures. A 166-CPU / 224 GB host does not need to run one container at a time.
+
+**Two job slots.** One `k=5` invocation, one oracle run or one harness timing run holds **one**
+slot. Slot 0 is the old `/tmp/swebench-docker.lock`, so tools that still take the old lock
+(`gate.py`, `push-task.sh`) simply occupy slot 0 and stay correct.
 
 ```bash
-flock /tmp/swebench-docker.lock <your docker command>          # blocks until free
-flock -w 1800 /tmp/swebench-docker.lock <cmd> || echo "waited 30m, still held"
+~/swebench-playbook/tools/docker-slot.sh <your docker command>   # first free of 2 slots, blocks otherwise
+DOCKER_SLOT_WAIT=1800 ~/swebench-playbook/tools/docker-slot.sh <cmd>
 ```
 
-- **Holder identity:** write `<pair>/<act>/<pid>` to `/tmp/swebench-docker.holder` on acquire,
-  truncate on release, so a blocked act can name who it is waiting on.
+- **Capacity guard (in the helper):** it queues instead of taking a slot when root free disk is
+  below 60 GB or available RAM below 48 GB. Disk is the nearest limit today (~87–100 GB free);
+  `docker system prune` of dangling images and build cache reclaims ~30 GB.
+- **Per-container limits:** keep the task's own limits (commonly 4 GB / 2 CPUs; some 2 GB / 1).
+  Two concurrent `k=5` jobs then peak near 40 GB and 20 CPUs.
+- **Holder identity:** the helper writes `<pid> <cmd>` to `/tmp/swebench-docker.holder.<slot>`.
 - **There is no TTL.** `flock` releases when the process exits, including on kill. A stale lock
   means a live holder — find it before breaking it.
-- **Scope the lock to the Docker call, never to a whole act.** Holding it across an `A1` lane
-  serialises the entire fan-out.
+- **Scope a slot to the Docker call, never to a whole act.**
+- Raising the slot count above 2 needs Docker's `default-address-pools` widened first (root,
+  `/etc/docker/daemon.json`); do not raise it otherwise.
 
-### `A1` fan-out versus the mutex — they conflict, and here is the resolution
+### `A1` fan-out versus the slot pool — they conflict, and here is the resolution
 
 `STATUS: LIVE`. `A1` is the canonical parallel act, yet its exit gate (G10 harness timing)
 requires a container. Both rules cannot be obeyed as written. **Split the act:** run every
 non-container gate in parallel across lanes, then queue *only* the G10 timing runs through the
-mutex. A lane that cannot get the lock reports `G10: not measured — lock contention`, which is
+slot pool. A lane that cannot get a slot reports `G10: not measured — lock contention`, which is
 an honest unmet line, not a waiver.
 
 | Parallel-safe | Serial-only |
 |---|---|
-| repo screening — every gate except G10 | **G10 timing, and anything else spawning Docker** — parallel runs exhaust host memory |
+| repo screening — every gate except G10 | **G10 timing, and anything else spawning Docker** — through the 2-slot pool (bridge-network ceiling) |
 | ideation, fork probes, novelty sweeps | `contract → solve → submit` for a given task |
-| reading trial artifacts | repairs — one at a time, always |
+| reading trial artifacts | repairs — one per task at a time; across tasks, via the slot pool |
 | independent tasks in **separate worktrees** | shared git index; shared `/tmp` paths |
 
 Use task-scoped temp paths (`/tmp/<task>-oracle.patch`, never `/tmp/oracle.patch`) — generic
@@ -440,12 +455,13 @@ The one orchestration shape that is proven. Do not improvise a different one.
 | `A1` across N territories | **N agents in parallel** | independent; 3 lanes ran clean on 2026-09-22 |
 | `A2` + `A3` per surviving repo | **parallel, one agent per repo** | independent; probes are cheap and read-only |
 | `B1` scaffold | **parallel, separate worktrees** | no shared index, task-scoped temp paths |
-| `B2 → B3 → B4 → B5` | **STRICTLY SERIAL per task, and one task at a time** | the contract→grader→solution chain is a two-way contract; and `B4`/`B5` spawn Docker |
+| `B2 → B3 → B4 → B5` | **STRICTLY SERIAL per task, and one task at a time** | the contract→grader→solution chain is a two-way contract; its Docker calls go through §6 slots |
 | `C1` reads and artifact downloads | **parallel** | read-only |
-| `C2`–`C6` repairs | **one at a time, always** | each spawns Docker; parallel runs have exhausted host memory and killed a poller mid-flight |
+| `C2`–`C6` repairs | **one per task; at most two tasks' Docker work at once** (§6 slots) | each spawns Docker; unbounded parallel runs exhausted the bridge-network pool and killed a poller mid-flight |
 
 So: fan out hard through `A`, fan out through `B1`, then **queue**. One task is pushed before
-the next one's contract is written. `C5` owns the queue once more than one task is live.
+the next one's contract is written. Docker work for *other* tasks (C-phase repairs, calibration,
+oracle reruns) may use the second slot meanwhile. `C5` owns the queue once more than one task is live.
 
 ---
 

@@ -129,7 +129,7 @@ For each of the top `WAVE` tasks in rank order, loop until the exit condition:
    you are reading stale results: sleep `POLL`, do not analyse, and **this does not consume an
    attempt.** → `C-drive/C1-read-verdict.md` §1.
 3. **Classify:** green (§ router §4) → done, next task. Jobs still running → sleep `POLL`, repeat;
-   not an attempt. Blocked → run `C1` from the top. **That counts as one attempt.**
+   not an attempt. Blocked → run `C1` from the top. It becomes **one attempt when its repair is pushed** (`00-ROUTER.md` §3 — the one definition); a C1 that ships no change is not an attempt.
 4. **Repair** through the act `C1` routes to — `C2`, `C3` or `C4` — honouring its ownership table
    and its verification step, and exiting through `C6`.
 5. **Commit and trigger**, then sleep `POLL` and return to 1.

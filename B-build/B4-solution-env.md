@@ -3,7 +3,7 @@
 > **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
 
 ```
-OWNER:   Claude
+OWNER:   Codex builds · Claude verifies (00-LANES.md §1)
 INPUT:   HANDOFF B2 (the contract) + HANDOFF B3 (the graded suite)
 OUTPUT:  solution/solve.sh (per step), environment/Dockerfile, task.toml
 EXIT:    oracle 3/3 locally — `codimango bench run -p <task> -a oracle -k 3`

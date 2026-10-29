@@ -3,7 +3,7 @@
 > **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
 
 ```
-OWNER:   Claude
+OWNER:   Codex scaffolds · Claude verifies (00-LANES.md §1)
 INPUT:   a survivor card + its HANDOFF from A-source/A3-idea-gate.md
 OUTPUT:  a task directory under the tasks repo
 EXIT:    the directory exists and every known scaffold landmine is either patched

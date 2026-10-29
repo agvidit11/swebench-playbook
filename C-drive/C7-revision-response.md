@@ -276,13 +276,15 @@ INDEPENDENT-PRESUBMIT <task> @ <sha>   agent: <codex|claude-subagent>   playbook
               each is a genuine reasoning miss, or named as infra (AgentTimeoutError,
               ApiServerShuttingDown, 0 tests, grader) with its fix or written justification;
               0 unexplained
-4 REVIEW      review-task-swebench-v2 (multi-turn: review-task-swebench-multiturn) run on the
-              final tree by this agent: verdict Accept; every Medium+ finding fixed, not argued
-5 COVERAGE    requirement <-> test matrix per step, BOTH directions: every requirement in each
-              step's instruction maps to >=1 graded test (0 UNTESTED / COVERED-BUT-UNASSERTED,
-              lh-coverage --auto matrix or equivalent), and every graded test maps to a stated
-              or repo-derivable requirement (0 unstated-but-graded); carried tests re-run in
-              later steps
+4 REVIEW      (F2) only AFTER validationStatus=passing on <sha>: exactly ONE format reviewer,
+              review-task-swebench-multiturn for a multi-turn task (task.toml format), else
+              review-task-swebench-v2, run on the tree AT <sha> by this agent; the result meets
+              B6 "The bar" (Accept, 0 Critical, 0 High, Medium/Low fixed or justified; spec<->test
+              Medium blocks). Any task-file edit after this voids it -> new push, new §5d
+5 COVERAGE    rebuild the B3 ⓪ requirement<->test matrix independently at <sha> (do not read the
+              author's copy first), then diff it against the author's: 0 UNTESTED / UNSTATED /
+              DUPLICATE / UNNECESSARY in either, and no row the two disagree on; carried tests
+              re-run in later steps via step-N fail_to_pass, never step-1 f2p in step-N p2p (B3 §3)
 6 PROOF       C7 RESUBMIT-PROOF lines 1-8 (or B5 block on a first submit) all green
 VERDICT       READY | NOT READY: <the failing lines>
 ```

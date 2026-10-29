@@ -4,11 +4,13 @@
 
 ```
 ACT:    B7-local-calibration
-OWNER:  Claude
-INPUT:  HANDOFF B4 — oracle 3/3 — and a B6 review gate that exits 0
-OUTPUT: a per-step local band from FIVE VALID TERMINAL attempts, bound to a bundle hash
-EXIT:   every step in 1-3 of 5 valid terminal attempts, or a written decision to push
-        anyway with the reason
+OWNER:  Claude orchestrates · Muse/Codex run (00-LANES.md §1)
+INPUT:  HANDOFF B4 — oracle 3/3 — and the B3 §9 requirement↔test matrix for the same bundle
+OUTPUT: ONE exact-bundle K5 read per step from FIVE VALID TERMINAL attempts, bound to a bundle hash
+EXIT:   every step in 0-3/5 (00-ROUTER §4 band), or a written disposition. A middling or
+        infra-only result is ADVISORY and never blocks the push by itself: record it and let the
+        server calibrate. Only a valid-denominator 5/5, or a 0/5 with no third-party gradient
+        and no proven-solvable implementation, must be dispositioned (fix, or push with reason).
 ```
 
 `STATUS: PROVISIONAL`, 2026-09-29. **This act contradicts `A3` §399 and that conflict is the
@@ -146,7 +148,7 @@ no equivalent today, and we have already graded one task against another task's 
 4. one **diagnostic** full-task smoke, once the last step exists — non-counting
 5. targeted later-step k=5, seeded from a verified passing step-1 checkpoint
 6. full-task k=5
-7. `B6` review gate, then `B5` push
+7. `B6` review gate (format reviewer on this exact bundle), then `B5` push
 
 **Do not run later stages speculatively. When a stage fails, cancel the queued later stages for
 that bundle.** Step 5 is seeded deliberately: it tests inherited-session restoration rather than

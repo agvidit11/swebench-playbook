@@ -2,11 +2,12 @@
 
 > **PROVENANCE HARD STOP: CLAUDE/CODEX MUST NEVER WRITE, PATCH, REWORD, OR SUPPLY REPLACEMENT PROSE FOR ANY `instruction.md`. CLAUDE MUST WRITE NOTHING ELSE INSIDE A TASK DIRECTORY. CODEX OWNS NON-CONTRACT TASK FILES. CONTRACT CHANGES GO TO MUSE/AVOCADO FROM REQUIREMENT-LEVEL OBLIGATIONS ONLY. RUN THE AUTHORSHIP AUDIT BEFORE EVERY PUSH.**
 
-> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged. **Documentation-only exception (2026-10-17):** if the task diff from the exact green server commit touches only `README.md` and `audit/**`, run `gate.py <task> --documentation-only` instead (re-verifies server results, reviews, the closed review ledger and presubmit; no Docker/oracle/calibration) and push with `PUSH_MODE=documentation-only`. Any other changed path refuses the exception.
+> **PRECHECK (Vidit 2026-10-13, PROVISIONAL):** before ANY push, first push or revision, run `python3 ~/swebench/revision-gate/gate.py <task>` (full run) and fix every FAIL. `push-task.sh` refuses to push without its stamp. Until 3 agents sign off in `ledger/VERIFY-revision-gate.md`, a FAIL means "look at this", not proof, and `GATE_OVERRIDE="<reason>"` is allowed and logged. **Calibration-only override (2026-10-29):** when every stage except `calibrate` is PASS and `calibrate` is FAIL/BLOCKED for a middling, infra-only or host-busy reason, `GATE_OVERRIDE="calibrate-only: <one line>"` is the documented path — local K2N is advisory (`A3` §399 r=0.07; `B7` EXIT) and the server calibrates. 62 of 216 logged overrides through 10-29 were exactly this. A valid-denominator 5/5, or an unexplained 0/5, still needs a fix or Vidit's approval. **Documentation-only exception (2026-10-17):** if the task diff from the exact green server commit touches only `README.md` and `audit/**`, run `gate.py <task> --documentation-only` instead (re-verifies server results, reviews, the closed review ledger and presubmit; no Docker/oracle/calibration) and push with `PUSH_MODE=documentation-only`. Any other changed path refuses the exception.
 
 ```
-OWNER:   Claude
-INPUT:   HANDOFF B4 — a locally-green task, oracle 3/3
+OWNER:   Claude verifies and runs the push script; Codex makes any task-file change
+         (00-LANES.md §1); a push happens only on Vidit's confirmation (00-LANES.md §0)
+INPUT:   HANDOFF B4 + B3 ⓪ matrix + B7 K5 read + B6 bar met — all on the same bundle hash
 OUTPUT:  one pushed commit containing only this task's paths
 EXIT:    full change: `preflight.sh <task> --with-oracle` exits 0;
          documentation-only change: `gate.py <task> --documentation-only` exits 0;
@@ -445,8 +446,9 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         proof: the ADV lines and a one-line disposition each
 [ ]  5. TIER 0 inventory clean (§3), and the FULL diff read, not skimmed
         proof: `git -C $REPO diff -- <task> | wc -l`, plus your read-through note
-[ ]  6. Agentic-reviewer precheck walked (§2): PASS / AT-RISK for all 17 axes
-        proof: the 17 lines
+[ ]  6. (retired 2026-10-29 — the 17-axis self-score is superseded by B6, §2.) Disposition
+        each axis a B6 reviewer actually raised, one line each
+        proof: the reviewer finding -> disposition lines
 [ ] 6a. BRANCH COUNT, RE-COUNTED AGAINST THE GRADER YOU BUILT — not the A3 estimate.
         Name each branch and show the mutant it catches (B3 §3). <=2 BLOCKS.
         MT: count PER STEP. Step 1 at <=2 blocks the task, not just the step.
@@ -479,9 +481,12 @@ Record the screen in the handoff: how many runs, how many entries removed, and w
         cannot fix this after the fact. (00-ROUTER.md §5)
         proof: the audit output and $?
 [ ] 6d. B6 REVIEW GATE: `tools/review-gate.sh <task> check` exits 0 -- every
-        installed reviewer returned the exact verdict Accept, zero Critical,
-        zero High. BLOCKING. The server's reviewer cannot see an unpushed
-        tree, so this is the only place a rubric failure is cheap. (B6)
+        dispatched reviewer meets B6 "The bar" (one format reviewer: multiturn
+        for MT, v2 for ST). BLOCKING. The server's reviewer cannot see an
+        unpushed tree, so this is the only place a rubric failure is cheap. (B6)
+[ ] 6e. B3 ⓪ REQUIREMENT↔TEST MATRIX current for this bundle hash: zero
+        UNTESTED / UNSTATED / DUPLICATE / UNNECESSARY rows (F1)
+        proof: matrix path + hash
         proof: the check output and $?
 [ ]  7. Local structural PASS, knowing it does not imply a server pass (§1)
         proof: `codimango bench validate -p <task> --structural-only` -> `Overall: PASS`
@@ -564,7 +569,7 @@ HANDOFF B5
   CHECKLIST: <n of 11 pre-submission + n of 5 post-submission ticked; waivers with reasons>
   ARTIFACTS: one commit on origin/main touching only <task>/
   FACTS:     the SHA; the staged file list; the server `Structural overall` line; whether
-             jobs were created; the 17-axis precheck verdicts; every advisory left unactioned
+             jobs were created; the B6 reviewer verdicts + bundle hash; every advisory left unactioned
   OPEN:      anything owned by Codex or by Avocado/human that shipped unresolved;
              the B4 §8 shape this task used
   NEXT:      S8 — wait (00-ROUTER.md §3). On any server verdict: C-drive/C1-read-verdict.md

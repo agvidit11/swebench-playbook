@@ -779,7 +779,7 @@ understood the candidate well enough to reject it.
 
 ## THE GATE CHECKLIST
 
-Per candidate card, in order. Tick with evidence; waive with a reason. A card failing any line is **killed and reported**, not repaired here.
+Per candidate card, in order. Tick with evidence; waive with a reason. A card failing a **factual veto** line (GATE 0, 1, 2, 3, 6) is **killed and reported**, not repaired here. GATE 4, GATE 5 and GATE 8 lines are **recorded, never kill on their own** (§ gate table) — GATE 5 runs only when GATE 4 leaves the discriminator unexplained.
 
 | # | Step | Proof |
 |---|---|---|
