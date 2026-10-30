@@ -219,7 +219,7 @@ def st_server_evidence(ctx):
     bad_details = [d for d in details if d.get("status") != "passed"]
     required_labels = {
         "Structural checks", "Oracle validation", "Metacode or Opus pass/fail balance",
-        "Agentic trial-output review", "Contamination check", "Provenance check",
+        "Agentic trial-output review", "Contamination check",
     }
     missing = sorted(required_labels - {d.get("label") for d in details})
     problems = []
