@@ -239,15 +239,12 @@ def _next(f, findings):
         return "READY", "IMPORT task"
     if f.get("dissent") and state in ("DRAFT", "NEEDS_REV"):
         return "ATTENTION", "ADDRESS agent review"
-    # DRAFT ladder: both presubmits (building session + independent agent) clean on this commit
+    # DRAFT ladder: one clean presubmit (either role) on this commit and no clear issue makes it submittable; the
+    # second presubmit and the agent reviews are recommended, not required (shown as notes on the card)
     if f["check_fail"]:
         return "ATTENTION", "FIX check"
-    if f.get("check_need", f["check"] == "NONE" or f["check_stale"]):
+    if not f.get("check_any", not (f["check"] == "NONE" or f["check_stale"])):
         return "READY", "RUN check"
-    if f["review"] in ("R0", "R~"):
-        return "READY", "GET R1"
-    if f["review"] == "R1":
-        return "READY", "GET R2"
     return "READY", "RESUBMIT" if state == "NEEDS_REV" else "SUBMIT"
 
 
@@ -378,6 +375,7 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
         f["check"], f["check_stale"], check_payload = _check(tev, current)
         f["check_fail"] = any(gts[r]["check"]["state"] == "bad" for r in gts)
         f["check_need"] = not all(gts[r]["check"]["state"] == "ok" for r in gts)
+        f["check_any"] = any(gts[r]["check"]["state"] == "ok" for r in gts)
 
         refc = {k: v for k, v in fields.items() if k.startswith("claims.")}
         if claims_healthy:

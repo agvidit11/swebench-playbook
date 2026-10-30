@@ -183,7 +183,7 @@ def _team_payload(snap, cfg, servers=None) -> dict:
                 continue
             session_targets.append({"session_key": session.get("session_key") or session.get("native_id"),
                                     "native_id": session.get("native_id"),
-                                    "name": session.get("name") or session.get("alias"),
+                                    "name": session.get("name") or session.get("alias"), "title": session.get("title"),
                                     "host": server["id"], "kind": session.get("kind"),
                                     "kind_icon": session.get("kind_icon"), "tasks": session.get("tasks") or [],
                                     "transport": session.get("transport")})
@@ -320,10 +320,13 @@ def _stats2(snap, cfg):
 
 from .html_page import PAGE  # noqa: E402  (template lives in its own module)
 
+import hashlib  # noqa: E402
+PAGE_VER = hashlib.sha1(PAGE.encode()).hexdigest()[:12]   # an open tab reloads itself when the served page changes
+
 
 def page(data: dict, live: bool = False) -> str:
     blob = json.dumps(data, default=str).replace("</", "<\\/")
-    return PAGE.replace("__DATA__", blob).replace("__LIVE__", "true" if live else "false")
+    return PAGE.replace("__DATA__", blob).replace("__LIVE__", "true" if live else "false").replace("__PAGE_VER__", PAGE_VER)
 
 
 def write(snap, cfg, path: Path) -> Path:
@@ -418,6 +421,7 @@ def serve(gather_fn, cfg, *, port: int = 8765, interval: int = 30, team_interval
             if etag:
                 self.send_header("ETag", etag)
             self.send_header("Cache-Control", cache_control)
+            self.send_header("X-Board-Page", PAGE_VER)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             if body and self.command != "HEAD":

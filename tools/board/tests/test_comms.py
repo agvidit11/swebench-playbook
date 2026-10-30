@@ -130,3 +130,29 @@ class SessionIdAddressTest(unittest.TestCase):
         self.assertEqual(t["to"], "session:3b403eb5-5715-42e6-8a68-bed6f2d1ea56")
         t = comms.target_for("3b403eb5", {"3b403eb5-5715-42e6-8a68-bed6f2d1ea56": "h·x"}, ["h"])
         self.assertEqual(t["to_label"], "h·x")
+
+
+class SupervisorTest(unittest.TestCase):
+    def ev(self, action, sid, at, host="h1", **pl):
+        return {"type": "supervisor", "host_id": host, "seq": 1, "occurred_at": at,
+                "actor": {"session_id": sid, "alias": f"{host}·{sid}", "kind": "claude"}, "payload": {"action": action, **pl}}
+
+    def test_latest_claim_wins_and_release_clears(self):
+        from workboard import comms
+        evs = [self.ev("claim", "a", "2026-10-29T01:00:00+00:00"),
+               self.ev("status", "a", "2026-10-29T02:00:00+00:00", text="all good", disk={"used_pct": 70}),
+               self.ev("claim", "b", "2026-10-29T03:00:00+00:00"),
+               self.ev("status", "a", "2026-10-29T04:00:00+00:00", text="stale supervisor")]
+        sup = comms.supervisor(evs, "h1")
+        self.assertEqual((sup["session_id"], sup["status"]), ("b", None))     # a's later status is ignored
+        self.assertIsNone(comms.supervisor(evs + [self.ev("release", "b", "2026-10-29T05:00:00+00:00")], "h1"))
+        self.assertIsNone(comms.supervisor(evs, "h2"))
+
+    def test_supervisor_message_target(self):
+        from workboard import comms
+        evs = [self.ev("claim", "a", "2026-10-29T01:00:00+00:00")]
+        t = comms.supervisor_target(evs, "supervisor", ["h1", "h2"], "h1")
+        self.assertEqual(t["to"], "session:a")
+        self.assertIsNone(comms.supervisor_target(evs, "board-4e", ["h1"], "h1"))
+        with self.assertRaises(ValueError):
+            comms.supervisor_target(evs, "supervisor:h2", ["h1", "h2"], "h1")

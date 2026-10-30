@@ -156,3 +156,51 @@ def discover(host_id: str, *, root: Path | None = None, uid: int | None = None,
             diagnostics.append({"file": path.name, "classification": classification, "reason": reason})
     sessions.sort(key=lambda x: (not x["live"], -(x.get("age_s") or 0), x["session_key"]))
     return sessions, diagnostics
+
+
+PROJECTS = Path(os.environ.get("CLAUDE_PROJECTS_DIR", "~/.claude/projects")).expanduser()
+_TITLE = re.compile(rb'"type":"(custom-title|ai-title)","(?:customTitle|aiTitle)":"((?:[^"\\]|\\.){1,200})"')
+
+
+def titles(native_ids, state_path: Path, projects: Path | None = None) -> dict[str, str]:
+    """{session id: tab title} — the latest /rename title, else Claude's own ai-title, read incrementally from each
+    transcript (only bytes appended since the last scan, offsets kept in state_path)."""
+    projects = Path(projects or PROJECTS).expanduser()
+    try:
+        state = json.loads(Path(state_path).read_text())
+    except (OSError, ValueError):
+        state = {}
+    out = {}
+    for sid in native_ids:
+        hits = list(projects.glob(f"*/{sid}.jsonl")) if projects.is_dir() else []
+        if not hits:
+            continue
+        path = hits[0]
+        st = state.get(sid) or {}
+        try:
+            size = path.stat().st_size
+            start = st.get("offset", 0) if st.get("path") == str(path) and st.get("offset", 0) <= size else 0
+            with open(path, "rb") as fh:
+                fh.seek(start)
+                buf = fh.read()
+        except OSError:
+            continue
+        cut = buf.rfind(b"\n") + 1                     # rescan a partial last line next time
+        for kind, raw in _TITLE.findall(buf[:cut]):
+            try:
+                title = json.loads(b'"' + raw + b'"')
+            except ValueError:
+                continue
+            if kind == b"custom-title" or not st.get("custom"):
+                st["title"], st["custom"] = title[:80], st.get("custom") or kind == b"custom-title"
+        st.update(path=str(path), offset=start + cut)
+        state[sid] = st
+        if st.get("title"):
+            out[sid] = st["title"]
+    try:
+        tmp = Path(str(state_path) + ".tmp")
+        tmp.write_text(json.dumps(state))
+        tmp.replace(state_path)
+    except OSError:
+        pass
+    return out

@@ -63,7 +63,7 @@ class ProjectionTest(unittest.TestCase):
         self.assertEqual(v.fields["review"], "R2")
         self.assertEqual(v.fields["next"], "RUN check")        # presubmit is required before submit
         one = two + [e("check", "t", {"pass": 20, "warn": 1, "fail": 0}, commit=SHA_A)]
-        self.assertEqual(self.view(obs, one).fields["next"], "RUN check")            # R2 + one presubmit is not enough
+        self.assertEqual(self.view(obs, one).fields["next"], "SUBMIT")               # one clean presubmit is enough
         checked = one + [e("check", "t", {"pass": 20, "warn": 0, "fail": 0, "role": "author"}, session="s3", commit=SHA_A)]
         self.assertEqual(self.view(obs, checked).fields["next"], "SUBMIT")
         same = one_session_both = [e("review", "t", {"verdict": "ready", "role": "author"}, commit=SHA_A, seq=5),
@@ -108,13 +108,12 @@ class ProjectionTest(unittest.TestCase):
                        e("review", "t", {"verdict": "ready"}, commit=SHA_A),
                        e("review", "t", {"verdict": "ready", "role": "author"}, session="s2", host="h2", commit=SHA_A)])
         self.assertEqual((v.fields["group"], v.fields["next"]), ("ATTENTION", "RERUN server"))
-        # full ladder
+        # relaxed ladder: one clean presubmit on the current commit is enough; reviews are recommended
         ladder = [([], "RUN check"),
-                  ([e("check", "t", {"pass": 1}, commit=SHA_A)], "RUN check"),
-                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A)], "GET R1"),
-                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A), e("review", "t", {"verdict": "ready"}, commit=SHA_A)], "GET R2"),
-                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A), e("review", "t", {"verdict": "ready"}, commit=SHA_A),
-                    e("review", "t", {"verdict": "ready", "role": "author"}, session="s2", host="h2", commit=SHA_A)], "SUBMIT")]
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A)], "SUBMIT"),
+                  ([e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A)], "SUBMIT"),
+                  ([e("check", "t", {"pass": 1}, commit=SHA_A), e("check", "t", {"pass": 1, "role": "author"}, session="s3", commit=SHA_A),
+                    e("review", "t", {"verdict": "ready"}, commit=SHA_A)], "SUBMIT")]
         for evs, expected in ladder:
             self.assertEqual(self.view([cm("t")] + base, evs).fields["next"], expected)
 
@@ -259,9 +258,11 @@ class ProjectionTest(unittest.TestCase):
         obs = [cm("t"), gt("t"), repo({SHA_S: "2026-10-22T00:00:00+00:00"})]
         self.assertEqual(self.view(obs).fields["next"], "RUN check")
         one_check = [e("check", "t", {"pass": 20, "warn": 0, "fail": 0}, commit=SHA_A)]
-        self.assertEqual(self.view(obs, one_check).fields["next"], "RUN check")      # independent only; author missing
+        self.assertEqual(self.view(obs, one_check).fields["next"], "SUBMIT")         # one clean presubmit is enough
+        old_check = [e("check", "t", {"pass": 20, "warn": 0, "fail": 0}, commit="0" * 40)]
+        self.assertEqual(self.view(obs, old_check).fields["next"], "RUN check")      # not on the current commit
         with_check = one_check + [e("check", "t", {"pass": 20, "warn": 0, "fail": 0, "role": "author"}, session="s3", commit=SHA_A)]
-        self.assertEqual(self.view(obs, with_check).fields["next"], "GET R1")
+        self.assertEqual(self.view(obs, with_check).fields["next"], "SUBMIT")
         failing = with_check + [e("check", "t", {"pass": 1, "fail": 2}, session="s4", commit=SHA_A, seq=9,
                                   at="2026-10-23T19:30:00+00:00")]
         self.assertEqual(self.view(obs, failing).fields["next"], "FIX check")        # a later failure is not hidden

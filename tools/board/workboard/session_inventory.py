@@ -87,6 +87,13 @@ def discover(cfg, evs: list[dict], host_id: str, *, now: float | None = None,
         parents, found = claude_sessions.discover(
             host_id, root=claude_root, proc_root=proc_root, pid_domain=pid_domain, now=now)
         diagnostics.extend(found)
+        if claude_root is None or claude_projects_root is not None:     # tests pass a fake registry
+            from .app import cache_dir
+            named = claude_sessions.titles([p["native_id"] for p in parents], cache_dir() / "session-titles.json",
+                                           claude_projects_root)
+            for p in parents:
+                if named.get(p["native_id"]):
+                    p["title"] = named[p["native_id"]]
     except Exception as exc:
         parents = []
         diagnostics.append({"classification": "source-error", "reason": f"Claude registry: {exc.__class__.__name__}"})

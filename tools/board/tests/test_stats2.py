@@ -58,6 +58,14 @@ class Stats2Test(unittest.TestCase):
         self.assertEqual(t["dec"][0][1], "accept_fb")   # never a synthesized human accept
         self.assertFalse(t["rc"])
 
+    def test_self_report_is_high_confidence_attribution(self):
+        ev = {"type": "report", "occurred_at": "2026-10-12T11:00:00+00:00", "entity": {"kind": "task", "id": "t"},
+              "actor": {"kind": "claude", "session_id": "s1"}, "host_id": "h", "seq": 1,
+              "payload": {"phase": "revision", "model": "gpt-5.6-sol", "kind": "codex", "summary": "x"}}
+        t = self.build([], [ev])
+        rep = [a for a in t["act"] if "report" in a[6]]
+        self.assertEqual([(a[1], a[2], a[3], a[5], a[8]) for a in rep], [("revision", "codex", "gpt-5.6-sol", "high", "high")])
+
     def test_model_name_normalised(self):
         self.assertEqual(stats2._model_name("{'model_id': 'muse-spark-1.4', 'provider_id': 'meta'}"), "muse-spark-1.4")
         self.assertEqual(stats2._model_name("gpt-5.6-sol"), "gpt-5.6-sol")

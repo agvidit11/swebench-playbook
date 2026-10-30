@@ -160,13 +160,13 @@ def next_steps(t: dict, flow: dict) -> list[dict]:
 
     def ladder(need_check=True):
         a, i = g["author"], g["independent"]
-        if need_check and a["check"]["state"] != "ok":
+        if need_check and a["check"]["state"] != "ok" and i["check"]["state"] != "ok":
             steps.append({"do": f"building session: run presubmit (`board check run {task}`)", "eta": "~10m"})
         if a["review"]["state"] != "ok":
-            steps.append({"do": f"building session: approve (`board review add {task} --verdict ready --role author`)",
+            steps.append({"do": f"recommended · building session: approve (`board review add {task} --verdict ready --role author`)",
                           "eta": "~5m"})
         if i["check"]["state"] != "ok" or i["review"]["state"] != "ok":
-            steps.append({"do": "independent agent (fresh, no build context): full presubmit + review, recorded with "
+            steps.append({"do": "recommended · independent agent (fresh, no build context): presubmit + review, recorded with "
                                 "`--role independent`", "eta": "~30m"})
         steps.append({"do": submit, "eta": "~2m"})
 
@@ -427,18 +427,17 @@ def primary_action(t: dict) -> dict:
     known = ("RUN check", "GET R", "SUBMIT", "RESUBMIT", "FIX check", "ADDRESS")
     if n and not n.startswith(known):                    # a state this board does not model yet: say so plainly
         return pa("❔", f"Check task state · {n.lower()}", "act", "unrecognised state — open the task in codimango")
-    if warns and any("verify" in (w.get("fix") or "") or "reviewer action" in w.get("why", "") for w in warns):
-        w = next(w for w in warns if "verify" in (w.get("fix") or "") or "reviewer action" in w.get("why", ""))
-        return pa("▲", f"Verify flagged check · {w['check']}", "act", w.get("why", ""))
-    if g["author"]["check"]["state"] != "ok":
-        return pa("🧪", "Presubmit · owner (building session)", "act", "run `board check run <task> --role author`")
-    if g["independent"]["check"]["state"] != "ok":
-        return pa("🧪", "Presubmit · 3P (fresh independent agent)", "act",
-                  "a fresh agent with no build context runs the full presubmit and records it with --role independent")
-    if g["author"]["review"]["state"] != "ok":
-        return pa("👍", "Agent approval · owner", "act", "`board review add <task> --verdict ready --role author`")
-    if g["independent"]["review"]["state"] != "ok":
-        return pa("👀", "Agent review · 3P (fresh independent agent)", "act", "independent reviewer records --role independent")
+    clean = [r for r in ("author", "independent") if g[r]["check"]["state"] == "ok"]
+    if not clean:
+        return pa("🧪", "Presubmit · run one on this commit", "act",
+                  "`board check run <task>` — the building session or a fresh independent agent")
+    recommend = [label for ok, label in ((len(clean) == 2, "second presubmit"),
+                                         (g["author"]["review"]["state"] == "ok", "owner approval"),
+                                         (g["independent"]["review"]["state"] == "ok", "3P review")) if not ok]
+    flagged = [w["check"] for w in warns]
+    why = f"presubmit clean ({who[clean[0]]}) on this commit, validation passing" + \
+          (f"; warnings in Validation: {', '.join(flagged[:3])}" if flagged else "") + \
+          (f"; recommended: {', '.join(recommend)}" if recommend else "; every gate is green")
     if n.startswith("RESUBMIT") or raw == "needs_revision":
-        return pa("🚀", "Resubmit for human review", "ship", "every gate above is green on this commit")
-    return pa("🚀", "Submit for human review", "ship", "every gate above is green on this commit")
+        return pa("🚀", "Resubmit for human review", "ship", why)
+    return pa("🚀", "Submit for human review", "ship", why)

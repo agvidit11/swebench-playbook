@@ -126,6 +126,40 @@ def _receipt_states(evs: list[dict]) -> dict[tuple[str, str], dict]:
     return out
 
 
+def supervisor(evs: list[dict], host: str) -> dict | None:
+    """The host's supervisor: the latest `claim` not followed by a `release` from that session, plus its latest
+    status update (task allocation, disk, checklist, board state — whatever it reported)."""
+    cur = None
+    for e in sorted((e for e in evs if e.get("type") == "supervisor" and e.get("host_id") == host),
+                    key=lambda e: (e.get("occurred_at") or "", e.get("seq") or 0)):
+        pl, actor = e.get("payload") or {}, e.get("actor") or {}
+        sid = actor.get("session_id")
+        if pl.get("action") == "claim":
+            cur = {"session_id": sid, "alias": actor.get("alias", ""), "kind": actor.get("kind"),
+                   "since": e.get("occurred_at"), "status": None}
+        elif pl.get("action") == "release" and cur and cur["session_id"] == sid:
+            cur = None
+        elif pl.get("action") == "status" and cur and cur["session_id"] == sid:
+            cur["status"] = {"at": e.get("occurred_at"), **{k: pl.get(k) for k in ("text", "disk", "sessions",
+                                                                                  "owned", "checklist") if k in pl}}
+    return cur
+
+
+def supervisor_target(evs: list[dict], spec: str, hosts: list[str], local_host: str | None) -> dict | None:
+    """'supervisor' (this server) or 'supervisor:<host>' -> a session target, or None if the spec is not one."""
+    if spec != "supervisor" and not spec.startswith("supervisor:"):
+        return None
+    host = spec.split(":", 1)[1] if ":" in spec else local_host
+    if host not in hosts:
+        raise ValueError(f"unknown server {host!r}")
+    sup = supervisor(evs, host)
+    if not sup:
+        raise ValueError(f"server {host} has no supervisor — a session claims it with `board supervisor claim`")
+    return {"to": f"session:{sup['session_id']}", "to_label": f"supervisor of {host} ({sup['alias']})",
+            "resolved_recipients": [{"session_key": sup["session_id"], "native_id": sup["session_id"],
+                                     "host": host, "name": sup["alias"]}]}
+
+
 def messages(evs: list[dict]) -> list[dict]:
     acks = {}
     for e in evs:
@@ -492,7 +526,7 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
                           for r in s.get("child_runs") or []]
             native.append({k: v for k, v in {
                 "session_key": s.get("session_key"), "native_id": sid, "alias": f"{h}·{s.get('name')}",
-                "name": s.get("name"), "kind": s.get("kind"), "kind_icon": s.get("kind_icon"),
+                "name": s.get("name"), "title": s.get("title"), "kind": s.get("kind"), "kind_icon": s.get("kind_icon"),
                 "started_at": s.get("started_at"), "age_s": s.get("age_s"),
                 "last_activity_at": s.get("last_activity_at"),
                 "ago_s": 0 if s.get("live") else s.get("age_s"),
@@ -528,6 +562,12 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
                     for sid, (t, a, kind) in sorted(ledger_sessions.items(), key=lambda kv: -kv[1][0])
                     if sid not in native_ids and (kind == "human" or not native)][:12]   # registry is authoritative where present
         rows = native + fallback
+        sup = supervisor(evs, h)
+        for row in rows:
+            if sup and sup["session_id"] in (row.get("native_id"), row.get("session_key")):
+                row["supervisor"] = True
+                sup["session_key"] = row.get("session_key") or sup["session_id"]
+                sup["name"] = row.get("title") or row.get("name")
         for row in rows:
             raw = str(row.get("status") or "unknown").lower()
             if raw in ("busy", "shell", "working", "running") and (row.get("status_ago_s") or 0) > 6 * 3600 and \
@@ -549,7 +589,7 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
         local_state = sync_state if h == local_host else None
         sync_error = getattr(local_state, "error", "") if local_state is not None else host_state.get("sync_error", "")
         queue = getattr(local_state, "pending", 0) if local_state is not None else host_state.get("queue", 0)
-        out.append({"id": h,
+        out.append({"id": h, "supervisor": sup,
                     "last_sync_at": datetime.fromtimestamp(last, timezone.utc).isoformat() if last else None,
                     "last_sync_ago_s": int(now - last) if last else None,
                     "last_activity_at": datetime.fromtimestamp(last_act, timezone.utc).isoformat() if last_act else None,

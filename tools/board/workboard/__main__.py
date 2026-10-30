@@ -1149,10 +1149,24 @@ def build_parser():
     hp.add_argument("tasks", nargs="*")
     hp.add_argument("--idle", action="store_true", help="not working on any task right now")
     hp.add_argument("--note", default="", help="one line about what you are doing")
+    rp = sub.add_parser("report", parents=[common],
+                        help="say what you just finished on a task: phase + model (feeds model throughput in Stats)")
+    rp.add_argument("task")
+    rp.add_argument("--phase", required=True, choices=REPORT_PHASES)
+    rp.add_argument("--model", default="", help="model that did the work, e.g. claude-opus-5-5, gpt-5.6-sol, muse-spark-1.4")
+    rp.add_argument("--kind", choices=["claude", "codex", "muse", "human"],
+                    help="who did it, when not this session (e.g. a Codex job you ran)")
+    rp.add_argument("--summary", default="", help="one line: what was done")
+    svp = sub.add_parser("supervisor", parents=[common],
+                         help="per-server supervisor: show, claim/release the role, or post a status update")
+    svp.add_argument("action", nargs="?", default="show", choices=["show", "claim", "release", "status"])
+    svp.add_argument("text", nargs="*", help="status: one or two lines (allocation, blockers, what you are doing)")
+    svp.add_argument("--checklist", action="append", default=[], help="status: a checklist line, repeatable "
+                                                                       "('[x] disk under 80%%', '[ ] restart server')")
     rcp = sub.add_parser("rollcall", parents=[common], help="ask every session to check in (`board here`)")
     rcp.add_argument("--server", help="only sessions on this server")
     mp = sub.add_parser("msg", parents=[common], help="message a session, a server, or all (delivered into sessions)")
-    mp.add_argument("to", help="'all', a server id, or part of a session's tab title")
+    mp.add_argument("to", help="'all', a server id, 'supervisor[:<server>]', or part of a session's tab title")
     mp.add_argument("text", nargs="+")
     mp.add_argument("--task", help="what the message is about")
     mp.add_argument("--reply-to", help="message id this answers")
@@ -1330,8 +1344,10 @@ def cmd_msg(args, cfg):
     orig = next((m for m in comms.messages(snap.events) if m["id"].startswith(args.reply_to)), None) \
         if args.reply_to else None
     try:
-        target = comms.target_for(args.to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers],
-                                  views=snap.views, sessions=getattr(snap, "sessions", []))
+        target = comms.supervisor_target(snap.events, args.to, [sv.id for sv in cfg.servers],
+                                         s.safe_host(s.host_id_for(cfg))) or \
+            comms.target_for(args.to, ev_mod.latest_aliases(snap.events), [sv.id for sv in cfg.servers],
+                             views=snap.views, sessions=getattr(snap, "sessions", []))
     except ValueError as exc:
         if not (orig and orig.get("from_session")):     # an ambiguous name is fine when replying: pin to the sender
             print(exc, file=sys.stderr)
@@ -1418,6 +1434,74 @@ def cmd_here(args, cfg):
         return 0
     for line in lines:
         print(line)
+    return 0
+
+
+def cmd_supervisor(args, cfg):
+    """One supervisor per server handles task allocation, disk, checklists and board state; others message it."""
+    import shutil
+    from . import comms, coord, events as ev_mod, sync as s
+    state, me = s.default_state_dir(), coord.actor_for(cfg)
+    host = s.safe_host(s.host_id_for(cfg))
+    snap = _snap_for_comms(args, cfg)
+    hosts = [sv.id for sv in cfg.servers] or [host]
+    if args.action == "show":
+        rows = {h: comms.supervisor(snap.events, h) for h in hosts}
+        if getattr(args, "json", False):
+            print(json.dumps(rows))
+            return 0
+        for h, sup in rows.items():
+            if not sup:
+                print(f"🛡 {h}: no supervisor (claim it from a session on {h}: board supervisor claim)")
+                continue
+            st = sup.get("status") or {}
+            print(f"🛡 {h}: {sup['alias']} since {str(sup['since'])[:16]}" +
+                  (f"\n    {str(st.get('at'))[:16]} · {st.get('text') or ''}" if st else "\n    no status update yet"))
+            for line in st.get("checklist") or []:
+                print(f"      {line}")
+        print("message one: board msg supervisor:<server> \"...\"")
+        return 0
+    cur = comms.supervisor(snap.events, host)
+    if args.action == "claim" and cur and cur["session_id"] != me["session_id"]:
+        print(f"note: taking over from {cur['alias']} (they were supervisor since {str(cur['since'])[:16]})", file=sys.stderr)
+    if args.action in ("release", "status") and (not cur or cur["session_id"] != me["session_id"]):
+        print(f"you are not the supervisor of {host}" + (f" ({cur['alias']} is)" if cur else ""), file=sys.stderr)
+        return 2
+    payload = {"action": args.action}
+    if args.action == "status":
+        du = shutil.disk_usage(Path.home())
+        mine = [v for v in snap.views if (v.fields.get("owner") or "").startswith(f"{host}·")]
+        live = [x for x in getattr(snap, "sessions", []) if x.get("host") == host and x.get("live")]
+        payload.update(text=" ".join(args.text)[:500], checklist=[c[:160] for c in args.checklist][:12],
+                       disk={"path": "~", "used_pct": round(100 * du.used / du.total), "free_gb": round(du.free / 2**30)},
+                       sessions=len(live), owned=len(mine))
+    if not coord.record(state, "supervisor", None, me, payload):
+        print("could not queue the supervisor event", file=sys.stderr)
+        return 2
+    st = s.sync(cfg, state_dir=state, timeout_seconds=20)
+    done = {"claim": f"🛡 you are now the supervisor of {host}", "release": f"🛡 released the supervisor role on {host}",
+            "status": f"🛡 status posted for {host} (disk {payload.get('disk', {}).get('used_pct')}% used)"}[args.action]
+    print(done + ("" if st.last_push_ok else " (queued)"))
+    return 0
+
+
+REPORT_PHASES = ["sourcing", "drafting", "calibration", "presubmit", "independent_review", "revision", "draft_fixing",
+                 "validation_babysit"]
+
+
+def cmd_report(args, cfg):
+    """A session reports finished work on a task (phase, model); Stats uses it as high-confidence attribution."""
+    from . import coord, sync as s
+    state = s.default_state_dir()
+    me = coord.actor_for(cfg)
+    payload = {"phase": args.phase, "model": args.model.strip()[:80] or None,
+               "kind": args.kind or me.get("kind"), "summary": args.summary.strip()[:300]}
+    if not coord.record(state, "report", args.task, me, payload):
+        print("could not queue the report", file=sys.stderr)
+        return 2
+    st = s.sync(cfg, state_dir=state, timeout_seconds=20)
+    print(f"📝 reported {args.phase} on {args.task}" + (f" · {payload['model']}" if payload["model"] else "") +
+          ("" if st.last_push_ok else " (queued; it syncs on the next run)"))
     return 0
 
 
@@ -1591,7 +1675,7 @@ def cmd_feed(args, cfg):
     return 0
 
 
-COMMANDS_EXTRA = {"here": cmd_here, "rollcall": cmd_rollcall, "msg": cmd_msg, "inbox": cmd_inbox,
+COMMANDS_EXTRA = {"here": cmd_here, "report": cmd_report, "supervisor": cmd_supervisor, "rollcall": cmd_rollcall, "msg": cmd_msg, "inbox": cmd_inbox,
                   "ack": cmd_ack, "feed": cmd_feed, "courier": cmd_courier_wait,
                   "courier-wait": cmd_courier_wait, "receipt": cmd_receipt,
                   "watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}

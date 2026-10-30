@@ -31,14 +31,24 @@ If `board` is not found (non-login shells, Codex shells), use `~/.local/bin/boar
      with `board check record <task> --role independent --pass N --warn N --fail N --summary "<what to fix, one line>"`.
    The summary is what the board shows as the next step, so make it the fix, not the verdict. A new push greys both
    ticks (the old result stays visible) until they are re-run on the new commit.
-4. Done or handing over: `board release <task> --reason "..."` and tell the next owner with `board msg`.
-5. Messages to you appear inside your session automatically (📬 workboard: …). Act, reply with `board msg`,
+4. Finished a chunk of work (a draft, a calibration round, a revision, a presubmit): report it so Stats can credit
+   the right model — `board report <task> --phase <sourcing|drafting|calibration|presubmit|independent_review|
+   revision|draft_fixing|validation_babysit> --model <model id> [--kind codex|muse] --summary "<one line>"`.
+   Use `--kind` when the work was done by a Codex/Muse job you ran, not by you.
+5. Done or handing over: `board release <task> --reason "..."` and tell the next owner with `board msg`.
+6. Messages to you appear inside your session automatically (📬 workboard: …). Act, reply with `board msg`,
    then `board ack <id>`.
 
 **Messaging:** `board msg <task> "text"` resolves and pins the task's current owner. `task:<slug>` is explicit;
 you may also target a stable session/name fragment, server ID, or `all`. States mean exactly queued locally,
 published in the private ledger, delivered by courier/hook, and explicitly acked. Never call published “delivered.”
 Codex/Muse jobs route to their parent Claude session when known.
+
+**Supervisor (one per server):** handles task allocation, disk usage, checklists and board status for its server.
+A session takes the role with `board supervisor claim`, posts updates with `board supervisor status "<text>"
+--checklist "[x] ..."` (disk use and owned/live counts are added automatically), and hands it off with
+`board supervisor release`. Anyone reaches it with `board msg supervisor "..."` (this server) or
+`board msg supervisor:<server> "..."`; `board supervisor` shows both servers' supervisors and their last update.
 
 **Courier session:** keep one dedicated normal Claude session open and run `/board courier`. It repeatedly runs
 `board courier-wait --json --timeout 3600` (the blocking wait costs zero model turns), delivers each returned item
@@ -65,6 +75,8 @@ authoritative token/model data support an estimate; never interpret unknown as `
 | One task in full / why NEXT says that | `board show <task>` / `board explain <task>` |
 | Check in / show what you own | `board here <task>…` · `board here --idle` · `board here` |
 | Ask every session to check in | `board rollcall` (`--server ID`) |
+| Report finished work (feeds model throughput) | `board report <task> --phase P --model M [--kind K] --summary "..."` |
+| Per-server supervisor | `board supervisor` · `claim` · `status "text" --checklist "..."` · `release` · `board msg supervisor[:ID]` |
 | Claim, hand to another session, give up | `board claim <task>` / `--to "<tab title words>"` / `board release <task> --reason ...` |
 | Run presubmit and log it | `board check run <task>` |
 | What changed | `board changes` |

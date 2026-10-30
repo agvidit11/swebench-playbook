@@ -10,7 +10,7 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 CACHE_NAME = "host-sessions.json"
 SESSION_FIELDS = {
-    "session_key", "native_id", "kind", "kind_icon", "host", "name", "started_at", "age_s",
+    "session_key", "native_id", "kind", "kind_icon", "host", "name", "title", "started_at", "age_s",
     "last_activity_at", "status", "status_since", "live", "classification", "liveness_reason",
     "transport", "restart", "focus", "tasks", "tokens", "advice", "child_runs", "last_report",
     "last_request", "is_summary", "recent_run_count", "older_run_count", "older_child_run_count",

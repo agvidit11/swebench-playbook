@@ -261,6 +261,9 @@ def build(snap, cfg, cache_dir: Path, *, facts_rows: list[dict] | None = None) -
                 from .roles import role_of
                 role = role_of(e, tev)
                 add(at, "independent_review" if role == "independent" else "presubmit", kind, None, "high", "high", e["type"])
+            elif e["type"] == "report" and pl.get("phase"):          # explicit self-report: phase + model are exact
+                rk = pl.get("kind") if pl.get("kind") in ("claude", "codex", "muse", "human") else kind
+                add(at, pl["phase"], rk, _model_name(pl.get("model")) if pl.get("model") else None, "high", "high", "report")
             elif e["type"] == "build_action":
                 add(at, "unclassified", pl.get("model") or kind, None, "unknown", "medium", "build")
             elif e["type"] == "touch" and not pl.get("weak"):
