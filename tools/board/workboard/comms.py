@@ -374,7 +374,8 @@ def _agent_view(info: dict | None, kind: str, native: list[dict], now: float) ->
     ago = int(now - info["last"][0]) if info["last"] else None
     out = {"tasks": sorted(info["tasks"]), "focus": {"tasks": sorted(info["tasks"]), "state": "board events"},
            "parent_name": via, "status_ago_s": ago,
-           "status": ("idle" if info.get("idle") else "active" if ago is not None and ago < 1800 else "quiet"),
+           "status": ("idle" if info.get("idle") else "active" if ago is not None and ago < 1800 else
+                      "quiet" if ago is not None and ago < 3 * 3600 else "ended?"),
            "transport": {"available": bool(parent), "kind": "parent" if parent else "hook",
                          "reason": f"messages reach it through {via}" if parent else "no live parent session"},
            "advice": {"state": "keep" if ago is not None and ago < 3600 else "watch",
@@ -382,24 +383,37 @@ def _agent_view(info: dict | None, kind: str, native: list[dict], now: float) ->
     return out
 
 
-def attention(rows: list[dict]) -> list[dict]:
-    """Sessions on a server that look blocked — what the supervisor should chase."""
-    out = []
+def attention(rows: list[dict], last_seen: dict | None = None, now: float | None = None) -> list[dict]:
+    """Sessions on a server that look blocked — what the supervisor should chase.
+
+    Guards against known false positives: a task a session only looked at is not ownership; a Codex/Muse job silent
+    for 3h+ has most likely finished (it drops out instead of being flagged forever); a 'waiting' registry status is
+    not a blocked prompt when the session still wrote board events in the last 10 minutes (background waits,
+    subagents)."""
+    out, last_seen, now = [], last_seen or {}, now or time.time()
+
+    def recently_active(r):
+        seen = last_seen.get(r.get("native_id")) or last_seen.get(r.get("session_key"))
+        try:
+            return bool(seen) and now - datetime.fromisoformat(seen).timestamp() < 600
+        except ValueError:
+            return False
     for r in rows:
         if r.get("is_summary") or r.get("is_actor"):
             continue
         st, ago = str(r.get("status") or "").lower(), r.get("status_ago_s") or 0
         name = r.get("title") or r.get("name") or r.get("alias") or "?"
         tasks = r.get("tasks") or []
+        owned = r.get("owned") if "owned" in r else tasks
         why = None
-        if st.startswith("waiting") and ago >= 600:
-            why = f"waiting for permission {_ago(ago)}"
+        if st.startswith("waiting") and ago >= 600 and not recently_active(r):
+            why = f"waiting for input {_ago(ago)} (permission prompt or question; no board activity since)"
         elif st.startswith("stale"):
             why = f"registry {st}"
-        elif r.get("kind") in ("codex", "muse") and st != "idle" and tasks and ago >= 3600:
-            why = f"{r['kind']} job silent {_ago(ago)} on {', '.join(tasks[:2])}"
-        elif st == "idle" and r.get("kind") not in ("codex", "muse") and tasks and ago >= 3 * 3600:
-            why = f"idle {_ago(ago)} while owning {', '.join(tasks[:2])}"
+        elif r.get("kind") in ("codex", "muse") and st != "idle" and tasks and 3600 <= ago < 3 * 3600:
+            why = f"{r['kind']} job silent {_ago(ago)} on {', '.join(tasks[:2])} (no report yet)"
+        elif st == "idle" and r.get("kind") not in ("codex", "muse") and owned and ago >= 3 * 3600:
+            why = f"idle {_ago(ago)} while owning {', '.join(owned[:2])}"
         if why and not any(o["name"] == name and o["why"].split(" ")[0] == why.split(" ")[0] for o in out):
             out.append({"session_key": r.get("session_key") or r.get("native_id"), "name": name, "why": why})
     return out
@@ -588,6 +602,7 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
                 "status_ago_s": status_since, "live": s.get("live"),
                 "classification": s.get("classification"), "liveness_reason": s.get("liveness_reason"),
                 "focus": s.get("focus"), "tasks": tasks, "child_runs": child_runs, "transport": s.get("transport"),
+                "owned": sorted(v.entity_id for v in views if v.fields.get("owner_session") == sid),
                 "restart": s.get("restart"), "tokens": s.get("tokens"), "advice": s.get("advice"),
                 "last_report": s.get("last_report"), "last_request": s.get("last_request"),
                 "is_summary": s.get("is_summary"), "recent_run_count": s.get("recent_run_count"),
@@ -645,7 +660,7 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
         local_state = sync_state if h == local_host else None
         sync_error = getattr(local_state, "error", "") if local_state is not None else host_state.get("sync_error", "")
         queue = getattr(local_state, "pending", 0) if local_state is not None else host_state.get("queue", 0)
-        out.append({"id": h, "supervisor": sup, "attention": attention(rows),
+        out.append({"id": h, "supervisor": sup, "attention": attention(rows, last_seen, now),
                     "last_sync_at": datetime.fromtimestamp(last, timezone.utc).isoformat() if last else None,
                     "last_sync_ago_s": int(now - last) if last else None,
                     "last_activity_at": datetime.fromtimestamp(last_act, timezone.utc).isoformat() if last_act else None,

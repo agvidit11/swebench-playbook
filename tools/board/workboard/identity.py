@@ -55,7 +55,7 @@ def current_actor(host_id: str, env=None, person: str = "") -> dict:
     child = _codex_ancestor(stop_at_claude=True) if sid and env is os.environ else None
     if child:                                         # a codex/muse job launched by a Claude session: its own actor,
         pid, start, cwd = child                       # so it can never release or renew the parent's claims
-        return {"session_id": f"codex:{host_id}:{pid}:{start}", "alias": f"{host_id}·Codex {Path(cwd).name or pid}",
+        return {"session_id": f"codex:{host_id}:{pid}:{start}", "alias": f"{host_id}·Codex {Path(cwd).name or pid}·{str(pid)[-4:]}",
                 "kind": "codex", "host": host_id, "person": person, "parent_session": sid}
     if sid:
         title = tab_title(sid) or f"session {sid[:8]}"
@@ -64,7 +64,7 @@ def current_actor(host_id: str, env=None, person: str = "") -> dict:
     codex = _codex_ancestor() if env is os.environ else None
     if codex:                                         # a Codex session not started from Claude: its own identity
         pid, start, cwd = codex
-        return {"session_id": f"codex:{host_id}:{pid}:{start}", "alias": f"{host_id}·Codex {Path(cwd).name or pid}",
+        return {"session_id": f"codex:{host_id}:{pid}:{start}", "alias": f"{host_id}·Codex {Path(cwd).name or pid}·{str(pid)[-4:]}",
                 "kind": "codex", "host": host_id, "person": person}
     tty = _tty()
     sid = f"human:{user}@{host_id}" + (f":{tty}" if tty else "")   # separate terminals are separate actors

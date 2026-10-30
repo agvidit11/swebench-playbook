@@ -44,6 +44,13 @@ you may also target a stable session/name fragment, server ID, or `all`. States 
 published in the private ledger, delivered by courier/hook, and explicitly acked. Never call published “delivered.”
 Codex/Muse jobs route to their parent Claude session when known.
 
+**Vidit on Slack:** the board posts (as the Metamate app, in one private channel, one thread per task or session)
+only when he is needed: blocked items, decisions, strict SUBMIT-READY, an hourly digest when something changed, and a
+morning brief (quiet 02:00–08:00 PT). Need a ruling? `board decide ask` — never message him on Slack yourself and never
+post or react on Slack as him: those writes are logged and make the bot ignore his answers for 5 minutes. His Slack
+answers settle task-level choices only (never submit, settings, deletes or policy). New task slugs can be claimed
+before they exist anywhere: `board claim <new-slug>` / `board here <new-slug>`.
+
 **Supervisor (one per server):** handles task allocation, disk usage, checklists and board status for its server.
 A session takes the role with `board supervisor claim`, posts updates with `board supervisor status "<text>"
 --checklist "[x] ..."` (disk use and owned/live counts are added automatically), and hands it off with
@@ -76,6 +83,8 @@ authoritative token/model data support an estimate; never interpret unknown as `
 | Check in / show what you own | `board here <task>…` · `board here --idle` · `board here` |
 | Ask every session to check in | `board rollcall` (`--server ID`) |
 | Report finished work (feeds model throughput) | `board report <task> --phase P --model M [--kind K] --summary "..."` |
+| Ask Vidit a task-level decision (goes to Slack) | `board decide ask <task> --q "..." --option "..." --option "..." [--recommend 1]` · `board decide list` |
+| Hand a blocker to Vidit (supervisor) | `board escalate <task|session> --reason "what you need from him"` |
 | Per-server supervisor | `board supervisor` · `claim` · `status "text" --checklist "..."` · `release` · `board msg supervisor[:ID]` |
 | Claim, hand to another session, give up | `board claim <task>` / `--to "<tab title words>"` / `board release <task> --reason ...` |
 | Run presubmit and log it | `board check run <task>` |

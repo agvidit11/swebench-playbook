@@ -221,8 +221,12 @@ class SyncCommandTest(unittest.TestCase):
         self.addCleanup(p.stop)
 
     def code_for(self, state):
+        # every best-effort side step of `sync` reaches real services (codimango, transcripts); keep them out of the test
         with mock.patch("workboard.sync.sync", return_value=state), mock.patch("workboard.app.refresh_claims_cache"), \
-             contextlib.redirect_stdout(io.StringIO()):
+             mock.patch("workboard.presence.emit"), mock.patch("workboard.claims_md_sync.sync"), \
+             mock.patch("workboard.sources.codimango.CodimangoSource.fetch"), mock.patch("workboard.reviews.refresh"), \
+             mock.patch("workboard.facts.hydrate"), mock.patch("workboard.facts.seed_personal_snapshots"), \
+             contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             return cli.main(["sync"])
 
     def test_exit_codes(self):

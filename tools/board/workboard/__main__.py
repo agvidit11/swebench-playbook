@@ -91,6 +91,21 @@ def _view_json(v):
             "findings": [asdict(f) for f in v.findings]}
 
 
+NEW_SLUG = re.compile(r"[a-z0-9][a-z0-9._-]{5,140}")
+
+
+def _find_or_new(snap, name):
+    """(task, view) — a task the board knows, or a well-formed new slug nobody has built yet (view None)."""
+    exact = [v for v in snap.views if v.entity_id == name]
+    near = [v for v in snap.views if name in v.entity_id]
+    if exact or len(near) == 1:
+        v = (exact or near)[0]
+        return v.entity_id, v
+    if not near and NEW_SLUG.fullmatch(name) and "-" in name:
+        return name, None
+    return _find(snap, name).entity_id, None
+
+
 def _find(snap, name):
     exact = [v for v in snap.views if v.entity_id == name]
     if exact:
@@ -438,11 +453,12 @@ def cmd_claim(args, cfg):
         print(f"refusing to claim: ledger did not sync ({err})", file=sys.stderr)
         return 2
     snap = _gather(args, cfg)
-    task = _find(snap, args.task).entity_id
+    task, view = _find_or_new(snap, args.task)
+    if view is None:
+        print(f"🆕 {task} is not on the board yet — claiming it as a new task", file=sys.stderr)
     to_actor = _resolve_session(snap, args.to) if args.to else None
     source_ok = bool(snap.health.get("claims") and snap.health["claims"].ok)
-    view = _find(snap, task)
-    clock_ok = not any(f.code == "CLOCK_SKEW" for f in view.findings + list(snap.findings))
+    clock_ok = not any(f.code == "CLOCK_SKEW" for f in (view.findings if view else []) + list(snap.findings))
     res = coord.claim(cfg, task, state_dir=state, to_actor=to_actor, steal=args.steal,
                       source_healthy=source_ok if args.steal else None, clock_healthy=clock_ok if args.steal else None)
     st = s.sync(cfg, state_dir=state)
@@ -1157,6 +1173,22 @@ def build_parser():
     rp.add_argument("--kind", choices=["claude", "codex", "muse", "human"],
                     help="who did it, when not this session (e.g. a Codex job you ran)")
     rp.add_argument("--summary", default="", help="one line: what was done")
+    dcp = sub.add_parser("decide", parents=[common],
+                         help="ask Vidit a task-level decision (posted to Slack), answer one, or list open ones")
+    dcp.add_argument("action", choices=["ask", "answer", "list", "undo"])
+    dcp.add_argument("target", nargs="?", help="ask: the task · answer/undo: the decision id (D-xxxx)")
+    dcp.add_argument("choice", nargs="?", help="answer: option number, yes or no")
+    dcp.add_argument("--q", "--question", dest="question", default="", help="ask: the question, one line")
+    dcp.add_argument("--option", action="append", default=[], help="ask: an option (repeat, max 4); none = yes/no")
+    dcp.add_argument("--recommend", default="", help="ask: the option number you recommend")
+    dcp.add_argument("--reason", default="")
+    esp = sub.add_parser("escalate", parents=[common],
+                         help="supervisor: hand a blocker to Vidit (posted to Slack in that task's thread)")
+    esp.add_argument("target", help="task slug, or session name")
+    esp.add_argument("--reason", required=True, help="what is blocked and what you need from Vidit, one line")
+    slp = sub.add_parser("slack", parents=[common], help="Slack face of the board (Metamate, one private channel)")
+    slp.add_argument("action", choices=["tick", "run", "status", "preview"])
+    slp.add_argument("--dry", action="store_true", help="write posts to ~/.cache/workboard/slack-outbox.md instead")
     svp = sub.add_parser("supervisor", parents=[common],
                          help="per-server supervisor: show, claim/release the role, or post a status update")
     svp.add_argument("action", nargs="?", default="show", choices=["show", "claim", "release", "status"])
@@ -1437,6 +1469,81 @@ def cmd_here(args, cfg):
     return 0
 
 
+def cmd_decide(args, cfg):
+    """Task-level decisions for Vidit. Asked here, answered on Slack (or here); the asker is told via the courier."""
+    import uuid
+    from . import coord, slack as sl, sync as s
+    state, me = s.default_state_dir(), coord.actor_for(cfg)
+    if args.action == "list":
+        snap = _snap_for_comms(args, cfg)
+        open_ = [d for d in sl.decisions(snap.events).values() if not d["answer"]]
+        if getattr(args, "json", False):
+            print(json.dumps(open_))
+            return 0
+        for d in open_:
+            print(f"❓ {d['id']}  {d['task'] or '—'}  {d['question']}  (asked by {d['asker_alias']})")
+            for i, o in enumerate(d["options"], 1):
+                print(f"     {i}. {o}")
+        print(f"{len(open_)} open" if open_ else "no open decisions")
+        return 0
+    if args.action == "ask":
+        if not (args.target and args.question):
+            print("usage: board decide ask <task> --q \"question\" [--option \"...\" ...] [--recommend N]", file=sys.stderr)
+            return 2
+        did = "D-" + uuid.uuid4().hex[:4]
+        payload = {"id": did, "action": "ask", "question": args.question[:300],
+                   "options": [o[:160] for o in args.option][:4], "recommend": args.recommend or None}
+        ok = coord.record(state, "decision", args.target, me, payload)
+        st = s.sync(cfg, state_dir=state, timeout_seconds=20)
+        print(f"❓ {did} asked" + ("" if st.last_push_ok else " (queued)") + " — Vidit sees it in Slack; the answer arrives "
+              "here as a board message. Settles a task choice only.")
+        return 0 if ok else 2
+    if not args.target:
+        print("give the decision id (D-xxxx)", file=sys.stderr)
+        return 2
+    if me.get("kind") != "human":
+        print("only Vidit answers decisions (from his shell or Slack)", file=sys.stderr)
+        return 2
+    payload = {"id": args.target, "action": "undo" if args.action == "undo" else "answer",
+               "choice": args.choice, "reason": args.reason, "source": "terminal"}
+    coord.record(state, "decision", None, me, payload)
+    s.sync(cfg, state_dir=state, timeout_seconds=20)
+    print(f"✔ {args.target} {'undone' if args.action == 'undo' else '→ ' + str(args.choice)}")
+    return 0
+
+
+def cmd_escalate(args, cfg):
+    from . import coord, sync as s
+    state, me = s.default_state_dir(), coord.actor_for(cfg)
+    task = args.target if NEW_SLUG.fullmatch(args.target) and "-" in args.target else None
+    payload = {"reason": args.reason[:300], **({} if task else {"session": args.target})}
+    coord.record(state, "escalate", task, me, payload)
+    st = s.sync(cfg, state_dir=state, timeout_seconds=20)
+    print("🚧 escalated to Vidit" + ("" if st.last_push_ok else " (queued)") + " — it lands in that task's Slack thread")
+    return 0
+
+
+def cmd_slack(args, cfg):
+    from . import slack as sl
+    if args.action == "status":
+        c = sl.load_config()
+        beat = sl.state_path().with_name("slack-heartbeat")
+        print(f"config: {sl.CONFIG} " + ("✓" if c else "missing/invalid"))
+        if c:
+            print(f"channel {c['channel_id']} · owner {c['owner_slack_user_id']} · host {c.get('host')} · quiet {c['quiet_hours']}")
+        print("last tick: " + (beat.read_text()[:400] if beat.exists() else "never"))
+        return 0
+    if args.action == "preview":
+        args.dry = True
+    if args.action == "run":
+        return sl.run(cfg, dry=args.dry)
+    res = sl.tick(cfg, dry=args.dry, ignore_quiet=args.action == "preview")
+    print(json.dumps(res, default=str))
+    if args.dry:
+        print(f"posts written to {sl.state_path().with_name('slack-outbox.md')}")
+    return 0
+
+
 def cmd_supervisor(args, cfg):
     """One supervisor per server handles task allocation, disk, checklists and board state; others message it."""
     import shutil
@@ -1681,7 +1788,7 @@ def cmd_feed(args, cfg):
     return 0
 
 
-COMMANDS_EXTRA = {"here": cmd_here, "report": cmd_report, "supervisor": cmd_supervisor, "rollcall": cmd_rollcall, "msg": cmd_msg, "inbox": cmd_inbox,
+COMMANDS_EXTRA = {"here": cmd_here, "report": cmd_report, "supervisor": cmd_supervisor, "decide": cmd_decide, "escalate": cmd_escalate, "slack": cmd_slack, "rollcall": cmd_rollcall, "msg": cmd_msg, "inbox": cmd_inbox,
                   "ack": cmd_ack, "feed": cmd_feed, "courier": cmd_courier_wait,
                   "courier-wait": cmd_courier_wait, "receipt": cmd_receipt,
                   "watch": cmd_watch, "ui": cmd_watch, "html": cmd_html, "serve": cmd_serve}

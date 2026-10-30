@@ -185,3 +185,16 @@ class AgentRowsTest(unittest.TestCase):
         rows = comms.servers([ev], [], cfg, native, [])[0]["sessions"]
         cx = [r for r in rows if r.get("kind") == "codex"]
         self.assertEqual((len(cx), cx[0]["tasks"], cx[0]["parent_name"], cx[0]["status"]), (1, ["t1"], "Lane", "active"))
+
+
+class AttentionFalsePositiveTest(unittest.TestCase):
+    def test_known_false_positives_are_not_flagged(self):
+        import time
+        from datetime import datetime, timezone
+        from workboard import comms
+        now = time.time()
+        recent = datetime.fromtimestamp(now - 120, timezone.utc).isoformat()
+        rows = [{"name": "bg-wait", "native_id": "s1", "status": "waiting", "status_ago_s": 1500},   # still writing events
+                {"name": "done-codex", "kind": "codex", "status": "ended?", "status_ago_s": 4 * 3600, "tasks": ["t"]},
+                {"name": "looked", "status": "idle", "status_ago_s": 5 * 3600, "tasks": ["jedi"], "owned": []}]
+        self.assertEqual(comms.attention(rows, {"s1": recent}, now), [])

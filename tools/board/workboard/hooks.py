@@ -330,6 +330,8 @@ def _post_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:
         actor = _actor(data, host_id, state)
         if new_alias:
             out.append(("alias", None, {"alias": new_alias["alias"]}, actor))
+        if cmd and slack_write(cmd):                     # marks the time only; the Slack bot's tripwire reads it
+            out.append(("slack_write", None, {"command": cmd[:200]}, actor))
         if task and actor["session_id"]:
             key = f"{task}|{actor['session_id']}" + ("|weak" if weak else "")   # a weak touch must not mask an edit
             if now - state.setdefault("touch", {}).get(key, 0) >= TOUCH_WINDOW_S:
@@ -390,6 +392,16 @@ def _session_start(data, cfg, state_dir, host_id, deadline) -> HookResult:
                             wait_seconds=max(0.0, deadline - time.monotonic()))
     return _with_inbox(HookResult(0), data, state_dir, host_id, "SessionStart",
                        intro=data.get("source") in (None, "startup", "clear", "compact"))
+
+
+# an agent writing to Slack (as Vidit or as an app) — the Slack bot refuses owner answers near such a write
+SLACK_WRITE = re.compile(r"\bmeta\b[^|;&\n]*\bslack\.[\w.-]+\s+(send|send-delayed|update|delete|add|remove|create|invite|"
+                         r"rename|set-topic|set-purpose|archive|unarchive|stream|upload)\b"
+                         r"|\bmeta\b[^|;&\n]*\bagents\.notification\s+send-slack\b")
+
+
+def slack_write(cmd: str) -> bool:
+    return bool(SLACK_WRITE.search(cmd or "")) and "board slack" not in (cmd or "")
 
 
 def _pre_tool(data, cfg, state_dir, host_id, deadline) -> HookResult:

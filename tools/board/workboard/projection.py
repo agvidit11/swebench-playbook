@@ -24,6 +24,7 @@ GROUP_ORDER = {"ATTENTION": 0, "READY": 1, "VALIDATING": 2, "REVIEWING": 3, "DON
 TAG = {"draft": "Draft", "needs_revision": "Needs revision", "needs_reviewers_assigned": "Needs reviewers",
        "being_reviewed": "In review", "accepted": "Accepted", "used_in_training": "In training", "archived": "Archived"}
 IMPORT_GRACE_S = 15 * 60          # a push newer than the server by less than this is "importing", not drift
+WORKING_EVENTS = ("claim", "presence", "report", "touch", "check", "review", "build_action", "checkin")
 GIT_ONLY_MAX_AGE_S = 14 * 86400   # git-only folders older than this are not tasks (templates, samples)
 SEV_ORDER = {"block": 0, "warn": 1, "info": 2}
 
@@ -276,10 +277,11 @@ def project(observations, evs, cfg, now, *, claims_healthy: bool = False) -> lis
     for lst in per_task_events.values():
         lst.sort(key=lambda e: (ts(e["occurred_at"]) or now, e["host_id"], e["seq"]))
 
-    for tid, tev_list in per_task_events.items():          # claimed before codimango/git know it (new slug)
-        if tid not in by_task and any(e["type"] in ("claim", "presence") for e in tev_list) and \
-                any((now - (ts(e["occurred_at"]) or now)).total_seconds() < GIT_ONLY_MAX_AGE_S for e in tev_list):
-            by_task[tid] = {"workboard.claim_only": True}
+    for tid, tev_list in per_task_events.items():          # being built before codimango knows it (new slug)
+        recent = [e for e in tev_list if e["type"] in WORKING_EVENTS and not (e.get("payload") or {}).get("weak") and
+                  (now - (ts(e["occurred_at"]) or now)).total_seconds() < GIT_ONLY_MAX_AGE_S]
+        if recent and not any(k.startswith("codimango.") for k in by_task.get(tid, {})):
+            by_task.setdefault(tid, {})["workboard.claim_only"] = True   # also revives an old git-only folder
     views = []
     for task, fields in by_task.items():
         cm = {k: v for k, v in fields.items() if k.startswith("codimango.")}

@@ -45,6 +45,14 @@ class ProjectionTest(unittest.TestCase):
         views = {v.entity_id: v for v in project(list(obs), list(evs), self.cfg, NOW)}
         return views[name]
 
+    def test_new_slug_shows_while_being_built(self):
+        old_folder = [gt("n", head_time="2026-09-01T00:00:00+00:00")]           # git-only, older than 14 days
+        names = lambda obs, evs: {v.entity_id for v in project(obs, evs, self.cfg, NOW)}
+        self.assertNotIn("n", names(old_folder, []))                              # template/sample folder stays hidden
+        self.assertIn("n", names(old_folder, [e("claim", "n")]))                  # a fresh claim revives it
+        self.assertIn("m", names([], [e("report", "m", {"phase": "drafting"})]))  # brand-new slug, report only
+        self.assertNotIn("w", names([], [e("touch", "w", {"weak": True})]))       # a reviewer's read is not building
+
     def test_used_in_training_counts_accepted(self):
         v = self.view([cm("t", "used_in_training", reviewed_at="2026-10-22T00:00:00Z")])
         self.assertEqual(v.fields["state"], "ACCEPTED")

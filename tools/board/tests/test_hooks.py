@@ -337,3 +337,14 @@ class WeakTouchTest(unittest.TestCase):
         weak = json.dumps({"type": "touch", "entity": {"kind": "task", "id": "t"}, "actor": {"session_id": "s", "kind": "claude"},
                            "payload": {"weak": True}}).encode()
         self.assertEqual(sync._touched([weak]), [])
+
+
+class SlackTripwireTest(unittest.TestCase):
+    def test_matches_agent_slack_writes_only(self):
+        from workboard.hooks import slack_write
+        self.assertTrue(slack_write("meta slack.reaction add --channel-id=C1 --message-ts=1.2 --name=white_check_mark"))
+        self.assertTrue(slack_write("meta slack.message send --to=@vidit --text=hi --no-message-suffix"))
+        self.assertTrue(slack_write("meta agents.notification send-slack --channel-id=C1 --text=x"))
+        self.assertFalse(slack_write("meta slack.message list --channel-id=C1"))
+        self.assertFalse(slack_write("meta slack.reaction list --channel-id=C1 --message-ts=1"))
+        self.assertFalse(slack_write("board slack tick"))

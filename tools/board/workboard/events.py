@@ -25,6 +25,7 @@ ACTOR_KINDS = {"claude", "codex", "muse", "human"}
 EVENT_TYPES = {
     "alias", "touch", "claim", "renew", "steal", "release", "assign", "check", "review",
     "build_action", "warning", "note", "presence", "msg", "ack", "receipt", "heartbeat", "checkin", "report", "supervisor",
+    "decision", "escalate", "slack_write",
 }
 
 
