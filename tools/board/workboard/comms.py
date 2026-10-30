@@ -140,8 +140,8 @@ def supervisor(evs: list[dict], host: str) -> dict | None:
         elif pl.get("action") == "release" and cur and cur["session_id"] == sid:
             cur = None
         elif pl.get("action") == "status" and cur and cur["session_id"] == sid:
-            cur["status"] = {"at": e.get("occurred_at"), **{k: pl.get(k) for k in ("text", "disk", "sessions",
-                                                                                  "owned", "checklist") if k in pl}}
+            cur["status"] = {"at": e.get("occurred_at"), **{k: pl.get(k) for k in ("text", "disk", "sessions", "owned",
+                                                                                  "checklist", "blocked") if k in pl}}
     return cur
 
 
@@ -365,6 +365,46 @@ def _checkin_view(e: dict | None, now: float) -> dict:
             "checkin_at": e.get("occurred_at"), "checkin_ago_s": ago}
 
 
+def _agent_view(info: dict | None, kind: str, native: list[dict], now: float) -> dict:
+    """Codex/Muse rows known only from board events: their tasks, parent session and what they last did."""
+    if not info or kind not in ("codex", "muse"):
+        return {}
+    parent = next((n for n in native if info["parent"] and info["parent"] in (n.get("native_id"), n.get("session_key"))), None)
+    via = (parent.get("title") or parent.get("name")) if parent else None
+    ago = int(now - info["last"][0]) if info["last"] else None
+    out = {"tasks": sorted(info["tasks"]), "focus": {"tasks": sorted(info["tasks"]), "state": "board events"},
+           "parent_name": via, "status_ago_s": ago,
+           "status": ("idle" if info.get("idle") else "active" if ago is not None and ago < 1800 else "quiet"),
+           "transport": {"available": bool(parent), "kind": "parent" if parent else "hook",
+                         "reason": f"messages reach it through {via}" if parent else "no live parent session"},
+           "advice": {"state": "keep" if ago is not None and ago < 3600 else "watch",
+                      "reason": (info["doing"] or f"last board event: {info['last'][1]}") if info["last"] else "no events"}}
+    return out
+
+
+def attention(rows: list[dict]) -> list[dict]:
+    """Sessions on a server that look blocked — what the supervisor should chase."""
+    out = []
+    for r in rows:
+        if r.get("is_summary") or r.get("is_actor"):
+            continue
+        st, ago = str(r.get("status") or "").lower(), r.get("status_ago_s") or 0
+        name = r.get("title") or r.get("name") or r.get("alias") or "?"
+        tasks = r.get("tasks") or []
+        why = None
+        if st.startswith("waiting") and ago >= 600:
+            why = f"waiting for permission {_ago(ago)}"
+        elif st.startswith("stale"):
+            why = f"registry {st}"
+        elif r.get("kind") in ("codex", "muse") and st != "idle" and tasks and ago >= 3600:
+            why = f"{r['kind']} job silent {_ago(ago)} on {', '.join(tasks[:2])}"
+        elif st == "idle" and r.get("kind") not in ("codex", "muse") and tasks and ago >= 3 * 3600:
+            why = f"idle {_ago(ago)} while owning {', '.join(tasks[:2])}"
+        if why and not any(o["name"] == name and o["why"].split(" ")[0] == why.split(" ")[0] for o in out):
+            out.append({"session_key": r.get("session_key") or r.get("native_id"), "name": name, "why": why})
+    return out
+
+
 def _ago(s: float) -> str:
     return f"{int(s // 86400)}d" if s >= 86400 else f"{int(s // 3600)}h" if s >= 3600 else f"{int(s // 60)}m"
 
@@ -495,7 +535,7 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
         for e in mine:
             if e["type"] == "checkin":
                 checkins[e["actor"].get("session_id", "")] = e
-        ledger_sessions = {}
+        ledger_sessions, agent_info = {}, {}
         for e in mine:
             try:
                 at = datetime.fromisoformat(e["occurred_at"]).timestamp()
@@ -503,9 +543,23 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
                 continue
             sid = e["actor"].get("session_id", "")
             kind = e["actor"].get("kind")
-            if now - at <= 2 * 3600 and kind in ("claude", "codex", "muse", "human") and sid:
+            window = 6 * 3600 if kind in ("codex", "muse") else 2 * 3600   # agent jobs run long between events
+            if now - at <= window and kind in ("claude", "codex", "muse", "human") and sid:
                 previous = ledger_sessions.get(sid, (0, "", kind))
                 ledger_sessions[sid] = max(previous[0], at), e["actor"].get("alias", ""), kind
+                info = agent_info.setdefault(sid, {"tasks": set(), "parent": None, "last": None, "doing": None})
+                ent = e.get("entity") or {}
+                if ent.get("kind") == "task" and ent.get("id") and e["type"] not in ("msg", "ack", "receipt"):
+                    info["tasks"].add(ent["id"])
+                info["parent"] = e["actor"].get("parent_session") or info["parent"]
+                if not info["last"] or at >= info["last"][0]:
+                    pl = e.get("payload") or {}
+                    info["last"] = (at, e["type"])
+                    if e["type"] == "report":
+                        info["doing"] = f"reported {pl.get('phase')}" + (f": {pl.get('summary')}" if pl.get("summary") else "")
+                    elif e["type"] == "checkin":
+                        info["doing"] = (pl.get("note") or pl.get("status") or "")[:200] or info["doing"]
+                    info["idle"] = e["type"] == "checkin" and pl.get("status") == "idle"
         owned = [v.entity_id for v in views if (v.fields.get("owner") or "").startswith(f"{h}·")
                  and (v.fields.get("assignment") or {}).get("state") in ("claimed", "legacy")]
         native = []
@@ -558,9 +612,11 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
                           "advice": {"state": "keep" if kind == "human" else "watch",
                                      "reason": "human shell check-in" if kind == "human" else
                                                "registry entry unavailable"}},
-                         **_checkin_view(checkins.get(sid), now))
+                         **{**_checkin_view(checkins.get(sid), now), **_agent_view(agent_info.get(sid), kind, native, now)})
                     for sid, (t, a, kind) in sorted(ledger_sessions.items(), key=lambda kv: -kv[1][0])
-                    if sid not in native_ids and (kind == "human" or not native)][:12]   # registry is authoritative where present
+                    # the Claude registry is authoritative for Claude; Codex/Muse never appear in it, so their
+                    # board events are the only record — always list them
+                    if sid not in native_ids and (kind in ("human", "codex", "muse") or not native)][:24]
         rows = native + fallback
         sup = supervisor(evs, h)
         for row in rows:
@@ -589,7 +645,7 @@ def servers(evs: list[dict], views, cfg, native_sessions: list[dict] | None = No
         local_state = sync_state if h == local_host else None
         sync_error = getattr(local_state, "error", "") if local_state is not None else host_state.get("sync_error", "")
         queue = getattr(local_state, "pending", 0) if local_state is not None else host_state.get("queue", 0)
-        out.append({"id": h, "supervisor": sup,
+        out.append({"id": h, "supervisor": sup, "attention": attention(rows),
                     "last_sync_at": datetime.fromtimestamp(last, timezone.utc).isoformat() if last else None,
                     "last_sync_ago_s": int(now - last) if last else None,
                     "last_activity_at": datetime.fromtimestamp(last_act, timezone.utc).isoformat() if last_act else None,

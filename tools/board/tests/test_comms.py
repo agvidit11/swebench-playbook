@@ -156,3 +156,32 @@ class SupervisorTest(unittest.TestCase):
         self.assertIsNone(comms.supervisor_target(evs, "board-4e", ["h1"], "h1"))
         with self.assertRaises(ValueError):
             comms.supervisor_target(evs, "supervisor:h2", ["h1", "h2"], "h1")
+
+
+class AttentionTest(unittest.TestCase):
+    def test_flags_blocked_sessions(self):
+        from workboard import comms
+        rows = [{"name": "a", "status": "waiting for permission", "status_ago_s": 1200},
+                {"name": "b", "status": "busy", "status_ago_s": 60},
+                {"name": "c", "kind": "codex", "status": "quiet", "status_ago_s": 4000, "tasks": ["t1"]},
+                {"name": "d", "status": "idle", "status_ago_s": 4 * 3600, "tasks": ["t2"]},
+                {"name": "e", "status": "idle", "status_ago_s": 4 * 3600, "tasks": []}]
+        self.assertEqual([f["name"] for f in comms.attention(rows)], ["a", "c", "d"])
+
+
+class AgentRowsTest(unittest.TestCase):
+    def test_codex_actor_listed_beside_registry_sessions(self):
+        import time
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+        from workboard import comms
+        at = datetime.fromtimestamp(time.time() - 600, timezone.utc).isoformat()
+        ev = {"type": "presence", "host_id": "h1", "seq": 1, "occurred_at": at, "recorded_at": at,
+              "entity": {"kind": "task", "id": "t1"}, "payload": {},
+              "actor": {"session_id": "codex:h1:1:2", "alias": "h1·Codex rev", "kind": "codex", "parent_session": "p1"}}
+        native = [{"host": "h1", "native_id": "p1", "session_key": "k1", "name": "agvidit-90", "title": "Lane", "kind": "claude",
+                   "live": True, "status": "busy"}]
+        cfg = SimpleNamespace(servers=[SimpleNamespace(id="h1")])
+        rows = comms.servers([ev], [], cfg, native, [])[0]["sessions"]
+        cx = [r for r in rows if r.get("kind") == "codex"]
+        self.assertEqual((len(cx), cx[0]["tasks"], cx[0]["parent_name"], cx[0]["status"]), (1, ["t1"], "Lane", "active"))

@@ -1472,6 +1472,10 @@ def cmd_supervisor(args, cfg):
         du = shutil.disk_usage(Path.home())
         mine = [v for v in snap.views if (v.fields.get("owner") or "").startswith(f"{host}·")]
         live = [x for x in getattr(snap, "sessions", []) if x.get("host") == host and x.get("live")]
+        servers = comms.servers(snap.events, snap.views, cfg, getattr(snap, "sessions", []),
+                                getattr(snap, "session_diagnostics", []), local_host=host)
+        flagged = next((sv.get("attention") or [] for sv in servers if sv["id"] == host), [])
+        payload["blocked"] = [{"name": f["name"], "why": f["why"]} for f in flagged][:12]
         payload.update(text=" ".join(args.text)[:500], checklist=[c[:160] for c in args.checklist][:12],
                        disk={"path": "~", "used_pct": round(100 * du.used / du.total), "free_gb": round(du.free / 2**30)},
                        sessions=len(live), owned=len(mine))
@@ -1482,6 +1486,8 @@ def cmd_supervisor(args, cfg):
     done = {"claim": f"🛡 you are now the supervisor of {host}", "release": f"🛡 released the supervisor role on {host}",
             "status": f"🛡 status posted for {host} (disk {payload.get('disk', {}).get('used_pct')}% used)"}[args.action]
     print(done + ("" if st.last_push_ok else " (queued)"))
+    for f in payload.get("blocked") or []:
+        print(f"  ⚠ {f['name']}: {f['why']} — chase it (board msg \"{f['name']}\" ...) and post the outcome")
     return 0
 
 
